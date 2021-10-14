@@ -27,8 +27,8 @@ library(plyr)
 colorSet <- RColorBrewer::brewer.pal(8, "Accent")
 
 #load bg image
-fig <- readRDS("bgfig.RDS")
-densMatgeneral <- readRDS("densMatGeneral")
+fig <- readRDS("static/bgfig.RDS")
+densMatgeneral <- readRDS("static/densMatGeneral")
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(# Application title
@@ -92,7 +92,6 @@ ui <- fluidPage(# Application title
 server <- function(input, output, session) {
     session$onSessionEnded(stopApp)
     options(warn = -1)
-    print("hi")
     accPDB <- reactive(input$PDB)
     pdb <- reactive(bio3d::read.pdb(accPDB()))
     
@@ -111,8 +110,6 @@ server <- function(input, output, session) {
     torsubset <- reactive({
       subset(tor(),resn %in% input$AA)
     })
-    print("there")
-
     
     output$chainColors <- renderUI({
         x <- vector('list', length(unique(torsubset()$chain)))

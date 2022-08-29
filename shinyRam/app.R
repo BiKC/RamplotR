@@ -35,7 +35,7 @@ ui <- fluidPage(# Application title
     titlePanel("ShinyRam"),
     tags$head(
         tags$script(src = "https://cdn.rawgit.com/arose/ngl/v0.10.4-1/dist/ngl.js"),
-        
+        tags$script(src="https://cdn.plot.ly/plotly-2.14.0.min.js")
     ),
     # Sidebar with a slider input for number of bins
     fluidPage(fluidRow(
@@ -76,30 +76,35 @@ ui <- fluidPage(# Application title
         stage.removeAllComponents();
         stage.loadFile('rcsb://'+pdbcode, {defaultRepresentation: true});
       });
-    ")
+    "),
+                tags$script(src="custom.js")
+                
             )
             
         )
         ,
         column(8,
                # Output panel
-               mainPanel(withSpinner(
-                   plotlyOutput("ramplot"), type = 6
-               )))
+               mainPanel(
+                   #plotlyOutput("ramplot"), type = 6
+                 tags$div(id="plotly",style="height:800px;width:891px")
+                 
+               ))
     )))
 
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
-    session$onSessionEnded(stopApp)
+  
+    #session$onSessionEnded(stopApp)
     options(warn = -1)
     accPDB <- reactive(input$PDB)
     pdb <- reactive(bio3d::read.pdb(accPDB()))
     
-    reactive(bio3d::write.pdb(pdb = pdb(), file = paste0(accPDB(), '.pdb')))
+    #reactive(bio3d::write.pdb(pdb = pdb(), file = paste0(accPDB(), '.pdb')))
     
     tor <- reactive({
-        x <- torsion.pdb(pdb())
-        tortab <- x[["tbl"]]
+        x <<- torsion.pdb(pdb())
+        tortab <- x[["tbl"]][,c("phi","psi")]
         spltor <-
             strsplit(rownames(tortab), split = ".", fixed = T)
         x <- cbind(tortab,as.data.frame(do.call(rbind,spltor)))
@@ -108,7 +113,8 @@ server <- function(input, output, session) {
     })
     
     torsubset <- reactive({
-      subset(tor(),resn %in% input$AA)
+      sub <- subset(tor(),resn %in% input$AA)
+      session$sendCustomMessage("process", list(df=sub,matrix=densMatgeneral,pdb=accPDB()))
     })
     
     output$chainColors <- renderUI({
@@ -127,8 +133,9 @@ server <- function(input, output, session) {
     })
     
     output$ramplot <- renderPlotly({
+      
+      
         session$sendCustomMessage("updateFig", input$PDB)
-        
         densMat <- densMatgeneral
         fig <-
             plot_ly(
@@ -177,6 +184,7 @@ server <- function(input, output, session) {
             ) 
         counter <- 1
         t <- torsubset()
+        
         for (i in unique(t$chain)) {
             x <- input[[paste0("chain", i)]]
             if (!is.null(x)) {
@@ -208,11 +216,11 @@ server <- function(input, output, session) {
                 ),
                 hoverinfo = 'text'
             )
-            
+
             counter <- counter + 1
-            
+
         }
-        
+
         fig <- fig %>% layout(
             autosize = F,
             width = 891,
@@ -231,7 +239,7 @@ server <- function(input, output, session) {
                 y = -0.065
             )
         )
-        fig
+        fig %>% toWebGL() %>% partial_bundle()
     })
     
     

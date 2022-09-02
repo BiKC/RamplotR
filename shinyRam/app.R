@@ -7,25 +7,20 @@
 #    http://shiny.rstudio.com/
 #
 
+
 #shiny related packages
 library(shiny)
 library(shinycssloaders)
 library(shinyWidgets)
-library(shinyjs)
 library(colourpicker)
 
 #used for pdb files
 library(bio3d)
-library(Rpdb)
-#used for graphs
-library(plotly)
-library(RColorBrewer)
 
 #Used for processing data
 library(plyr)
 
-colorSet <- RColorBrewer::brewer.pal(8, "Accent")
-previousPDB<-""
+colorSet <- c("#7FC97F","#BEAED4","#FDC086","#FFFF99","#386CB0","#F0027F","#BF5B17","#666666")
 
 #load bg image
 fig <- readRDS("static/bgfig.RDS")
@@ -167,16 +162,11 @@ server <- function(input, output, session) {
         if(session$userData$previousPDB!=accPDB){
           incProgress(1 / 4, detail = paste("Fetching sequence"))
           pdb <- bio3d::read.pdb(accPDB)
-          
           incProgress(1 / 4, detail = paste("Transforming data"))
           torsion <- torsion.pdb(pdb)
-          print("step 1")
           tortab <- torsion[["tbl"]][, c("phi", "psi")]
-          print("step 2")
           spltor <- strsplit(rownames(tortab), split = ".", fixed = T)
-          print("step 3")
           torsion <- cbind(tortab, as.data.frame(do.call(rbind, spltor)))
-          print("step 4")
           session$userData$torsion <-
             rename(torsion, c(
               'V1' = "resi",

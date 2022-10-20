@@ -22,7 +22,7 @@ Shiny.addCustomMessageHandler("process",
         matrix = obj['matrix'];
         //transpose matrix.z
         //matrix.z = matrix.z[0].map((_, colIndex) => matrix.z.map(row => row[colIndex]));
-
+        name = obj['name'];
         pdb = obj['pdb'];
         backgroundColors = obj['backgroundColors'];
         chainColors = obj['chainColors'];
@@ -32,7 +32,7 @@ Shiny.addCustomMessageHandler("process",
             chainColors = [chainColors];
         }
 
-        console.log(chainColors);
+        //console.log(chainColors);
         //Transform df from format {chain:[],resi:[],resn[],phi:[],psi:[]} to format {[chain,resi,resn,phi,psi]}
         df["processed"] = df.chain.map(function (d, i) { return [d, df.resi[i], df.resn[i], df.phi[i], df.psi[i]] });
 
@@ -53,7 +53,7 @@ Shiny.addCustomMessageHandler("process",
 
         // contour plot
         // make contours like this:
-        console.log(limits)
+        //console.log(limits)
         var data = [
             // plot the matrix as contours
             {
@@ -150,7 +150,7 @@ Shiny.addCustomMessageHandler("process",
 
 
         var layout = {
-            title: pdb,
+            title: name,
             xaxis: {
                 title: 'Phi Φ (degrees)',
                 range: [-180, 180]

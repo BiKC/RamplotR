@@ -26,18 +26,27 @@ color_set <- c(
   "#386CB0", "#F0027F", "#BF5B17", "#666666"
 )
 
+rampage<-c("#F1EEF6","#BDC9E1","#74A9CF","#0570B0")
+pdbsum<-c("#FEFFB2","#F3F300","#C37800","#F30100")
+
 # load bg image
-fig <- readRDS("static/bgfig.RDS")
-densMatGeneral <- readRDS("static/densMatGeneral")
-#densMatGeneral$z<-t(densMatGeneral$z)
-densMatGly <- readRDS("static/densMatGly")
-#densMatGly$z<-t(densMatGly$z)
+#fig <- readRDS("static/bgfig.RDS")
 
-densMatPrepro <- readRDS("static/densMatprePro")
-#densMatPrepro$z<-t(densMatPrepro$z)
-
-densMatPro <- readRDS("static/densMatPro")
-#densMatPro$z<-t(densMatPro$z)
+# densMatGeneral <- readRDS("shinyRam/static/alphafold/densMatGeneral")
+# densMatGeneral$z<-t(densMatGeneral$z)
+# saveRDS(densMatGeneral,"shinyRam/static/alphafold/densMatGeneral")
+# 
+# densMatGly <- readRDS("shinyRam/static/alphafold/densMatGly")
+# densMatGly$z<-t(densMatGly$z)
+# saveRDS(densMatGly,"shinyRam/static/alphafold/densMatGly")
+# 
+# densMatPrepro <- readRDS("shinyRam/static/alphafold/densMatprePro")
+# densMatPrepro$z<-t(densMatPrepro$z)
+# saveRDS(densMatPrepro,"shinyRam/static/alphafold/densMatPrepro")
+# 
+# densMatPro <- readRDS("shinyRam/static/alphafold/densMatPro")
+# densMatPro$z<-t(densMatPro$z)
+# saveRDS(densMatPro,"shinyRam/static/alphafold/densMatPro")
 
 allAA <- c(
   "ALA",
@@ -74,17 +83,51 @@ ui <- fluidPage(
   fluidPage(fluidRow(
     column(
       4,
-      textInput(
-        inputId = "PDB",
-        label = "PDB-code:",
-        value = "1BBB"
+      fluidRow(
+        column(6,
+          textInput(
+            inputId = "PDB",
+            label = "PDB-code:",
+            value = "1BBB"
+          ),
+          actionButton("submit", "Apply Changes", class = "btn-primary btn-lg")
+        ),
+        column(6,
+          fileInput("structfile",label = "Or upload a custom file")
+        )
       ),
-      actionButton("submit", "Apply Changes", class = "btn-primary btn-lg"),
+      
       hr(),
-      selectInput(
-        "background", "Choose background plot",
-        c("General", "Glycine", "Preproline", "Proline")
+      h4("Background settings"),
+      fluidRow(
+        column(6,selectInput(
+          "bgtype","Reference dataset for background density",
+          c("original","alphafold","alphafold_filtered","astral2.08","custom_high_resolution")
+        )),
+        column(6,selectInput(
+          "background", "Choose background plot",
+          c("General", "Glycine", "Preproline", "Proline")
+        ))
       ),
+      dropdown(
+        list(
+          colourpicker::colourInput("bg1", "Not allowed region",
+                                    value = "#F1EEF6"
+          ),
+          colourpicker::colourInput("bg2", "Generously allowed regions",
+                                    value = "#BDC9E1"
+          ),
+          colourpicker::colourInput("bg3", "Allowed regions",
+                                    value = "#74A9CF"
+          ),
+          colourpicker::colourInput("bg4", "Favoured regions",
+                                    value = "#0570B0"
+          ),
+          selectInput("colorscheme","Default colorscheme", choices = c("Rampage","PDBSum","custom"),selected = "Rampage")
+        ),
+        label = "Background colors"
+      ),
+      hr(),
       pickerInput(
         "AA",
         "Amino acid selection",
@@ -93,27 +136,31 @@ ui <- fluidPage(
         options = list(`actions-box` = TRUE),
         selected = allAA
       ),
+      
       hr(),
-      dropdown(
-        list(
-          colourpicker::colourInput("bg1", "Not allowed region",
-            value = "#f1eef6"
-          ),
-          colourpicker::colourInput("bg2", "Generously allowed regions",
-            value = "#bdc9e1"
-          ),
-          colourpicker::colourInput("bg3", "Allowed regions",
-            value = "#74a9cf"
-          ),
-          colourpicker::colourInput("bg4", "Favoured regions",
-            value = "#0570b0"
-          )
-        ),
-        label = "Background density settings"
-      ),
-      hr(),
+      tags$label("Chain colors",class="control-label"),
       uiOutput("chainColors"),
       hr(),
+      h4("3D view options"),
+      fluidRow(
+        column(4,
+               checkboxInput("ligands",label = "Show ligands"),
+        ),
+        column(4,
+               checkboxInput("dna",label = "Show DNA"),
+        ),
+        column(4,
+               checkboxInput("rna",label = "Show RNA"),
+        )
+      ),
+      fluidRow(
+        column(4,
+               checkboxInput("spinning",label = "Spinning"),
+        ),
+        column(4,
+               checkboxInput("rocking",label = "Rocking",value=T),
+        )
+      ),
       fluidRow(
         NGLVieweR::NGLVieweROutput("NGL"),
         # tags$div(id = "viewport", style = "width:600px; height:600px;"),
@@ -155,7 +202,6 @@ server <- function(input, output, session) {
   # session$onSessionEnded(stopApp)
   options(warn = -1)
   session$userData$previousPDB <- ""
-  session$userData$background <- ""
   # reactive(bio3d::write.pdb(pdb = pdb(), file = paste0(accPDB(), '.pdb')))
 
   searchlimit <- function(matrix, percentage, x = 1) {
@@ -174,20 +220,131 @@ server <- function(input, output, session) {
   densityToPercent <- function(matrix, x) {
     100 * sum(matrix$z[matrix$z > x]) / sum(matrix$z)
   }
+  
+  observeEvent(input$ligands,{
+    if(input$ligands){
+      NGLVieweR_proxy("NGL")%>%addSelection(type = "ball+stick", param=list(name="ligand",sele= "ligand"))
+    }else{
+      NGLVieweR_proxy("NGL")%>%removeSelection("ligand")
+    }
+  })
+  
+  observeEvent(input$dna,{
+    if(input$dna){
+      NGLVieweR_proxy("NGL")%>%addSelection(type = "cartoon", param=list(name="dna",sele= "dna"))
+    }else{
+      NGLVieweR_proxy("NGL")%>%removeSelection("dna")
+    }
+  })
+  
+  observeEvent(input$rna,{
+    if(input$rna){
+      NGLVieweR_proxy("NGL")%>%addSelection(type = "cartoon", param=list(name="rna",sele= "rna"))
+    }else{
+      NGLVieweR_proxy("NGL")%>%removeSelection("rna")
+    }
+  })
+  observeEvent(input$rocking,{
+    if(input$rocking){
+      NGLVieweR_proxy("NGL")%>%updateRock()
+      if(input$spinning==T){
+        updateCheckboxInput(session,"spinning",value = F)
+      }
+    }else{
+      NGLVieweR_proxy("NGL")%>%updateRock(rock = F)
+      
+    }
+  })
+  observeEvent(input$spinning,{
+    if(input$spinning){
+      NGLVieweR_proxy("NGL")%>%updateSpin()
+      if(input$rocking==T){
+        updateCheckboxInput(session,"rocking",value = F)
+      }
+    }else{
+      NGLVieweR_proxy("NGL")%>%updateSpin(spin = F)
+    }
+  })
+  
+  updateColorInputs <- function(colors){
+    updateColourInput(session, "bg1", value=colors[1])
+    updateColourInput(session, "bg2", value=colors[2])
+    updateColourInput(session, "bg3", value=colors[3])
+    updateColourInput(session, "bg4", value=colors[4])
+  }
+  
+  observeEvent(input$bgtype,
+               {
+                 files<-list.files(paste0("static/",input$bgtype))
+                 choices=list("Commonly used"=files[!files %in% allAA],
+                              "Per amino acid"=files[files %in% allAA])
+                 if (input$background %in% files) {sel=input$background}
+                 else {sel=choices[1]}
+                 updateSelectInput(session,"background",choices = choices, selected = sel)
+               })
+  
+  observeEvent(input$colorscheme,{
+    if (input$colorscheme =="Rampage"){
+      updateColorInputs(rampage)
+    }
+    else if (input$colorscheme =="PDBSum"){
+      updateColorInputs(pdbsum)
+      
+    }
+  })
+  
+  observeEvent(input$background,{
+    if (input$background %in% allAA){
+      updatePickerInput(session,"AA",selected = input$background)
+    }
+  })
+  
+  observeEvent({input$bg1
+    input$bg2
+    input$bg3
+    input$bg4},
+    {
+      colors<-c(input$bg1,input$bg2,input$bg3,input$bg4)
+      #print(colors == rampage)
+      if (all(colors == rampage)){
+        updateSelectInput(session, "colorscheme",selected = "Rampage")
+        
+      }
+      else if (all(colors == pdbsum)){
+        updateSelectInput(session, "colorscheme",selected = "PDBSum")
+        
+      } else {
+        updateSelectInput(session, "colorscheme",selected = "custom")
+      }
+    })
 
   output$dummy <- reactive({
     input$submit
     withProgress(message = "Making plot", value = 0, {
+      inputType<-""
       isolate({
-        accPDB <- input$PDB
+        if (is.null(input$structfile$datapath)){
+          inputType<-"code"
+          accPDB <- input$PDB
+        }
+        else {
+          inputType<-"file"
+          accPDB <- input$structfile$datapath
+        }
         if (session$userData$previousPDB != accPDB) {
+          #print("yup")
           incProgress(1 / 4, detail = paste("Fetching sequence"))
-          pdb <- tryCatch(expr = {
-            bio3d::read.cif(accPDB)
-          }, error = function(e) {
-            print(e)
-            bio3d::read.pdb(accPDB)
-          })
+          if (inputType=="file") {
+            pdb<-bio3d::read.pdb(accPDB)
+          }
+          else {
+            pdb <- tryCatch(expr = {
+              bio3d::read.cif(accPDB)
+            }, error = function(e) {
+              #print(e)
+              bio3d::read.pdb(accPDB)
+            })
+          }
           incProgress(1 / 4, detail = paste("Transforming data"))
           torsion <- torsion.pdb(pdb)
           tortab <- torsion[["tbl"]][, c("phi", "psi")]
@@ -199,16 +356,29 @@ server <- function(input, output, session) {
               "V2" = "chain",
               "V3" = "resn"
             ))
+          
+          chains<-unique(session$userData$torsion$chain)
+
+          nglview<-NGLVieweR(data = accPDB)%>%setRock()
+          counter=1
+          for (i in unique(chains)) {
+            #print(i)
+            nglview<-addRepresentation(NGLVieweR = nglview,type = "cartoon", param=list("sele"= paste0(":", i,"  and protein"), "color"= color_set[((counter - 1) %% length(color_set)) + 1]))
+            counter=counter+1
+          }
+          output$NGL <- NGLVieweR::renderNGLVieweR(nglview)
+          
           output$chainColors <- renderUI({
             isolate({
-              x <- vector("list", length(unique(torsionsubset$chain)))
+              x <- vector("list", length(chains))
               c <- 1
-              for (i in unique(torsionsubset$chain)) {
+              for (i in chains) {
+                col<-color_set[((c - 1) %% length(color_set)) + 1]
                 x[[i]] <-
                   list(colourpicker::colourInput(
                     paste0("chain", i),
                     label = paste("Chain", i),
-                    value = color_set[((c - 1) %% length(color_set)) + 1]
+                    value = col
                   ))
                 c <- c + 1
               }
@@ -216,31 +386,16 @@ server <- function(input, output, session) {
               dropdown(x, label = "Chain color settings")
             })
           })
+          
+          
+          
           session$userData$previousPDB <- accPDB
           incProgress(1 / 4, detail = paste("Filter data"))
         } else {
           incProgress(3 / 4, detail = paste("Filter data"))
         }
-        AAselection <- input$AA
-        if (session$userData$background != input$background) {
-          session$userData$background <- input$background
-          updatePickerInput(session, "AA",
-            selected =
-              AAselection <- allAA
-          )
-        }
-
-        if (input$background == "General") {
-          matrix <- densMatGeneral
-          torsionsubset <- session$userData$torsion
-          torsionsubset <- subset(torsionsubset, resn %in% AAselection)
-        } else if (input$background == "Glycine") {
-          matrix <- densMatGly
-          # update input$AA to only include glycine
-          updatePickerInput(session, "AA", selected = c("GLY"))
-          torsionsubset <- subset(session$userData$torsion, resn == "GLY")
-        } else if (input$background == "Preproline") {
-          matrix <- densMatPrepro
+        if (input$background == "preProline"){
+          matrix <- readRDS(paste0("static/",input$bgtype,"/preProline"))
           # get a subset of only those amino acids that precede a proline
           torsionsubset <- data.frame()
           for (i in 1:length(session$userData$torsion$resn) - 1) {
@@ -248,15 +403,19 @@ server <- function(input, output, session) {
               torsionsubset <- rbind(torsionsubset, session$userData$torsion[i, ])
             }
           }
-          torsionsubset <- subset(torsionsubset, resn %in% AAselection)
-        } else if (input$background == "Proline") {
-          matrix <- densMatPro
-          updatePickerInput(session, "AA", selected = c("PRO"))
-          torsionsubset <- subset(session$userData$torsion, resn == "PRO")
+          torsionsubset <- subset(torsionsubset, resn %in% input$AA)
+        }
+        else if (!input$background %in% allAA) {
+          matrix <- readRDS(paste0("static/",input$bgtype,"/General"))
+          torsionsubset <- session$userData$torsion
+          torsionsubset <- subset(torsionsubset, resn %in% input$AA)
+        } else {
+          matrix <- readRDS(paste0("static/",input$bgtype,"/",input$background))
+          #updatePickerInput(session, "AA", selected = input$background)
+          torsionsubset <- subset(session$userData$torsion, resn %in% input$AA)
         }
         incProgress(1 / 4, detail = paste("Creating plot"))
         # session$sendCustomMessage("updateFig", input$PDB)
-        output$NGL <- NGLVieweR::renderNGLVieweR(NGLVieweR(data = input$PDB) %>% addRepresentation("cartoon"))
         # get input chain colors from ui
         chain_colors <- vector("list", length(unique(torsionsubset$chain)))
         for (i in unique(torsionsubset$chain)) {
@@ -316,12 +475,14 @@ server <- function(input, output, session) {
           ttabsub <- ttabsub[, c("resi", "chain", "resn", "phi", "psi", "density")]
           ttabsub
         })
+        name<-ifelse(inputType=="file",tools::file_path_sans_ext(basename(input$structfile$name)),accPDB)
 
         session$sendCustomMessage(
           "process",
           list(
             df = torsionsubset,
             matrix = matrix,
+            name=name,
             pdb = accPDB,
             backgroundColors = c(input$bg1, input$bg2, input$bg3, input$bg4),
             # get the colors from the chain ui color settings and add them to a vector

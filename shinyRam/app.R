@@ -353,17 +353,45 @@ server <- function(input, output, session) {
             })
           }
           incProgress(1 / 4, detail = paste("Transforming data"))
-          torsion <- torsion.pdb(pdb)
-          tortab <- torsion[["tbl"]][, c("phi", "psi")]
-          spltor <- strsplit(rownames(tortab), split = ".", fixed = T)
-          torsion <- cbind(tortab, as.data.frame(do.call(rbind, spltor)))
-          session$userData$torsion <-
-            rename(torsion, c(
-              "V1" = "resi",
-              "V2" = "chain",
-              "V3" = "resn"
-            ))
-          
+          pdb<<-pdb
+          # Get the list of unique chains
+          chains <- unique(pdb$atom[,"chain"])
+
+          # Initialize an empty data frame to store the results
+          torsion <- data.frame()
+
+          # Loop over each chain
+          for (chain in chains) {
+
+            print(chain)
+            # Subset the pdb data for the current chain
+            pdb_chain <- trim.pdb(pdb, chain = chain)
+            # Identify the residue numbers that correspond to the residue names in allAA
+            resno_allAA <- unique(pdb_chain$atom[pdb_chain$atom[,"resid"] %in% allAA, "resno"])
+
+            # Subset the pdb_chain object to only include those residue numbers
+            pdb_chain <- trim.pdb(pdb_chain, resno = resno_allAA)
+            
+            # if there is no data for the current chain, skip it
+            if (nrow(pdb_chain$atom) == 0) {
+              next
+            }
+            # Calculate the torsion angles for the current chain
+            torsion_chain <- torsion.pdb(pdb_chain)
+            
+            # Add the chain information to the torsion angles data frame
+            tortab_chain <- torsion_chain[["tbl"]][, c("phi", "psi")]
+            spltor_chain <- strsplit(rownames(tortab_chain), split = ".", fixed = T)
+            torsion_chain <- cbind(tortab_chain, as.data.frame(do.call(rbind, spltor_chain)))
+            torsion_chain <- rename(torsion_chain, c("V1" = "resi", "V2" = "chain", "V3" = "resn"))
+            
+            # Combine the results row wise
+            torsion <- rbind(torsion, torsion_chain)
+          }
+          print(torsion)
+          # Store the results in the user data
+          session$userData$torsion <- torsion
+
           chains<-unique(session$userData$torsion$chain)
 
           nglview<-NGLVieweR(data = accPDB)%>%setRock()

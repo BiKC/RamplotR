@@ -193,8 +193,12 @@ ui <- fluidPage(
           tabPanel("Ramachandran plot", tags$div(id = "plotly", style = "height:800px;width:891px")),
           tabPanel(
             "Residues list",
-            selectInput("regionselect", "Show residues for region", c("Not allowed", "Generously allowed", "Allowed", "Favoured")),
+            selectInput("regionselect", "Show residues for region", c("Not allowed", "Generously allowed", "Allowed", "Favoured", "All")),
             dataTableOutput("regions")
+          ),
+          tabPanel(
+            "Summary statistics",
+            htmlOutput("summary")
           )
         )
       )
@@ -453,15 +457,30 @@ server <- function(input, output, session) {
             }
           }
           torsionsubset <- subset(torsionsubset, resn %in% input$AA)
+          # also subset for chains
+          # since chainselection is added as uiOutput, it is not available in the beginning, so check if it exists, otherwise subset for all chains
+          if (!is.null(input$chainselection)) {
+            torsionsubset <- subset(torsionsubset, chain %in% input$chainselection)
+          }
+          
         }
         else if (!input$background %in% allAA) {
           matrix <- readRDS(paste0("static/",input$bgtype,"/General"))
           torsionsubset <- session$userData$torsion
           torsionsubset <- subset(torsionsubset, resn %in% input$AA)
+          # also subset for chains
+          if (!is.null(input$chainselection)) {
+            torsionsubset <- subset(torsionsubset, chain %in% input$chainselection)
+          }
         } else {
           matrix <- readRDS(paste0("static/",input$bgtype,"/",input$background))
           #updatePickerInput(session, "AA", selected = input$background)
           torsionsubset <- subset(session$userData$torsion, resn %in% input$AA)
+          # also subset for chains
+          print(input$chainselection)
+          if (!is.null(input$chainselection)) {
+            torsionsubset <- subset(torsionsubset, chain %in% input$chainselection)
+          }
         }
         incProgress(1 / 4, detail = paste("Creating plot"))
         # session$sendCustomMessage("updateFig", input$PDB)

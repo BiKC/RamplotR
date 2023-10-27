@@ -539,10 +539,108 @@ server <- function(input, output, session) {
         output$regions <- renderDataTable({
 
           # filter the data frame to only include the amino acids that are in the selected region
-          ttabsub <- subset(ttab(), region == input$regionselect)
-          ttabsub <- ttabsub[, c("resi", "chain", "resn", "phi", "psi", "density")]
+          if (input$regionselect == "All") {
+            ttabsub <- ttab()
+          } else {
+            ttabsub <- subset(ttab(), region == input$regionselect)
+            ttabsub <- ttabsub[, c("resi", "chain", "resn", "phi", "psi", "density")]
+          }
+          # also filter for the selected amino acids (input$AA) and chains (input$chainselection)
+          ttabsub <- subset(ttabsub, resn %in% input$AA)
+          if (!is.null(input$chainselection)) {
+            ttabsub <- subset(ttabsub, chain %in% input$chainselection)
+          }
           ttabsub
         })
+
+        
+          # display statistics for the regions:
+          # for the following, we do not include glycine and proline
+          # Favoured regions (no. of residues, %)
+          # Allowed regions (no. of residues, %)
+          # Generously allowed regions (no. of residues, %)
+          # Not allowed regions (no. of residues, %)
+          # Total no. of residues (no. of residues, %)
+          # --------------------------
+          # End-residues (Excl. Gly and Pro)
+          # --------------------------
+          # Glycine residues (no. of residues)
+          # Proline residues (no. of residues)
+          # --------------------------
+          # Total no. of residues (no. of residues)
+
+          # define a function to negate the %in% operator
+          `%nin%` <- Negate(`%in%`)
+          # exclude glycine and proline
+          exclude <- c("GLY", "PRO")
+          
+          # get the number of end-residues
+          # end-residues are the residues that are at the beginning or end of a chain, so they don't have a region (na) and they are not glycine or proline
+          ttabsub2 <- ttab()
+          ttabsub2 <- ttabsub2[is.na(ttabsub2$region), ]
+          print(ttabsub2)
+          end_count <- nrow(subset(ttabsub2, resn %nin% exclude & resn %in% allAA))
+
+          # get the number of residues for each region
+          # for the following, we do not include glycine and proline
+          count_no_gly_pro <- nrow(subset(ttab(), resn %nin% exclude & resn %in% allAA)) - end_count
+          fr_count <- nrow(subset(ttab(), region == "Favoured" & resn %nin% exclude & resn %in% allAA))
+          fr_percent <- round(100 * fr_count / count_no_gly_pro, 2) # round to 2 decimals
+          ar_count <- nrow(subset(ttab(), region == "Allowed" & resn %nin% exclude & resn %in% allAA))
+          ar_percent <- round(100 * ar_count / count_no_gly_pro, 2)
+          gar_count <- nrow(subset(ttab(), region == "Generously allowed" & resn %nin% exclude & resn %in% allAA))
+          gar_percent <- round(100 * gar_count / count_no_gly_pro, 2)
+          nar_count <- nrow(subset(ttab(), region == "Not allowed" & resn %nin% exclude & resn %in% allAA))
+          nar_percent <- round(100 * nar_count / count_no_gly_pro, 2)
+          total_count <- count_no_gly_pro
+          total_percent <- round(100 * total_count / count_no_gly_pro, 2)
+
+          
+          # exclude glycine and proline
+          ttabsub2 <- subset(ttabsub2, resn %nin% exclude & resn %in% allAA)
+          end_count <- nrow(ttabsub2)
+          # get the number of glycine and proline residues
+          gly_count <- nrow(subset(ttab(), resn == "GLY"))
+          pro_count <- nrow(subset(ttab(), resn == "PRO"))
+          # get the total number of residues
+          total_count2 <- nrow(subset(ttab(), resn %in% allAA))
+
+          # create html output to display the statistics
+        
+            output$summary <- renderUI({
+  HTML(paste0(
+    "<div style='font-size:16px; line-height:1.6;'>",
+    "<p><b>Statistics for the regions:</b></p>",
+    "<table>",
+    "<tr><th style='padding: 0 1em;'>Region</th><th style='padding: 0 1em;'>No. of residues</th><th style='padding: 0 1em;'>%</th></tr>",
+    "<tr><td style='padding: 0 1em;'>Favoured regions:</td><td style='padding: 0 1em;'>", fr_count, "</td><td style='padding: 0 1em;'>(", fr_percent, "%)</td></tr>",
+    "<tr><td style='padding: 0 1em;'>Allowed regions:</td><td style='padding: 0 1em;'>", ar_count, "</td><td style='padding: 0 1em;'>(", ar_percent, "%)</td></tr>",
+    "<tr><td style='padding: 0 1em;'>Generously allowed regions:</td><td style='padding: 0 1em;'>", gar_count, "</td><td style='padding: 0 1em;'>(", gar_percent, "%)</td></tr>",
+    "<tr><td style='padding: 0 1em;'>Not allowed regions:</td><td style='padding: 0 1em;'>", nar_count, "</td><td style='padding: 0 1em;'>(", nar_percent, "%)</td></tr>",
+    "<tr><td style='padding: 0 1em;'>Non-glycine and non-proline residues:</td><td style='padding: 0 1em;'>", total_count, "</td><td style='padding: 0 1em;'>(", total_percent, "%)</td></tr>",
+    "</table>",
+    "<hr>",
+    "<p><b>End-residues (Excl. Gly and Pro)</b></p>",
+    "<table>",
+    "<tr><td style='padding: 0 1em;'>Total no. of end-residues:</td><td style='padding: 0 1em;'>", end_count, "</td></tr>",
+    "</table>",
+    "<hr>",
+    "<p><b>Glycine and proline residues</b></p>",
+    "<table>",
+    "<tr><td style='padding: 0 1em;'>Glycine residues:</td><td style='padding: 0 1em;'>", gly_count, "</td></tr>",
+    "<tr><td style='padding: 0 1em;'>Proline residues:</td><td style='padding: 0 1em;'>", pro_count, "</td></tr>",
+    "</table>",
+    "<hr>",
+    "<p><b>Total no. of residues</b></p>",
+    "<table>",
+    "<tr><td style='padding: 0 1em;'>Total no. of residues:</td><td style='padding: 0 1em;'>", total_count2, "</td></tr>",
+    "</table>",
+    "</div>"
+  ))
+})
+
+
+
         name<-ifelse(inputType=="file",tools::file_path_sans_ext(basename(input$structfile$name)),accPDB)
 
         session$sendCustomMessage(

@@ -128,13 +128,20 @@ ui <- fluidPage(
         label = "Background colors"
       ),
       hr(),
-      pickerInput(
-        "AA",
-        "Amino acid selection",
-        allAA,
-        multiple = T,
-        options = list(`actions-box` = TRUE),
-        selected = allAA
+      fluidRow(
+        column(6,
+          pickerInput(
+            "AA",
+            "Amino acid selection",
+            allAA,
+            multiple = T,
+            options = list(`actions-box` = TRUE),
+            selected = allAA
+          )
+        ),
+        column(6,
+          uiOutput("chains")
+        )
       ),
       
       hr(),
@@ -384,6 +391,20 @@ server <- function(input, output, session) {
               }
 
               dropdown(x, label = "Chain color settings")
+            })
+          })
+
+          output$chains <- renderUI({
+            # pickerInput
+            isolate({
+              pickerInput(
+                "chainselection",
+                "Chain selection",
+                choices = chains,
+                multiple = T,
+                options = list(`actions-box` = TRUE),
+                selected = chains
+              )
             })
           })
           

@@ -74,7 +74,7 @@ allAA <- c(
 # Define UI for application that draws a histogram
 ui <- fluidPage(
   # Application title
-  titlePanel("ShinyRam"),
+  titlePanel("RamplotR"),
   tags$head(
     tags$script(src = "https://cdn.rawgit.com/arose/ngl/v0.10.4-1/dist/ngl.js"),
     tags$script(src = "https://cdn.plot.ly/plotly-2.14.0.min.js")

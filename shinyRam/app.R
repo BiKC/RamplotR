@@ -182,6 +182,7 @@ ui <- fluidPage(
               c("Residue-aware (recommended)" = "residue",
                 "Selected background (legacy)" = "legacy")
             ),
+            uiOutput("modelControl"),
             selectInput(
               "bgtype", "Reference dataset",
               c("original", "alphafold", "alphafold_filtered",
@@ -407,6 +408,19 @@ server <- function(input, output, session) {
   loaded <- reactiveVal(NULL)
   selected_residue <- reactiveVal(NULL)
   viewer_ready <- reactiveVal(FALSE)
+  current_model <- reactive({
+    value <- input$modelChoice
+    if (is.null(value) || !nzchar(value)) return(1L)
+    suppressWarnings(as.integer(value))
+  })
+  output$modelControl <- renderUI({
+    data <- req(loaded())
+    if (data$nmodels <= 1L) return(NULL)
+    selectInput("modelChoice", "Structural model",
+      choices = stats::setNames(as.character(seq_len(data$nmodels)),
+        paste("Model", seq_len(data$nmodels))),
+      selected = "1")
+  })
 
   default_color <- function(index) color_set[((index - 1L) %% length(color_set)) + 1L]
   residue_key <- function(chain, resi, insertion_code = "") {
@@ -498,7 +512,7 @@ server <- function(input, output, session) {
       )
       if (is.null(pdb)) return()
       incProgress(0.5, detail = "Calculating backbone geometry")
-      torsions <- tryCatch(ram_extract_torsions(pdb),
+      torsions <- tryCatch(ram_extract_torsions(ram_model_at(pdb, 1L)),
         error = function(e) {
           showNotification(conditionMessage(e), type = "error", duration = 12)
           NULL
@@ -552,7 +566,9 @@ server <- function(input, output, session) {
           selected = chains
         )
       })
-      loaded(list(key = key, name = name, torsions = torsions, chains = chains))
+      loaded(list(key = key, name = name, torsions = torsions, chains = chains,
+                  pdb = pdb, nmodels = ram_model_count(pdb), source_id = source_id,
+                  viewer_format = viewer_format))
       updateSelectInput(session, "sequenceChain",
                         choices = chains, selected = chains[[1L]])
       incProgress(0.25, detail = "Preparing interactive views")
@@ -566,11 +582,18 @@ server <- function(input, output, session) {
       if (choice %in% allAA) choice else "General"
     ram_read_reference(file.path("static", input$bgtype, refname))
   })
-  classified <- reactive({
+  model_torsions <- reactive({
     data <- req(loaded())
-    req(input$validationMode, input$bgtype)
+    model <- current_model()
+    if (length(model) != 1L || is.na(model) || model < 1L ||
+        model > data$nmodels) return(data$torsions)
+    if (model == 1L) return(data$torsions)
+    ram_extract_torsions(ram_model_at(data$pdb, model))
+  })
+  classified <- reactive({
+    req(loaded(), input$validationMode, input$bgtype)
     ram_classify_torsions(
-      data$torsions,
+      model_torsions(),
       reference_dir = file.path("static", input$bgtype),
       selected_reference = plot_reference(),
       mode = input$validationMode,
@@ -689,7 +712,7 @@ server <- function(input, output, session) {
         else "General")
       provenance <- ram_report_metadata(
         structure$name, input$bgtype, input$background,
-        input$validationMode, 1L, reference_file
+        input$validationMode, current_model(), reference_file
       )
       ram_save_html_report(file, data, provenance, image)
     }
@@ -930,10 +953,14 @@ server <- function(input, output, session) {
       resn = as.character(row$resn[[1L]]),
       region = as.character(row$region[[1L]]),
       phi = as.numeric(row$phi[[1L]]),
-      psi = as.numeric(row$psi[[1L]])
+      psi = as.numeric(row$psi[[1L]]),
+      modelIndex = current_model(),
+      multipleModels = isolate(loaded())$nmodels > 1L
     ))
     if (!is.null(isolate(loaded())) && isTRUE(viewer_ready())) {
       sele <- if (is.null(row)) "none" else selection_string(row)
+      if (!is.null(row) && isolate(loaded())$nmodels > 1L)
+        sele <- paste0(sele, " and /", current_model() - 1L)
       NGLVieweR_proxy("NGL") %>% updateSelection(
         name = "ram-highlight", sele = sele)
     }
@@ -958,6 +985,10 @@ server <- function(input, output, session) {
     data <- req(loaded())
     req(viewer_ready(), input$nglRepresentation)
     style <- input$nglRepresentation
+    model <- current_model()
+    if (is.na(model)) model <- 1L
+    suffix <- if (data$nmodels > 1L)
+      paste0(" and /", model - 1L) else ""
     if (!style %in% c("cartoon", "ribbon", "licorice", "ball+stick", "surface"))
       return()
     colors <- isolate(current_chain_colors())
@@ -967,7 +998,7 @@ server <- function(input, output, session) {
       proxy <- NGLVieweR_proxy("NGL")
       proxy %>% removeSelection(name)
       proxy %>% addSelection(style, param = list(
-        name = name, sele = paste0(":", chain, " and protein"),
+        name = name, sele = paste0(":", chain, " and protein", suffix),
         color = colors[[k]],
         opacity = if (identical(style, "surface")) 0.8 else 1
       ))

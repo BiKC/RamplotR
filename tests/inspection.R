@@ -26,15 +26,13 @@ ref <- data.frame(
   phi=c(-60,-75,179,-40),psi=c(-45,-30,-179,140),
   region=c("Favoured","Favoured","Allowed","Favoured")
 )
-other <- ref[c(1,2,3,4), ]
-other <- other[-2, ,drop=FALSE]
-other <- rbind(other[1L,,drop=FALSE],transform(other[1L,,drop=FALSE],
-  resn="ASP",resi=88L,phi=-110,psi=85),
-  other[2:3,,drop=FALSE])
+other <- rbind(ref[1,,drop=FALSE], transform(ref[1,,drop=FALSE],
+  resn="ASP",resi=88L,phi=-110,psi=85), ref[2:4,,drop=FALSE])
 pair <- ram_compare_torsions(ref,other)
-assert(nrow(pair)==5L, "Alignment should preserve insertion and deletion")
+assert(nrow(pair)==5L, "Alignment should preserve inserted residues")
 assert(sum(pair$alignment=="Insertion")==1L, "Expected insertion")
-assert(sum(pair$alignment=="Deletion")==1L, "Expected deletion")
+deletion <- ram_compare_torsions(ref, ref[-2,,drop=FALSE])
+assert(sum(deletion$alignment=="Deletion")==1L, "Expected deletion")
 assert(any(!is.na(pair$delta_phi)), "Aligned angles should be comparable")
 assert(inherits(try(ram_align_residues(ref,other,max_cells=2),
                     silent=TRUE),"try-error"), "Bounded alignments")

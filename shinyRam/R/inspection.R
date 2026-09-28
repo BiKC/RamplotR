@@ -58,7 +58,10 @@ ram_align_residues <- function(a, b, max_cells = 4e6) {
   n <- nrow(a); m <- nrow(b)
   if (n * m > max_cells)
     stop("Comparison exceeds the sequence-alignment size limit; select shorter chains.")
-  if (!n || !m) return(data.frame(index_a=integer(), index_b=integer()))
+  if (!n || !m) return(data.frame(
+    index_a = if (n) seq_len(n) else rep(NA_integer_, m),
+    index_b = if (m) seq_len(m) else rep(NA_integer_, n)
+  ))
   symbols_a <- unname(ram_amino_acid_letters[a$resn])
   symbols_b <- unname(ram_amino_acid_letters[b$resn])
   symbols_a[is.na(symbols_a)] <- "X"

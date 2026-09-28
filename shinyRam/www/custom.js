@@ -90,6 +90,10 @@
     const shades = array(obj && obj.backgroundColors);
     if (!frame || !frame.x || !frame.y || !frame.z || limits.length < 3) return;
 
+    // The plot container starts hidden while empty. Measure its actual width
+    // only after showing it, otherwise the first Plotly layout becomes tiny.
+    plot.style.display = "block";
+
     const background = [
       safeColor(shades[0], "#F1EEF6"),
       safeColor(shades[1], "#BDC9E1"),
@@ -217,7 +221,6 @@
       }
     };
 
-    plot.style.display = "block";
     if (empty) empty.hidden = true;
     if (currentStructure) {
       currentStructure.textContent =

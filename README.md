@@ -1,102 +1,102 @@
 # RamplotR
 
-RamplotR is an R Shiny application for interactive Ramachandran plots of protein structures. It includes residue and chain filters, multiple reference-density datasets, regional statistics, an optional residue-aware classification and a 3D molecular viewer.
+**Interactive protein-structure inspection and Ramachandran analysis, from experimental structures to AlphaFold and ESMFold predictions.**
 
-## Historical published version
+RamplotR is an open-source R Shiny application that brings backbone geometry, a 3D molecular viewer, residue-level validation and prediction confidence into one linked workspace. Click a residue in the plot, sequence, table or structure to inspect it everywhere. Compare conformations, examine multi-model ensembles and export figures or reproducible reports.
 
-The tagged version [v0.1.0-legacy](https://github.com/BiKC/RamplotR/releases/tag/v0.1.0-legacy) preserves the implementation available before the 2026 scientific corrections. Use this tag to reproduce analysis performed with the earlier application. New scientific behaviour and reference classifications may differ and should be recorded in subsequent analyses.
+![RamplotR showing a Ramachandran plot, molecular structure and linked sequence navigator](docs/screenshots/overview.png)
 
-## Usage
+*RamplotR's default publication palette. Example: PDB [1CRN](https://www.rcsb.org/structure/1CRN). [More screenshots](#screenshots).*
 
-The original app has been hosted at https://bioit.shinyapps.io/RamplotR/. The hosted deployment may not match the current repository.
+[**Get started**](#get-started) · [**Explore the features**](#what-you-can-do) · [**Scientific interpretation**](#scientific-interpretation) · [**Documentation**](#documentation)
 
-To run this repository locally, install a current R 4.x and the following CRAN packages:
+## What you can do
+
+| Workflow | Capabilities |
+| --- | --- |
+| **Explore a structure** | Interactive φ/ψ plots with several reference-density datasets, residue-aware classification and instant amino-acid/chain filtering. |
+| **Inspect residues in context** | Synchronized Ramachandran plot, searchable residue table, all-chain sequence navigator and NGL 3D viewer. Selected residues are highlighted and brought into focus; an issue queue helps navigate outliers and missing angles. |
+| **Work with predicted models** | Import AlphaFold DB models by UniProt accession or upload AlphaFold 2/3, ColabFold and ESMFold structures. Examine pLDDT, and view a linked PAE heatmap when compatible confidence data are available. |
+| **Examine structural geometry** | Explore peptide ω, side-chain χ1 and descriptive Cβ measurements. Optionally attach the matching deposited structure's official wwPDB validation report for independent rotamer, clash and geometry annotations. |
+| **Inspect experimental evidence** | Overlay a local CCP4/MRC cryo-EM map in the 3D viewer as a qualitative aid, without uploading the map to a separate service. |
+| **Compare models** | Sequence-align chains from two structures; inspect wrapped angular differences and changes in classification. For compatible multi-model structures, calculate circular φ/ψ variability and classification consistency. |
+| **Publish or automate** | Export SVG and high-resolution PNG figures, filtered CSV tables and standalone HTML reports. Run the offline R command-line tool on individual files or a directory of structures. |
+
+Advanced analysis stays in collapsible panels or dedicated comparison/summary views, keeping the everyday 2D/3D inspection screen uncluttered.
+
+## Screenshots
+
+All images below are taken from [real browser tests](docs/screenshots/README.md). The prediction-confidence example uses **synthetic test data** to demonstrate the interface, not a biological result.
+
+| Linked residue inspection | All-chain sequence navigator |
+| :---: | :---: |
+| <img src="docs/screenshots/residue-inspection.png" alt="A selected residue highlighted on the Ramachandran plot and in 3D" width="520"> | <img src="docs/screenshots/all-chains.png" alt="Expandable sequence tracks for four chains of 1BBB" width="420"> |
+| **Prediction confidence and PAE** | **Multi-model ensemble analysis** |
+| <img src="docs/screenshots/prediction-pae.png" alt="Synthetic AlphaFold-style PAE heatmap linked to the structure viewer" width="520"> | <img src="docs/screenshots/ensemble.png" alt="Circular angle and classification consistency analysis of NMR models" width="520"> |
+
+## Get started
+
+### Run the interactive app
+
+Install [R](https://www.r-project.org/) (a current R 4.x release), clone the repository and start the Shiny application:
+
+```bash
+git clone https://github.com/BiKC/RamplotR.git
+cd RamplotR
+```
 
 ```r
-install.packages(c("shiny", "shinyWidgets", "colourpicker", "bio3d", "NGLVieweR", "DT", "jsonlite"))
+install.packages(c(
+  "shiny", "shinyWidgets", "colourpicker", "bio3d",
+  "NGLVieweR", "DT", "jsonlite", "htmltools", "xml2"
+))
 shiny::runApp("shinyRam")
 ```
 
-The input panel lets you select a four-character PDB identifier or upload a local PDB or mmCIF structure (.pdb, .ent, .cif, .mcif, .mmcif). Uploads retain insertion codes and atom alternate locations for backbone processing. Structures with consistent multiple models offer a model selector. Both PDB and mmCIF uploads are supported; see the [inspection guide](docs/inspection-user-guide.md) for the current model and comparison limitations.
+Enter a four-character **PDB ID** (for example, `1CRN`), **upload** your own PDB/mmCIF structure or choose **AlphaFold DB** to retrieve an available model by UniProt accession. Local uploads support `.pdb`, `.ent`, `.cif`, `.mcif` and `.mmcif`.
+
+The project has also been hosted at [bioit.shinyapps.io/RamplotR](https://bioit.shinyapps.io/RamplotR/), but that deployment may not reflect the latest GitHub version. Running locally is the most reliable way to use the current implementation. Public-accession retrieval requires an internet connection; uploaded coordinates and local map files can be inspected without an external folding service.
+
+### Analyse many structures
+
+From the repository root, process a structure or a directory containing supported structure files:
+
+```bash
+Rscript scripts/ramplotr-batch.R --input structures/ --output results/ --report
+```
+
+The offline command produces per-residue CSV, machine-readable JSON and a batch summary; `--report` additionally requests SVG and standalone HTML reports. For a compatible multi-model structure, add `--ensemble-models 20`. Use `--help` for all options, including declared prediction provenance and an optional matching wwPDB validation XML.
+
+See the [batch-analysis instructions](docs/phase-c-guide.md#offline-batch-mode) for examples and resource limits.
 
 ## Scientific interpretation
 
-Reference density grids are in `shinyRam/static/`. They include the original distributions derived from the protein selection discussed by [Lovell et al. (2003)](https://pubmed.ncbi.nlm.nih.gov/12557186/), plus additional datasets. The chosen background controls the visual plot; residue-aware classification uses corresponding General, GLY, PRO and preProline grids from the selected dataset. The explicitly labelled legacy mode reproduces classification against the displayed background.
+RamplotR's **residue-aware mode** evaluates general residues, glycine, proline and pre-proline against their corresponding bundled reference distributions. The selected plotting background is independent of those residue-specific classification calculations. The original density references trace back to the distributions discussed by [Lovell et al. (2003)](https://pubmed.ncbi.nlm.nih.gov/12557186/); other bundled reference datasets can also be selected.
 
-Reference distributions and density-percentile thresholds in RamplotR must not be described as equivalent to MolProbity quality metrics without independent validation. Save the selected reference dataset, scientific mode, threshold settings and application version alongside published results.
+**RamplotR region labels are not interchangeable with MolProbity or wwPDB classifications.** They use different reference populations, residue treatments and region definitions. Our [independent validation results](docs/phase-a-results.md), [reproducible protocol](docs/wwpdb-validation.md) and [pinned experimental-structure corpus](validation/manifest.csv) document agreement in calculated angles as well as differences in classification. For deposited experimental structures, attach the official report for the **same structure and model** when making independent quality assessments.
 
-## Interface
+For predictions, pLDDT and PAE describe model confidence rather than experimental verification. ESMFold normally provides pLDDT but not PAE; experimental thermal B-factors are **never** automatically interpreted as prediction confidence. The native ω, χ1 and Cβ measurements are descriptive, and visualising a density map is not a quantitative map–model fit measurement.
 
-The primary plot and 3D viewer share a selected-residue inspector, which remains visible when you switch tabs. A compact sequence overview directly beneath these views shows **every selected chain at once**; expand it to browse individual residues without leaving the plot. The loaded interface also offers a condensed laptop layout and a reversible focus mode for hiding analysis settings. Click a point, row, sequence letter or residue in the molecular structure to show the corresponding residue across all views. The inspector includes **Show in plot**, **Clear**, and outlier-review navigation. Changing residue filters, density reference, classification mode or palette updates the result without refetching the structure.
+The default RamplotR teal contour palette provides consistent, recognisable publication figures; changing colours never changes the scientific reference distribution or classification thresholds. Figure and report exports include relevant analysis settings and provenance.
 
-The residue table has readable angles, combined scientific/review filters and CSV export. The 3D viewer supports cartoon, ribbon, sticks, ball-and-stick and surface representations; ligand, DNA, RNA, spin and rock controls remain visible beneath the viewer as modern switches. RamplotR's own ordered publication palette is selected by default, with legacy colour schemes and custom colours still available.
+## Documentation
 
-The optional comparison tab aligns a chain from each of two structures by sequence and displays angular and classification differences, including insertions and deletions. Multi-model structures can be inspected model by model. The Summary tab exports vector SVG and 300-dpi PNG plots plus a self-contained report with reproducibility settings.
+- [Interactive inspection, colours, comparisons and exports](docs/inspection-user-guide.md)
+- [AlphaFold, ColabFold and ESMFold confidence analysis](docs/phase-b-guide.md)
+- [Geometry, official wwPDB evidence, cryo-EM overlays, ensembles and batch mode](docs/phase-c-guide.md)
+- [Independent wwPDB validation protocol and benchmark results](docs/wwpdb-validation.md) · [Results](docs/phase-a-results.md)
+- [Performance and large-structure benchmarks](docs/benchmark-results.md) · [Scaling results](docs/scaling-results.md)
 
-### AlphaFold and ESMFold confidence (Phase B)
+Developers can run the pure-R scientific regression suite from the repository root with `Rscript tests/scientific.R`. Additional tests cover structure parsing, validation imports, confidence formats, geometry, ensembles and the batch CLI. GitHub Actions also exercises the application in a real browser and runs the scientific tests on Ubuntu and Windows.
 
-AlphaFold DB accession lookup and explicit AlphaFold 2/3, ColabFold and ESMFold upload provenance can add pLDDT tracks beneath every chain. AlphaFold PAE and AF3 confidence JSON are optional, strictly matched to the selected coordinates, and shown as a linked, collapsible heatmap. ESMFold local PDBs expose pLDDT from their B-factor fields; standard ESMFold does not provide PAE. Experimental B-factors are never interpreted as prediction confidence. See the [prediction guide](docs/phase-b-guide.md).
+The [`v0.1.0-legacy` tag](https://github.com/BiKC/RamplotR/tree/v0.1.0-legacy) preserves the historical version for reproducing earlier analyses. Record the exact RamplotR revision and reference dataset when publishing results.
 
-For screenshots, limitations and the complete workflow see the [inspection and publication guide](docs/inspection-user-guide.md). The interface layout and browser verification history are documented in [interface-refresh.md](docs/interface-refresh.md).
+## Research use and citation
 
-## Extended verification and research workflows (Phase C)
+RamplotR has been used to visualise protein models in the study *[Unveiling Intra-Clonal Diversity of Monkeypox Virus from Brazil's First Outbreak Wave](https://doi.org/10.3390/v18010062)* (Witt et al., *Viruses*, 2026), including supplementary Ramachandran plots of viral polymerase and helicase models. This is an example of its research use, not an independent validation of the software.
 
-RamplotR now provides optional **peptide omega and descriptive chi1
-measurements**, imports official **wwPDB rotamer, clash and bond/angle outlier
-annotations** as separate evidence, and can overlay **local CCP4/MRC cryo-EM
-maps** in NGL. Consistent multi-model structures can be analysed as circular
-phi/psi ensembles with residue-level classification agreement. For
-reproducible offline studies, `scripts/ramplotr-batch.R` processes a directory
-of PDB/mmCIF files and writes CSV, JSON, SVG and standalone HTML reports.
-None of the newly computed angle diagnostics is presented as an official
-MolProbity or density-fit score. See the
-[Phase C guide](docs/phase-c-guide.md) for usage, validation provenance,
-resource limits and scientific caveats.
+When using RamplotR in a publication, cite the software repository and the **exact version or commit** you used, and report the selected reference dataset and analysis mode.
 
-## Independent Phase A validation
+## License
 
-The [independent validation protocol](docs/wwpdb-validation.md) uses official
-wwPDB residue-level validation reports to compare RamplotR's angles and
-reference-dependent classifications. A [versioned public corpus manifest](validation/manifest.csv)
-covers five experimental structures: 1CRN, 1UBQ, 6VXX, 2DQ4 and 1D3Z. The companion
-[GitHub Actions workflow](.github/workflows/wwpdb-validation.yml) archives
-source XML/mmCIF files, SHA256 hashes, exact software versions, per-residue
-results and reference-group contingency matrices. Differences in categories
-are explicitly reported instead of falsely claiming the four-group RamplotR
-method and six-group MolProbity are identical. The [first five-structure
-results](docs/phase-a-results.md), [pinned numerical results](validation/baseline-2026-09-28.csv)
-and [pinned official source SHA256 hashes](validation/baseline-source-hashes-2026-09-28.csv)
-are available for independent review. In particular, the outlier-rich 2DQ4
-case exposes important differences between RamplotR and wwPDB outlier calls.
-
-AlphaFold and ESMFold predicted-structure ingestion and linked confidence
-assessment are implemented separately from Phase A's independent experimental
-validation benchmark. Confidence is additional model evidence, not an official
-wwPDB/MolProbity quality score.
-
-## Regression tests
-
-Pure-R tests do not require Shiny or Bio3D. From the repository root:
-
-```sh
-Rscript tests/scientific.R
-Rscript tests/peptide.R
-Rscript tests/input.R
-Rscript tests/classification.R
-Rscript tests/inspection.R
-```
-
-GitHub Actions runs source parsing, scientific regression tests and inspection/alignment tests on Ubuntu and Windows. Its full-browser job runs the Shiny app with real PDB input, checks table alignment and linked views, and exercises figure/report export and an actual multi-model NMR fixture. The separate structure validation workflow checks real structures and reference classifications.
-
-## Project files
-
-- `shinyRam/app.R`: user interface and Shiny server
-- `shinyRam/R/`: structure loading, backbone analysis and classifications
-- `shinyRam/static/`: reference-density matrices
-- `shinyRam/www/`: plotting JavaScript and bundled viewer assets
-- `tests/`: isolated scientific and input tests
-- `docs/upgrade-worklog.md`: original scientific upgrade plan and verification status
-- `docs/upgrade-inspection-worklog.md`: current inspection-upgrade checklist
-- `docs/inspection-user-guide.md`: user workflow, colour scheme, export and comparison guidance
-
-MIT license; see LICENSE.
+[MIT](LICENSE). The bundled reference datasets and external validation reports retain their respective scientific provenance; consult the linked documentation when reusing those data.

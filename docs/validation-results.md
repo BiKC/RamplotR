@@ -1,4 +1,4 @@
-# Phase A: observed independent wwPDB validation results
+# Independent wwPDB validation: five-structure results
 
 **Date:** September 28, 2026. **Version:** original bundled reference
 distributions, residue-aware classification, model 1. All samples were

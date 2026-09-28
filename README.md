@@ -67,13 +67,13 @@ Rscript scripts/ramplotr-batch.R --input structures/ --output results/ --report
 
 The offline command produces per-residue CSV, machine-readable JSON and a batch summary; `--report` additionally requests SVG and standalone HTML reports. For a compatible multi-model structure, add `--ensemble-models 20`. Use `--help` for all options, including declared prediction provenance and an optional matching wwPDB validation XML.
 
-See the [batch-analysis instructions](docs/phase-c-guide.md#offline-batch-mode) for examples and resource limits.
+See the [batch-analysis instructions](docs/structural-verification.md#offline-batch-mode) for examples and resource limits.
 
 ## Scientific interpretation
 
 RamplotR's **residue-aware mode** evaluates general residues, glycine, proline and pre-proline against their corresponding bundled reference distributions. The selected plotting background is independent of those residue-specific classification calculations. The original density references trace back to the distributions discussed by [Lovell et al. (2003)](https://pubmed.ncbi.nlm.nih.gov/12557186/); other bundled reference datasets can also be selected.
 
-**RamplotR region labels are not interchangeable with MolProbity or wwPDB classifications.** They use different reference populations, residue treatments and region definitions. Our [independent validation results](docs/phase-a-results.md), [reproducible protocol](docs/wwpdb-validation.md) and [pinned experimental-structure corpus](validation/manifest.csv) document agreement in calculated angles as well as differences in classification. For deposited experimental structures, attach the official report for the **same structure and model** when making independent quality assessments.
+**RamplotR region labels are not interchangeable with MolProbity or wwPDB classifications.** They use different reference populations, residue treatments and region definitions. Our [independent validation results](docs/validation-results.md), [reproducible protocol](docs/wwpdb-validation.md) and [pinned experimental-structure corpus](validation/manifest.csv) document agreement in calculated angles as well as differences in classification. For deposited experimental structures, attach the official report for the **same structure and model** when making independent quality assessments.
 
 For predictions, pLDDT and PAE describe model confidence rather than experimental verification. ESMFold normally provides pLDDT but not PAE; experimental thermal B-factors are **never** automatically interpreted as prediction confidence. The native ω, χ1 and Cβ measurements are descriptive, and visualising a density map is not a quantitative map–model fit measurement.
 
@@ -82,9 +82,9 @@ The default RamplotR teal contour palette provides consistent, recognisable publ
 ## Documentation
 
 - [Interactive inspection, colours, comparisons and exports](docs/inspection-user-guide.md)
-- [AlphaFold, ColabFold and ESMFold confidence analysis](docs/phase-b-guide.md)
-- [Geometry, official wwPDB evidence, cryo-EM overlays, ensembles and batch mode](docs/phase-c-guide.md)
-- [Independent wwPDB validation protocol and benchmark results](docs/wwpdb-validation.md) · [Results](docs/phase-a-results.md)
+- [AlphaFold, ColabFold and ESMFold confidence analysis](docs/prediction-confidence.md)
+- [Geometry, official wwPDB evidence, cryo-EM overlays, ensembles and batch mode](docs/structural-verification.md)
+- [Independent wwPDB validation protocol and benchmark results](docs/wwpdb-validation.md) · [Results](docs/validation-results.md)
 - [Performance and large-structure benchmarks](docs/benchmark-results.md) · [Scaling results](docs/scaling-results.md)
 
 Developers can run the pure-R scientific regression suite from the repository root with `Rscript tests/scientific.R`. Additional tests cover structure parsing, validation imports, confidence formats, geometry, ensembles and the batch CLI. GitHub Actions also exercises the application in a real browser and runs the scientific tests on Ubuntu and Windows.

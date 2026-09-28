@@ -56,12 +56,30 @@ const puppeteer = require("puppeteer-core");
       .classList.contains("is-hidden"));
     await new Promise(done=>setTimeout(done,1300));
     await page.click("#submit");
-    await page.waitForFunction(() => {
-      const panel=document.querySelector("#ram-confidence-panel");
-      return panel && panel.textContent.includes("ESMFold") &&
-        panel.textContent.includes("87.0") &&
-        document.querySelectorAll(".ram-confidence-mini-cell").length>0;
-    },{timeout:90000});
+    try {
+      await page.waitForFunction(() => {
+        const panel=document.querySelector("#ram-confidence-panel");
+        return panel && panel.textContent.includes("ESMFold") &&
+          panel.textContent.includes("87.0") &&
+          document.querySelectorAll(".ram-confidence-mini-cell").length>0;
+      },{timeout:25000});
+    } catch (error) {
+      const diagnostics=await page.evaluate(() => ({
+        source: document.querySelector('input[name="inputSource"]:checked')?.value,
+        predictionSource: document.querySelector("#predictionSource")?.value,
+        predictionSettingsOpen: document.querySelector("#ram-prediction-upload")?.open,
+        fileName:document.querySelector("#structfile")?.files?.[0]?.name,
+        fileInput: window.Shiny?.shinyapp?.$inputValues?.["structfile:shiny.file"],
+        shinyInput: window.Shiny?.shinyapp?.$inputValues?.predictionSource,
+        panel:document.querySelector("#predictionPanel")?.textContent?.slice(0,1200),
+        plot:document.querySelector("#ram-current-structure")?.textContent,
+        notifications:[...document.querySelectorAll(".shiny-notification")]
+          .map(el=>el.textContent)
+      }));
+      console.error("Prediction upload diagnostics:",JSON.stringify(diagnostics));
+      await page.screenshot({path:path.join(output,"prediction-debug.png"),fullPage:true});
+      throw error;
+    }
     assert.equal(await page.$("#ram-pae-plot"),null,
       "ESMFold without PAE must not invent an error map");
     await page.screenshot({path:path.join(output,"prediction-esmfold.png"),

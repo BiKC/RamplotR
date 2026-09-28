@@ -1,6 +1,6 @@
-# Phase B — AlphaFold and ESMFold confidence integration
+# Prediction confidence: implementation record
 
-Base: main `99fd7f38c17e88dce28b043560ecd5a147d647ea`. Scientific Phase A and historical tag stay unchanged.
+Base: main `99fd7f38c17e88dce28b043560ecd5a147d647ea`. Independent validation and the historical tag remain unchanged.
 
 - [x] Native prediction provenance and per-residue pLDDT extraction from AlphaFold and ESMFold B-factors; experimental B-factors must never be relabelled confidence.
 - [x] Optional AlphaFold DB accession retrieval and JSON confidence sidecar uploads (AlphaFold 2 PAE and AlphaFold 3 full confidence/summary JSON).

@@ -9,9 +9,16 @@ ram_external_validation_read <- function(path, max_bytes=32000000L,
   if (!file.exists(path) || !is.finite(file.info(path)$size) ||
       file.info(path)$size <= 0 || file.info(path)$size > max_bytes)
     stop("Provide a nonempty wwPDB validation XML (or XML.gz), 32 MB maximum.")
-  raw <- readBin(path,what="raw",n=file.info(path)$size)
-  if (grepl("\\.gz$",path,ignore.case=TRUE))
-    raw <- memDecompress(raw,type="gzip")
+  # Read gzip streams through a capped connection. memDecompress() on an
+  # entire uploaded gzip allocates the uncompressed size before it can be
+  # checked, allowing a small gzip bomb to exhaust a Shiny worker.
+  if (grepl("\\.gz$",path,ignore.case=TRUE)) {
+    con <- gzfile(path,open="rb")
+    on.exit(close(con),add=TRUE)
+    raw <- readBin(con,what="raw",n=as.integer(max_bytes)+1L)
+  } else {
+    raw <- readBin(path,what="raw",n=as.integer(max_bytes)+1L)
+  }
   if (length(raw) > max_bytes)
     stop("The uncompressed wwPDB report exceeds the 32 MB limit.")
   doc <- xml2::read_xml(raw)

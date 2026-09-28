@@ -400,8 +400,10 @@ ui <- fluidPage(
                       tags$summary("Local cryo-EM density map"),
                       tags$p(class="ram-field-hint",
                         "Overlay a local CCP4/MRC map. This is a visual aid, not an experimental map-fit score."),
-                      tags$input(type="file",id="ram-density-file",
-                                 accept=".map,.mrc,.ccp4"),
+                      # Insert the file picker after Shiny's initial input
+                      # binding so the map stays client-side in the browser.
+                      tags$div(id="ram-density-file-slot",
+                               class="ram-density-picker"),
                       tags$div(class="ram-density-level",
                         tags$label("Map threshold (σ)", `for`="ram-density-level"),
                         tags$input(type="range",id="ram-density-level",

@@ -174,7 +174,7 @@ setImmediate(() => {
   assert.equal(inputs.at(-1).name, "ramNglPick",
                "An NGL click must publish the same residue identity.");
   assert.equal(inputs.at(-1).value.resi, 2);
-  handlers["ram-selection"](null);
+  handlers["ram-selection"]({clear: true});
   assert.equal(restyles.at(-1).change.x[0].length, 0,
                "Clear selection must remove the overlay.");
   assert.equal(stickSelections.at(-1), "none",

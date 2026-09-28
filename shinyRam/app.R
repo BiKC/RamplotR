@@ -724,6 +724,9 @@ server <- function(input, output, session) {
         if (is.na(row$region[[1L]])) "Angles unavailable" else row$region[[1L]])
     )
   })
+  # Keep the shared selection label current while the plot tab is hidden
+  # (for example when a residue is selected from the DataTable).
+  outputOptions(output, "selectedResidueInfo", suspendWhenHidden = FALSE)
   observe({
     row <- selected_row()
     session$sendCustomMessage("ram-selection", if (is.null(row)) list(clear = TRUE) else list(

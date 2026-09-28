@@ -868,7 +868,16 @@ body > .container-fluid { max-width: none; padding: 0; }
    predicted structures, keeping the default experimental workflow compact. */
 .ram-prediction-upload.is-hidden { display: none; }
 .ram-prediction-upload { grid-column: 1 / -1; border-top: 1px solid #dce9e5;
-  padding: 12px 3px 2px; margin-top: 4px; }
+  padding: 4px 3px 2px; margin-top: 0; }
+.ram-prediction-upload > summary { cursor:pointer; display: list-item;
+  color:#1b6268; font-size:11px; font-weight:750; padding:7px 2px; }
+.ram-prediction-upload > summary:focus-visible { outline:2px solid #317e95; }
+.ram-prediction-upload[open] .ram-prediction-upload-fields {
+  padding-top:8px; }
+.ram-has-data .ram-prediction-upload:not([open]) {
+  border-top:0; padding:0; margin:0; }
+.ram-has-data .ram-prediction-upload:not([open]) > summary {
+  padding:4px 2px; color:#4a7175; }
 .ram-prediction-upload-fields { display:grid;
   grid-template-columns:minmax(215px,1fr) minmax(0,2fr);
   align-items: start; gap: 10px 15px; }
@@ -880,7 +889,7 @@ body > .container-fluid { max-width: none; padding: 0; }
   width:auto; height:auto; padding:0; margin:0 0 7px; overflow:visible;
   clip:auto; white-space:normal; }
 .ram-prediction-upload .ram-field-hint { margin:3px 0 0; max-width:900px; }
-.ram-has-data .ram-source:has(.ram-prediction-upload:not(.is-hidden)) {
+.ram-has-data .ram-source:has(.ram-prediction-upload[open]:not(.is-hidden)) {
   align-items:start;
 }
 .ram-source-choice .radio-inline { font-size: 11px !important; }

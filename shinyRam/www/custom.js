@@ -234,7 +234,13 @@
     if (pdbWrap) pdbWrap.classList.toggle("is-hidden", !!(upload || afdb));
     if (uploadWrap) uploadWrap.classList.toggle("is-hidden", !upload);
     if (afdbWrap) afdbWrap.classList.toggle("is-hidden", !afdb);
-    if (predictionFields) predictionFields.classList.toggle("is-hidden", !upload);
+    if (predictionFields) {
+      predictionFields.classList.toggle("is-hidden", !upload);
+      const app = document.querySelector(".ram-app");
+      if (upload && (!app || !app.classList.contains("ram-has-data"))) {
+        predictionFields.open = true;
+      }
+    }
   }
 
   function changePredictionSource() {
@@ -268,7 +274,11 @@
     // Square angular axes remain enforced in Plotly. On short laptops, use
     // the available vertical space rather than blindly matching card width.
     const width = plot.clientWidth;
-    const minimum = width < 540 ? 285 : 385;
+    // Reserve enough physical pixels for equal 360° axes and their labels.
+    // The previous fixed 385px minimum shrank the angular area to <48%
+    // of its width on compact laptop screens with prediction controls.
+    const minimum = width < 540 ? 285 :
+      Math.max(385, Math.min(690, Math.ceil(width * 0.52 + 124)));
     let height = Math.max(minimum, Math.min(690,
       Math.round(width + (width < 540 ? 35 : 75))));
     const app = document.querySelector && document.querySelector(".ram-app");
@@ -492,6 +502,8 @@
         const app = document.querySelector && document.querySelector(".ram-app");
         if (app && !app.classList.contains("ram-has-data")) {
           app.classList.add("ram-has-data");
+          const details = document.getElementById("ram-prediction-upload");
+          if (details) details.open = false;
           scheduleResize();
         }
       })

@@ -70,3 +70,5 @@ Sources:
 - AFDB PAE JSON: https://alphafold.ebi.ac.uk/faq
 - AF3 output format: https://github.com/google-deepmind/alphafold3/blob/main/docs/output.md
 - AFDB API field transition (2026): https://www.ebi.ac.uk/pdbe/news/breaking-changes-afdb-predictions-api
+
+For a local uploaded structure, the **Prediction settings** section opens while choosing its prediction type and optional matching confidence JSON. It collapses automatically once analysis finishes to leave more room for the Ramachandran plot. Reopen it any time to change the declared source or confidence sidecars and run the analysis again.

@@ -159,7 +159,8 @@ ui <- fluidPage(
             actionButton("submit", "Analyze structure", class = "btn-primary")
           )
         ),
-        tags$div(id = "ram-prediction-upload", class = "ram-prediction-upload is-hidden",
+        tags$details(id = "ram-prediction-upload", class = "ram-prediction-upload is-hidden",
+          tags$summary(class = "ram-prediction-summary", "Prediction settings (optional)"),
           tags$div(class = "ram-prediction-upload-fields",
             selectInput("predictionSource", "Uploaded structure type",
               choices = c("Experimental or unknown (no confidence)" = "experimental",

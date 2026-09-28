@@ -307,6 +307,7 @@
     selectionTrace = traces.length - 1;
 
     const narrow = plot.clientWidth < 540;
+    plot.style.height = plotHeight() + "px";
     const axis = {
       range: [-180, 180],
       tickvals: [-180, -90, 0, 90, 180],
@@ -415,6 +416,10 @@
     const width = plot.clientWidth;
     if (!width) return;
     const height = plotHeight();
+    // Give the host element a definite height. Plotly's responsive resize
+    // otherwise remeasures CSS min-height (270px on mobile) and silently
+    // undoes the intended square-plot dimensions.
+    plot.style.height = height + "px";
     // Plotly can retain both the original desktop SVG width and height.
     // Update both dimensions to keep the full -180°..180° square visible.
     if (Math.abs((plot._fullLayout && plot._fullLayout.height || 0) - height) >= 2 ||

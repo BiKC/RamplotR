@@ -168,7 +168,7 @@ ui <- fluidPage(
                           "AlphaFold 3" = "alphafold3",
                           "ESMFold" = "esmfold",
                           "Other predicted model (B-factor pLDDT)" = "other_prediction"),
-              selected = "experimental"),
+              selected = "experimental", selectize = FALSE),
             tags$div(id = "ram-confidence-sidecars",
               class = "ram-prediction-sidecars is-hidden",
               fileInput("predictionJson", "PAE / full confidence JSON",

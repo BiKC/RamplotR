@@ -22,7 +22,7 @@ const assert = require("node:assert/strict");
   const errors = [];
   try {
     const page = await browser.newPage();
-    page.on("pageerror", error => errors.push(error.message));
+    page.on("pageerror", error => errors.push(String(error && (error.stack || error.message || error))));
     await page.setViewport({ width: 1440, height: 940, deviceScaleFactor: 1 });
     await page.goto("http://127.0.0.1:8765", {
       waitUntil: "networkidle2", timeout: 60000
@@ -265,6 +265,20 @@ const assert = require("node:assert/strict");
       window.getNGLStage("NGL").getRepresentationsByName("ram-highlight")
         .list.length > 0, { timeout: 18000 });
 
+    // Check whether the browser delivered resize events and whether Plotly's
+    // relayout handler actually received the new mobile dimensions.
+    await page.evaluate(() => {
+      window.__ramResizeEvents = 0;
+      window.__ramRelayoutCalls = [];
+      window.addEventListener("resize", () => window.__ramResizeEvents++);
+      const original = window.Plotly.relayout;
+      window.Plotly.relayout = function(node, update, ...rest) {
+        if (node && node.id === "plotly") {
+          window.__ramRelayoutCalls.push({ ...update });
+        }
+        return original.call(this, node, update, ...rest);
+      };
+    });
     await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
     try {
       await page.waitForFunction(() => {
@@ -288,6 +302,8 @@ const assert = require("node:assert/strict");
           computedHeight: getComputedStyle(p).height,
           plotClass: p.className,
           windowWidth: window.innerWidth,
+          resizeEvents: window.__ramResizeEvents,
+          relayoutCalls: window.__ramRelayoutCalls,
           activeTab: document.querySelector(".ram-main .nav-tabs li.active a").textContent,
           layoutWidth: p._fullLayout && p._fullLayout.width,
           layoutHeight: p._fullLayout && p._fullLayout.height,

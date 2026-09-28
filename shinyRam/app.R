@@ -24,8 +24,8 @@ source(file.path("R", "backbone.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
 
 color_set <- c(
-  "#7FC97F", "#BEAED4", "#FDC086", "#FFFF99",
-  "#386CB0", "#F0027F", "#BF5B17", "#666666"
+  "#137C79", "#8662A8", "#C47B36", "#4E86B3",
+  "#648E5E", "#B95873", "#9C7545", "#62798D"
 )
 
 rampage<-c("#F1EEF6","#BDC9E1","#74A9CF","#0570B0")
@@ -151,7 +151,7 @@ ui <- fluidPage(
       tags$div(
         class = "ram-workspace",
         tags$aside(
-          class = "ram-sidebar", "aria-label" = "Analysis settings",
+          id = "ram-settings", class = "ram-sidebar", "aria-label" = "Analysis settings",
           tags$section(
             class = "ram-panel",
             tags$div(
@@ -223,28 +223,6 @@ ui <- fluidPage(
             ),
             tags$div(class = "ram-panel-divider"),
             tags$div(class = "ram-chain-controls", uiOutput("chainColors"))
-          ),
-          tags$section(
-            class = "ram-panel",
-            tags$div(
-              class = "ram-section-heading",
-              tags$div(
-                tags$h3("3D display"),
-                tags$p("Choose which molecular features appear in the viewer.")
-              )
-            ),
-            tags$div(
-              class = "ram-toggles",
-              checkboxInput("ligands", "Ligands"),
-              checkboxInput("dna", "DNA"),
-              checkboxInput("rna", "RNA")
-            ),
-            tags$div(class = "ram-panel-divider"),
-            tags$div(
-              class = "ram-toggles",
-              checkboxInput("spinning", "Spin"),
-              checkboxInput("rocking", "Rock", value = TRUE)
-            )
           )
         ),
         tags$main(
@@ -259,8 +237,13 @@ ui <- fluidPage(
                   tags$h2("Conformation overview"),
                   tags$p("Use the plot to inspect phi (φ) and psi (ψ) backbone angles.")
                 ),
-                tags$span(id = "ram-current-structure",
-                          class = "ram-status", "No structure loaded")
+                tags$div(
+                  class = "ram-result-actions",
+                  tags$a(class = "ram-mobile-settings-link",
+                         href = "#ram-settings", "Analysis settings"),
+                  tags$span(id = "ram-current-structure",
+                            class = "ram-status", "No structure loaded")
+                )
               ),
               tags$div(
                 class = "ram-charts",
@@ -283,11 +266,21 @@ ui <- fluidPage(
                   class = "ram-chart-card", "aria-label" = "3D molecular viewer",
                   tags$h3(class = "ram-chart-label", "Molecular structure"),
                   tags$p(class = "ram-chart-help",
-                         "Rotate and zoom the structure. Viewer controls are on the left."),
+                         "Drag to rotate, scroll to zoom."),
                   tags$div(class = "ram-ngl",
                            NGLVieweR::NGLVieweROutput("NGL")),
-                  tags$p(class = "ram-ngl-note",
-                         "Structure rendering is provided by NGLVieweR.")
+                  tags$div(
+                    class = "ram-viewer-options",
+                    tags$div(class = "ram-viewer-options-title", "Display"),
+                    tags$div(
+                      class = "ram-toggles",
+                      checkboxInput("ligands", "Ligands"),
+                      checkboxInput("dna", "DNA"),
+                      checkboxInput("rna", "RNA"),
+                      checkboxInput("spinning", "Spin"),
+                      checkboxInput("rocking", "Rock", value = TRUE)
+                    )
+                  )
                 )
               )
             ),
@@ -490,7 +483,9 @@ server <- function(input, output, session) {
           # Shiny upload paths lack an extension; identify the format explicitly.
           viewer_format <- if (inputType == "file")
             ram_detect_format(input$structfile$name) else NULL
-          nglview <- NGLVieweR(data = accPDB, format = viewer_format) %>% setRock()
+          nglview <- NGLVieweR(data = accPDB, format = viewer_format) %>%
+            NGLVieweR::stageParameters(backgroundColor = "#f7fafb") %>%
+            setRock()
           counter=1
           for (i in unique(chains)) {
             #print(i)

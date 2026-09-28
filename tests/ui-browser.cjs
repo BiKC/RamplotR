@@ -84,6 +84,9 @@ const assert = require("node:assert/strict");
     assert.ok(plot.axisPixels.x >= 0.48 * plot.width &&
               plot.axisPixels.y >= 0.48 * plot.width,
               "Angular axes must use at least half of the plot panel width.");
+    // NGL loads and paints asynchronously after the Plotly response.
+    // Give the viewer a moment to render before taking the desktop preview.
+    await new Promise(resolve => setTimeout(resolve, 1600));
     await page.screenshot({
       path: "benchmarks/output/ui-preview/desktop-loaded.png", fullPage: true
     });

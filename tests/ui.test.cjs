@@ -118,6 +118,7 @@ assert.ok(badge.textContent.includes("1 plotted residues"));
 // Plotly.react promises resolve on the next microtask; point-click handlers
 // are registered after rendering, not before.
 setImmediate(() => {
+  try {
   assert.equal(typeof events.plotly_click, "function");
   assert.equal(rendered.traces[4].customdata[0][2], "A",
                "Insertions must stay attached to the plotted residue.");
@@ -140,4 +141,5 @@ setImmediate(() => {
   assert.equal(restyles.at(-1).change.x[0].length, 0,
                "Clear selection must remove the overlay.");
   console.log("RamplotR plot, source switching and three-way picking tests passed.");
-}).catch(e => { console.error(e); process.exitCode = 1; });
+  } catch (e) { console.error(e); process.exitCode = 1; }
+});

@@ -250,6 +250,7 @@ ui <- fluidPage(
                 tags$section(
                   class = "ram-chart-card", "aria-label" = "Ramachandran plot",
                   tags$h3(class = "ram-chart-label", "Residue distribution"),
+                  tags$p(class = "ram-chart-help", "Click a residue to highlight it in the 3D structure and residue list."),
                   tags$p(class = "ram-chart-help",
                          "Hover over a point to identify its chain and residue."),
                   tags$div(
@@ -260,7 +261,11 @@ ui <- fluidPage(
                     tags$p("Enter an accession and select Analyze structure.")
                   ),
                   tags$div(id = "plotly", class = "ram-plot",
-                           role = "img", "aria-label" = "Interactive Ramachandran plot")
+                           role = "img", "aria-label" = "Interactive Ramachandran plot"),
+                  tags$div(class = "ram-selection-bar",
+                    tags$span(id = "ram-selected-residue", "Click a point to select a residue"),
+                    actionButton("clearSelection", "Clear selection", class = "btn-default btn-sm")
+                  )
                 ),
                 tags$section(
                   class = "ram-chart-card", "aria-label" = "3D molecular viewer",
@@ -301,6 +306,7 @@ ui <- fluidPage(
                     "Allowed", "Favoured"),
                   selected = "All"
                 ),
+                tags$p(class = "ram-field-hint", "Click a row to highlight that residue in the plot and molecular viewer."),
                 dataTableOutput("regions")
               )
             ),
@@ -336,398 +342,335 @@ ui <- fluidPage(
 )
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
-  # session$onSessionEnded(stopApp)
-  session$userData$previousPDB <- ""
-  # reactive(bio3d::write.pdb(pdb = pdb(), file = paste0(accPDB(), '.pdb')))
+  # Structure parsing and backbone torsions are intentionally independent of
+  # visual controls. Only the Analyze button loads a new structure.
+  structure <- reactiveVal(NULL)
+  torsions <- reactiveVal(NULL)
+  structure_name <- reactiveVal(NULL)
+  selected_residue <- reactiveVal(NULL)
+  viewer_highlight_added <- reactiveVal(FALSE)
+  available_chains <- reactiveVal(character())
 
-  # Reference cutoffs are deterministic and calculated once per density grid.
-  searchlimit <- function(matrix, percentage, x = 1) {
-    ram_density_thresholds(matrix, percentage)[[1L]]
-  }
+  output$chains <- renderUI({
+    chains <- available_chains()
+    if (!length(chains)) return(NULL)
+    pickerInput("chainselection", "Chain selection", choices = chains,
+      multiple = TRUE, options = list("actions-box" = TRUE), selected = chains)
+  })
+  output$chainColors <- renderUI({
+    chains <- available_chains()
+    if (!length(chains)) return(NULL)
+    dropdown(lapply(seq_along(chains), function(k) {
+      colourpicker::colourInput(
+        paste0("chain", chains[[k]]),
+        label = paste("Chain", chains[[k]]),
+        value = color_set[((k - 1L) %% length(color_set)) + 1L])
+    }), label = "Chain color settings")
+  })
 
-  observeEvent(input$ligands,{
-    if(input$ligands){
-      NGLVieweR_proxy("NGL")%>%addSelection(type = "ball+stick", param=list(name="ligand",sele= "ligand"))
-    }else{
-      NGLVieweR_proxy("NGL")%>%removeSelection("ligand")
-    }
-  })
-  
-  observeEvent(input$dna,{
-    if(input$dna){
-      NGLVieweR_proxy("NGL")%>%addSelection(type = "cartoon", param=list(name="dna",sele= "dna"))
-    }else{
-      NGLVieweR_proxy("NGL")%>%removeSelection("dna")
-    }
-  })
-  
-  observeEvent(input$rna,{
-    if(input$rna){
-      NGLVieweR_proxy("NGL")%>%addSelection(type = "cartoon", param=list(name="rna",sele= "rna"))
-    }else{
-      NGLVieweR_proxy("NGL")%>%removeSelection("rna")
-    }
-  })
-  observeEvent(input$rocking,{
-    if(input$rocking){
-      NGLVieweR_proxy("NGL")%>%updateRock()
-      if(input$spinning==T){
-        updateCheckboxInput(session,"spinning",value = F)
-      }
-    }else{
-      NGLVieweR_proxy("NGL")%>%updateRock(rock = F)
-      
-    }
-  })
-  observeEvent(input$spinning,{
-    if(input$spinning){
-      NGLVieweR_proxy("NGL")%>%updateSpin()
-      if(input$rocking==T){
-        updateCheckboxInput(session,"rocking",value = F)
-      }
-    }else{
-      NGLVieweR_proxy("NGL")%>%updateSpin(spin = F)
-    }
-  })
-  
-  updateColorInputs <- function(colors){
-    updateColourInput(session, "bg1", value=colors[1])
-    updateColourInput(session, "bg2", value=colors[2])
-    updateColourInput(session, "bg3", value=colors[3])
-    updateColourInput(session, "bg4", value=colors[4])
-  }
-  
-  observeEvent(input$bgtype,
-               {
-                 files<-list.files(paste0("static/",input$bgtype))
-                 choices=list("Commonly used"=files[!files %in% allAA],
-                              "Per amino acid"=files[files %in% allAA])
-                 if (input$background %in% files) {sel=input$background}
-                 else {sel=choices[1]}
-                 updateSelectInput(session,"background",choices = choices, selected = sel)
-               })
-  
-  observeEvent(input$colorscheme,{
-    if (input$colorscheme =="Rampage"){
-      updateColorInputs(rampage)
-    }
-    else if (input$colorscheme =="PDBSum"){
-      updateColorInputs(pdbsum)
-      
-    }
-  })
-  
-  observeEvent(input$background,{
-    if (input$background %in% allAA){
-      updatePickerInput(session,"AA",selected = input$background)
-    }
-  })
-  
-  observeEvent({input$bg1
-    input$bg2
-    input$bg3
-    input$bg4},
-    {
-      colors<-c(input$bg1,input$bg2,input$bg3,input$bg4)
-      #print(colors == rampage)
-      if (all(colors == rampage)){
-        updateSelectInput(session, "colorscheme",selected = "Rampage")
-        
-      }
-      else if (all(colors == pdbsum)){
-        updateSelectInput(session, "colorscheme",selected = "PDBSum")
-        
-      } else {
-        updateSelectInput(session, "colorscheme",selected = "custom")
-      }
-    })
-
-  # Process a structure only when requested. A newly opened session starts
-  # with the empty plot rather than fetching the default PDB automatically.
   observeEvent(input$submit, {
-    withProgress(message = "Making plot", value = 0, {
-      inputType<-""
-      isolate({
-        inputType <- if (identical(input$inputSource, "upload")) "file" else "code"
-        if (inputType == "file" && is.null(input$structfile$datapath)) {
-          showNotification("Choose a PDB or mmCIF file first.", type = "error")
-          return(invisible(NULL))
-        }
-        accPDB <- if (inputType == "file") input$structfile$datapath else
-          toupper(trimws(input$PDB))
-        structure_key <- paste(inputType, accPDB, sep = ":")
-        if (!identical(session$userData$previousPDB, structure_key)) {
-          incProgress(1 / 4, detail = "Reading structure")
-          pdb <- tryCatch(
-            ram_load_structure(
-              path = if (inputType == "file") accPDB else NULL,
-              original_name = if (inputType == "file") input$structfile$name else NULL,
-              pdb_id = if (inputType == "code") accPDB else NULL
-            ),
-            error = function(e) {
-              showNotification(conditionMessage(e), type = "error", duration = 12)
-              NULL
-            }
-          )
-          if (is.null(pdb)) return(invisible(NULL))
-          incProgress(1 / 4, detail = paste("Transforming data"))
-          # Keep insertion codes and validate peptide connectivity before
-          # classifying glycine, proline and pre-proline residues.
-          torsion <- ram_extract_torsions(pdb)
-          chains <- unique(torsion$chain)
-          # Store the results in the user data
-          session$userData$torsion <- torsion
-
-          chains<-unique(session$userData$torsion$chain)
-
-          # Shiny upload paths lack an extension; identify the format explicitly.
-          viewer_format <- if (inputType == "file")
-            ram_detect_format(input$structfile$name) else NULL
-          nglview <- NGLVieweR(data = accPDB, format = viewer_format) %>%
-            NGLVieweR::stageParameters(backgroundColor = "#f7fafb") %>%
-            setRock()
-          counter=1
-          for (i in unique(chains)) {
-            #print(i)
-            nglview<-addRepresentation(NGLVieweR = nglview,type = "cartoon", param=list("sele"= paste0(":", i,"  and protein"), "color"= color_set[((counter - 1) %% length(color_set)) + 1]))
-            counter=counter+1
-          }
-          output$NGL <- NGLVieweR::renderNGLVieweR(nglview)
-          
-          output$chainColors <- renderUI({
-            isolate({
-              widgets <- lapply(seq_along(chains), function(k) {
-                colourpicker::colourInput(
-                  paste0("chain", chains[[k]]),
-                  label = paste("Chain", chains[[k]]),
-                  value = color_set[((k - 1L) %% length(color_set)) + 1L]
-                )
-              })
-              dropdown(widgets, label = "Chain color settings")
-            })
-          })
-
-          output$chains <- renderUI({
-            # pickerInput
-            isolate({
-              pickerInput(
-                "chainselection",
-                "Chain selection",
-                choices = chains,
-                multiple = T,
-                options = list(`actions-box` = TRUE),
-                selected = chains
-              )
-            })
-          })
-          
-          
-          
-          session$userData$previousPDB <- structure_key
-          incProgress(1 / 4, detail = paste("Filter data"))
-        } else {
-          incProgress(3 / 4, detail = paste("Filter data"))
-        }
-        if (input$background == "preProline"){
-          matrix <- ram_read_reference(file.path("static", input$bgtype, "preProline"))
-          # get a subset of only those amino acids that precede a proline
-          torsionsubset <- data.frame()
-          torsionsubset <- subset(session$userData$torsion,
-                                 bonded_to_next & !is.na(next_resn) &
-                                   next_resn == "PRO")
-          torsionsubset <- subset(torsionsubset, resn %in% input$AA)
-          # also subset for chains
-          # since chainselection is added as uiOutput, it is not available in the beginning, so check if it exists, otherwise subset for all chains
-          if (!is.null(input$chainselection)) {
-            torsionsubset <- subset(torsionsubset, chain %in% input$chainselection)
-          }
-          
-        }
-        else if (!input$background %in% allAA) {
-          matrix <- ram_read_reference(file.path("static", input$bgtype, "General"))
-          torsionsubset <- session$userData$torsion
-          torsionsubset <- subset(torsionsubset, resn %in% input$AA)
-          # also subset for chains
-          if (!is.null(input$chainselection)) {
-            torsionsubset <- subset(torsionsubset, chain %in% input$chainselection)
-          }
-        } else {
-          matrix <- ram_read_reference(file.path("static", input$bgtype, input$background))
-          #updatePickerInput(session, "AA", selected = input$background)
-          torsionsubset <- subset(session$userData$torsion, resn %in% input$AA)
-          # also subset for chains
-          if (!is.null(input$chainselection)) {
-            torsionsubset <- subset(torsionsubset, chain %in% input$chainselection)
-          }
-        }
-        incProgress(1 / 4, detail = paste("Creating plot"))
-        # session$sendCustomMessage("updateFig", input$PDB)
-        # get input chain colors from ui
-        ttab <- reactive({
-          ram_classify_torsions(
-            session$userData$torsion,
-            reference_dir = file.path("static", input$bgtype),
-            selected_reference = matrix,
-            mode = input$validationMode,
-            threshold_fn = searchlimit
-          )
-        })
-        output$regions <- renderDataTable({
-
-          # filter the data frame to only include the amino acids that are in the selected region
-          if (input$regionselect == "All") {
-            ttabsub <- ttab()
-          } else {
-            ttabsub <- subset(ttab(), region == input$regionselect)
-            ttabsub <- ttabsub[, c("resi", "chain", "resn", "phi", "psi", "density")]
-          }
-          # also filter for the selected amino acids (input$AA) and chains (input$chainselection)
-          ttabsub <- subset(ttabsub, resn %in% input$AA)
-          if (!is.null(input$chainselection)) {
-            ttabsub <- subset(ttabsub, chain %in% input$chainselection)
-          }
-          ttabsub
-        })
-
-        
-          # display statistics for the regions:
-          # for the following, we do not include glycine and proline
-          # Favoured regions (no. of residues, %)
-          # Allowed regions (no. of residues, %)
-          # Generously allowed regions (no. of residues, %)
-          # Not allowed regions (no. of residues, %)
-          # Total no. of residues (no. of residues, %)
-          # --------------------------
-          # End-residues (Excl. Gly and Pro)
-          # --------------------------
-          # Glycine residues (no. of residues)
-          # Proline residues (no. of residues)
-          # --------------------------
-          # Total no. of residues (no. of residues)
-
-          # All statistics use the same amino-acid and chain selection as the plot.
-          stats_table <- subset(ttab(), resn %in% input$AA)
-          if (!is.null(input$chainselection)) {
-            stats_table <- subset(stats_table, chain %in% input$chainselection)
-          }
-          # define a function to negate the %in% operator
-          `%nin%` <- Negate(`%in%`)
-          # exclude glycine and proline
-          exclude <- c("GLY", "PRO")
-          
-          missing_angles <- is.na(stats_table$region)
-          end_count <- sum(missing_angles & !stats_table$resn %in% exclude)
-          eligible <- stats_table[!missing_angles & !stats_table$resn %in% exclude, , drop = FALSE]
-          count_no_gly_pro <- nrow(eligible)
-          region_count <- function(name) sum(eligible$region == name, na.rm = TRUE)
-          region_percent <- function(n) {
-            if (count_no_gly_pro == 0L) return(NA_real_)
-            round(100 * n / count_no_gly_pro, 2)
-          }
-          fr_count <- region_count("Favoured")
-          ar_count <- region_count("Allowed")
-          gar_count <- region_count("Generously allowed")
-          nar_count <- region_count("Not allowed")
-          fr_percent <- region_percent(fr_count)
-          ar_percent <- region_percent(ar_count)
-          gar_percent <- region_percent(gar_count)
-          nar_percent <- region_percent(nar_count)
-          total_count <- count_no_gly_pro
-          total_percent <- region_percent(total_count)
-          gly_count <- sum(stats_table$resn == "GLY")
-          pro_count <- sum(stats_table$resn == "PRO")
-          total_count2 <- nrow(stats_table)
-
-          # create html output to display the statistics
-        
-            output$summary <- renderUI({
-  percent_label <- function(p) {
-    if (is.na(p)) "n/a" else sprintf("%.2f%%", p)
-  }
-  metric <- function(label, value, hint) {
-    tags$div(
-      class = "ram-summary-metric",
-      tags$span(class = "ram-summary-metric-label", label),
-      tags$strong(as.character(value)),
-      tags$small(hint)
-    )
-  }
-  region_row <- function(label, count, percent) {
-    tags$tr(
-      tags$td(label),
-      tags$td(class = "ram-numeric", format(count, big.mark = ",")),
-      tags$td(class = "ram-numeric", percent_label(percent))
-    )
-  }
-  tags$div(
-    class = "ram-summary",
-    tags$div(
-      class = "ram-summary-metrics",
-      metric("Selected residues", total_count2, "Across selected chains"),
-      metric("Classified, excluding Gly/Pro", total_count,
-             "Residues with defined backbone angles"),
-      metric("Outliers", nar_count, "Outside the selected reference regions")
-    ),
-    tags$h3("Region breakdown"),
-    tags$p(class = "ram-summary-note",
-           "Percentages use classified residues other than glycine and proline as the denominator."),
-    tags$div(
-      class = "ram-summary-table-wrap",
-      tags$table(
-        class = "ram-summary-table",
-        tags$thead(
-          tags$tr(tags$th("Region"), tags$th("Residues"), tags$th("Share"))
-        ),
-        tags$tbody(
-          region_row("Favoured", fr_count, fr_percent),
-          region_row("Allowed", ar_count, ar_percent),
-          region_row("Generously allowed", gar_count, gar_percent),
-          region_row("Not allowed", nar_count, nar_percent),
-          region_row("Total classified", total_count, total_percent)
-        )
-      )
-    ),
-    tags$div(
-      class = "ram-summary-footnotes",
-      tags$div(
-        tags$strong(format(end_count, big.mark = ",")),
-        tags$span("Missing or terminal angles (excluding Gly/Pro)")
-      ),
-      tags$div(
-        tags$strong(format(gly_count, big.mark = ",")),
-        tags$span("Glycine residues")
-      ),
-      tags$div(
-        tags$strong(format(pro_count, big.mark = ",")),
-        tags$span("Proline residues")
-      )
-    )
-  )
-})
-
-
-        name<-ifelse(inputType=="file",tools::file_path_sans_ext(basename(input$structfile$name)),accPDB)
-
-        session$sendCustomMessage(
-          "process",
-          list(
-            df = torsionsubset,
-            matrix = matrix,
-            name=name,
-            pdb = accPDB,
-            backgroundColors = c(input$bg1, input$bg2, input$bg3, input$bg4),
-            # get the colors from the chain ui color settings and add them to a vector
-            chainColors = unlist(lapply(unique(torsionsubset$chain), function(x) {
-              input[[paste0("chain", x)]]
-            })),
-            limits = ram_density_thresholds(matrix)
-          )
-        )
+    source_type <- if (identical(input$inputSource, "upload")) "upload" else "pdb"
+    if (source_type == "upload" && is.null(input$structfile$datapath)) {
+      showNotification("Choose a PDB or mmCIF file first.", type = "error")
+      return()
+    }
+    accession <- toupper(trimws(input$PDB))
+    if (source_type == "pdb" && !nzchar(accession)) {
+      showNotification("Enter a PDB accession first.", type = "error")
+      return()
+    }
+    withProgress(message = "Loading structure", value = 0, {
+      loaded <- tryCatch(ram_load_structure(
+        path = if (source_type == "upload") input$structfile$datapath else NULL,
+        original_name = if (source_type == "upload") input$structfile$name else NULL,
+        pdb_id = if (source_type == "pdb") accession else NULL
+      ), error = function(e) {
+        showNotification(conditionMessage(e), type = "error", duration = 12)
+        NULL
       })
+      if (is.null(loaded)) return()
+      incProgress(.5, detail = "Calculating backbone torsions")
+      angles <- tryCatch(ram_extract_torsions(loaded), error = function(e) {
+        showNotification(conditionMessage(e), type = "error", duration = 12)
+        NULL
+      })
+      if (is.null(angles)) return()
+      label <- if (source_type == "pdb") accession else
+        tools::file_path_sans_ext(input$structfile$name)
+      viewer_source <- if (source_type == "pdb") accession else
+        input$structfile$datapath
+      viewer_format <- if (source_type == "upload")
+        ram_detect_format(input$structfile$name) else NULL
+      chains <- unique(as.character(angles$chain))
+      molecule <- NGLVieweR(data = viewer_source, format = viewer_format) %>%
+        NGLVieweR::stageParameters(backgroundColor = "#f7fafb") %>%
+        setRock() %>%
+        NGLVieweR::selectionParameters(3, "residue")
+      for (k in seq_along(chains)) {
+        molecule <- addRepresentation(molecule, "cartoon",
+          param = list(
+            name = paste0("chain-", k),
+            sele = paste0(":", chains[k], " and protein"),
+            color = color_set[((k - 1L) %% length(color_set)) + 1L]))
+      }
+      # Clear selection and signal the browser before switching structures.
+      selected_residue(NULL)
+      viewer_highlight_added(FALSE)
+      session$sendCustomMessage("ramplotr-select", NULL)
+      structure(loaded)
+      torsions(angles)
+      available_chains(chains)
+      structure_name(label)
+      output$NGL <- NGLVieweR::renderNGLVieweR(molecule)
+      incProgress(.5)
     })
-  }, ignoreInit = TRUE)
+  })
+
+  # Only the selected background controls the plotted density. All region
+  # classifications use per-residue reference grids unless legacy is selected.
+  observeEvent(input$bgtype, {
+    req(input$bgtype)
+    files <- list.files(file.path("static", input$bgtype))
+    choices <- list("Commonly used" = files[!files %in% allAA],
+                    "Per amino acid" = files[files %in% allAA])
+    choice <- if (!is.null(input$background) && input$background %in% files)
+      input$background else if ("General" %in% files) "General" else files[1]
+    updateSelectInput(session, "background", choices = choices, selected = choice)
+  })
+  observeEvent(input$background, {
+    if (!is.null(input$background) && input$background %in% allAA) {
+      updatePickerInput(session, "AA", selected = input$background)
+    }
+  })
+  updateColorInputs <- function(colors) {
+    for (k in seq_len(4L))
+      colourpicker::updateColourInput(session, paste0("bg", k), value = colors[k])
+  }
+  observeEvent(input$colorscheme, {
+    if (identical(input$colorscheme, "Rampage")) updateColorInputs(rampage)
+    if (identical(input$colorscheme, "PDBSum")) updateColorInputs(pdbsum)
+  })
+  observe({
+    colors <- c(input$bg1, input$bg2, input$bg3, input$bg4)
+    if (length(colors) != 4L || anyNA(colors)) return()
+    name <- if (identical(colors, unname(rampage))) "Rampage" else
+      if (identical(colors, unname(pdbsum))) "PDBSum" else "custom"
+    if (!identical(input$colorscheme, name))
+      updateSelectInput(session, "colorscheme", selected = name)
+  })
+
+  selected_matrix <- reactive({
+    req(input$bgtype, input$background)
+    background <- input$background
+    # Some reference sets name this group preProline.
+    if (identical(background, "preProline") ||
+        identical(background, "Preproline")) background <- "preProline"
+    if (!background %in% allAA && background != "preProline")
+      background <- "General"
+    ram_read_reference(file.path("static", input$bgtype, background))
+  })
+
+  classified <- reactive({
+    req(torsions(), input$bgtype, input$validationMode)
+    ram_classify_torsions(torsions(), file.path("static", input$bgtype),
+      selected_matrix(), mode = input$validationMode,
+      threshold_fn = ram_density_thresholds)
+  })
+
+  visible_rows <- reactive({
+    rows <- classified()
+    # An explicit empty selection should display no residues; NULL is used
+    # only before a dynamic chain-picker has been mounted.
+    if (!is.null(input$AA)) rows <- rows[rows$resn %in% input$AA, , drop = FALSE]
+    if (!is.null(input$chainselection))
+      rows <- rows[rows$chain %in% input$chainselection, , drop = FALSE]
+    if (identical(input$background, "preProline"))
+      rows <- rows[!is.na(rows$bonded_to_next) & rows$bonded_to_next &
+        !is.na(rows$next_resn) & rows$next_resn == "PRO", , drop = FALSE]
+    rows
+  })
+
+  # Every visual change invalidates this observer; parsing/torsions remain
+  # cached. Plotly.react handles repainting without resetting the viewport.
+  observe({
+    req(structure(), selected_matrix())
+    rows <- visible_rows()
+    groups <- unique(as.character(rows$chain))
+    colors <- vapply(groups, function(chain) {
+      widget <- input[[paste0("chain", chain)]]
+      if (!is.null(widget) && nzchar(widget)) widget else
+        color_set[((match(chain, available_chains()) - 1L) %% length(color_set)) + 1L]
+    }, character(1))
+    palette <- c(input$bg1, input$bg2, input$bg3, input$bg4)
+    req(length(palette) == 4L, all(nzchar(palette)))
+    matrix <- selected_matrix()
+    session$sendCustomMessage("process", list(
+      df = rows, matrix = matrix, name = structure_name(),
+      backgroundColors = palette, chainColors = unname(colors),
+      limits = ram_density_thresholds(matrix),
+      selected = selected_residue()))
+  })
+
+  region_rows <- reactive({
+    rows <- visible_rows()
+    if (!identical(input$regionselect, "All") && !is.null(input$regionselect))
+      rows <- rows[!is.na(rows$region) &
+        rows$region == input$regionselect, , drop = FALSE]
+    rows
+  })
+  output$regions <- renderDataTable({
+    rows <- region_rows()
+    data.frame(
+      Chain = rows$chain, Residue = rows$resi,
+      Insertion = rows$insertion_code, Amino_acid = rows$resn,
+      Phi = round(rows$phi, 2), Psi = round(rows$psi, 2),
+      Region = rows$region, Density_percentile = round(rows$density, 2),
+      check.names = FALSE)
+  }, selection = "single", rownames = FALSE, options = list(pageLength = 15,
+     scrollX = TRUE))
+
+  # All summary counts use the same live selection as the scatter plot.
+  output$summary <- renderUI({
+    rows <- visible_rows()
+    exclude <- rows$resn %in% c("GLY", "PRO")
+    eligible <- rows[!exclude & !is.na(rows$region), , drop = FALSE]
+    counts <- vapply(c("Favoured", "Allowed", "Generously allowed", "Not allowed"),
+      function(x) sum(eligible$region == x), integer(1))
+    percentage <- function(n) if (nrow(eligible)) sprintf("%.2f%%", 100 * n /
+      nrow(eligible)) else "n/a"
+    region_row <- function(label, number) tags$tr(
+      tags$td(label), tags$td(class = "ram-numeric", number),
+      tags$td(class = "ram-numeric", percentage(number)))
+    metric <- function(label, value, hint) tags$div(class = "ram-summary-metric",
+      tags$span(class = "ram-summary-metric-label", label),
+      tags$strong(as.character(value)), tags$small(hint))
+    tags$div(class = "ram-summary",
+      tags$div(class = "ram-summary-metrics",
+        metric("Selected residues", nrow(rows), "Across selected chains"),
+        metric("Classified, excluding Gly/Pro", nrow(eligible),
+          "Residues with defined backbone angles"),
+        metric("Outliers", counts[["Not allowed"]],
+          "Outside the selected reference regions")),
+      tags$h3("Region breakdown"),
+      tags$p(class = "ram-summary-note",
+        "Percentages use classified residues other than glycine and proline as the denominator."),
+      tags$div(class = "ram-summary-table-wrap",
+        tags$table(class = "ram-summary-table",
+          tags$thead(tags$tr(tags$th("Region"), tags$th("Residues"), tags$th("Share"))),
+          tags$tbody(lapply(names(counts), function(label)
+            region_row(label, counts[[label]])),
+            region_row("Total classified", nrow(eligible))))),
+      tags$div(class = "ram-summary-footnotes",
+        tags$div(tags$strong(sum(!exclude & is.na(rows$region))),
+          tags$span("Missing or terminal angles (excluding Gly/Pro)")),
+        tags$div(tags$strong(sum(rows$resn == "GLY")),
+          tags$span("Glycine residues")),
+        tags$div(tags$strong(sum(rows$resn == "PRO")),
+          tags$span("Proline residues"))))
+  })
+
+  # A single selected residue drives plot emphasis, 3D highlighting and
+  # table selection, whichever representation the user clicked first.
+  valid_selection <- function(x) {
+    if (is.null(x) || is.null(x$chain) || is.null(x$resi)) return(NULL)
+    row <- torsions()
+    if (is.null(row)) return(NULL)
+    index <- which(as.character(row$chain) == as.character(x$chain) &
+       row$resi == suppressWarnings(as.integer(x$resi)) &
+       as.character(row$insertion_code) ==
+         if (is.null(x$insertion_code)) "" else as.character(x$insertion_code))
+    if (!length(index)) return(NULL)
+    row[index[1L], , drop = FALSE]
+  }
+  select_row <- function(row) {
+    if (is.null(row) || !nrow(row)) return()
+    selected_residue(list(
+      chain = as.character(row$chain[1L]),
+      resi = as.integer(row$resi[1L]),
+      insertion_code = as.character(row$insertion_code[1L]),
+      resn = as.character(row$resn[1L])))
+  }
+  observeEvent(input$ramplotr_point, {
+    select_row(valid_selection(input$ramplotr_point))
+  })
+  observeEvent(input$regions_rows_selected, {
+    index <- input$regions_rows_selected
+    rows <- region_rows()
+    if (length(index) != 1L || index < 1L || index > nrow(rows)) return()
+    select_row(rows[index, , drop = FALSE])
+  })
+  observeEvent(input$NGL_selection, {
+    # NGLVieweR emits values such as [ALA]12:A.CA; ignore atom suffixes.
+    selection <- input$NGL_selection
+    if (!is.character(selection) || !length(selection)) return()
+    token <- regmatches(selection[1L],
+      regexec("\\[[^]]+\\](-?[0-9]+)(?:\\^([A-Za-z0-9]))?:([^\\.\\s]+)",
+              selection[1L], perl = TRUE))[[1L]]
+    if (length(token) < 4L) return()
+    row <- valid_selection(list(resi = as.integer(token[2L]),
+      chain = token[4L], insertion_code = if (length(token) > 2L) token[3L] else ""))
+    select_row(row)
+  })
+
+  observeEvent(input$clearSelection, {
+    selected_residue(NULL)
+  })
+  observeEvent(selected_residue(), {
+    selected <- selected_residue()
+    session$sendCustomMessage("ramplotr-select", selected)
+    if (is.null(selected) || is.null(torsions())) {
+      if (viewer_highlight_added()) {
+        NGLVieweR_proxy("NGL") %>% removeSelection("ramplotr-highlight")
+        viewer_highlight_added(FALSE)
+      }
+      return()
+    }
+    chain <- selected$chain
+    if (!grepl("^[A-Za-z0-9]$", chain)) return()
+    insertion <- selected$insertion_code
+    sele <- paste0(selected$resi,
+      if (nzchar(insertion)) paste0("^", insertion) else "",
+      ":", chain)
+    if (viewer_highlight_added()) {
+      NGLVieweR_proxy("NGL") %>% updateSelection("ramplotr-highlight", sele)
+    } else {
+      NGLVieweR_proxy("NGL") %>% addSelection("ball+stick", param = list(
+        name = "ramplotr-highlight", sele = sele, colorValue = "#ff5630",
+        colorScheme = "uniform", radiusScale = 1.3))
+      viewer_highlight_added(TRUE)
+    }
+  }, ignoreNULL = FALSE)
+
+  observeEvent(input$ligands, {
+    if (isTRUE(input$ligands))
+      NGLVieweR_proxy("NGL") %>%
+        addSelection("ball+stick", param = list(name = "ligand", sele = "ligand"))
+    else NGLVieweR_proxy("NGL") %>% removeSelection("ligand")
+  })
+  observeEvent(input$dna, {
+    if (isTRUE(input$dna))
+      NGLVieweR_proxy("NGL") %>%
+        addSelection("cartoon", param = list(name = "dna", sele = "dna"))
+    else NGLVieweR_proxy("NGL") %>% removeSelection("dna")
+  })
+  observeEvent(input$rna, {
+    if (isTRUE(input$rna))
+      NGLVieweR_proxy("NGL") %>%
+        addSelection("cartoon", param = list(name = "rna", sele = "rna"))
+    else NGLVieweR_proxy("NGL") %>% removeSelection("rna")
+  })
+  observeEvent(input$rocking, {
+    if (isTRUE(input$rocking)) {
+      NGLVieweR_proxy("NGL") %>% updateRock()
+      if (isTRUE(input$spinning)) updateCheckboxInput(session, "spinning", value = FALSE)
+    } else NGLVieweR_proxy("NGL") %>% updateRock(rock = FALSE)
+  })
+  observeEvent(input$spinning, {
+    if (isTRUE(input$spinning)) {
+      NGLVieweR_proxy("NGL") %>% updateSpin()
+      if (isTRUE(input$rocking)) updateCheckboxInput(session, "rocking", value = FALSE)
+    } else NGLVieweR_proxy("NGL") %>% updateSpin(spin = FALSE)
+  })
 }
 
-
-# Run the application
 shinyApp(ui = ui, server = server)

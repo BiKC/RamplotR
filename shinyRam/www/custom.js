@@ -237,11 +237,22 @@
     if (predictionFields) predictionFields.classList.toggle("is-hidden", !upload);
   }
 
+  function changePredictionSource() {
+    const source = document.getElementById("predictionSource");
+    const sidecars = document.getElementById("ram-confidence-sidecars");
+    if (!source || !sidecars) return;
+    sidecars.classList.toggle("is-hidden",
+      source.value !== "alphafold2" && source.value !== "alphafold3");
+  }
+
   function initSourceControl() {
     changeSource();
+    changePredictionSource();
     changeCompareSource();
     document.addEventListener("change", function (event) {
       if (event.target && event.target.name === "inputSource") changeSource();
+      if (event.target && event.target.id === "predictionSource")
+        changePredictionSource();
       if (event.target && event.target.name === "compareInputSource")
         changeCompareSource();
     });

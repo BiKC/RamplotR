@@ -388,7 +388,7 @@ ui <- fluidPage(
                   )
                 )
               ),
-
+              uiOutput("predictionPanel")
             ),
             tabPanel(
               title = "Residue list", value = "residues",
@@ -1006,6 +1006,73 @@ server <- function(input, output, session) {
         )
       })
     )
+  })
+
+  output$predictionPanel <- renderUI({
+    structure <- req(loaded())
+    prediction <- structure$prediction
+    if (is.null(prediction)) return(NULL)
+    if (current_model() > 1L)
+      return(tags$section(class = "ram-confidence-panel",
+        tags$p("Confidence applies to model 1 only. Switch back to model 1 to view its predictions.")))
+    known <- prediction$residues$plddt
+    available <- known[is.finite(known)]
+    title <- switch(prediction$source,
+      alphafold_db = "AlphaFold DB", alphafold2 = "AlphaFold / ColabFold",
+      alphafold3 = "AlphaFold 3", esmfold = "ESMFold",
+      other_prediction = "Predicted structure", "Predicted structure")
+    label <- if (length(available))
+      sprintf("Mean pLDDT %.1f · %d / %d residues",
+              mean(available), length(available), length(known))
+      else "No usable pLDDT values"
+    metric <- function(title, value) {
+      if (is.finite(value)) tags$span(class = "ram-confidence-metric",
+        paste0(title, " ", sprintf("%.2f", value))) else NULL
+    }
+    tags$details(id = "ram-confidence-panel",
+      class = "ram-confidence-panel",
+      tags$summary(
+        tags$span(class = "ram-confidence-title",
+          paste(title, "confidence")),
+        tags$span(class = "ram-confidence-subtitle", label),
+        if (!is.null(prediction$pae))
+          tags$span(class = "ram-confidence-available", "PAE available")
+      ),
+      tags$div(class = "ram-confidence-body",
+        tags$p(class = "ram-confidence-explainer",
+          "pLDDT estimates local prediction confidence. PAE estimates uncertainty in relative residue placement. Neither replaces experimental or stereochemical validation."),
+        tags$div(class = "ram-confidence-metrics",
+          metric("pTM", prediction$ptm),
+          metric("ipTM", prediction$iptm)),
+        if (!is.null(prediction$pae)) tagList(
+          tags$div(class = "ram-confidence-map-title",
+            tags$strong("Predicted aligned error (PAE)"),
+            tags$span("Click an axis residue to inspect it in 2D and 3D.")),
+          tags$div(id = "ram-pae-plot", role = "img",
+            "aria-label" = "Interactive predicted aligned error heatmap"),
+          tags$p(class = "ram-pae-note", id = "ram-pae-note")
+        ) else tags$p(class = "ram-confidence-explainer",
+          "No matching PAE matrix was provided for this model."),
+        if (length(prediction$notes)) tags$p(
+          class = "ram-confidence-warning",
+          paste(prediction$notes, collapse = " "))
+      )
+    )
+  })
+  observe({
+    structure <- req(loaded())
+    prediction <- structure$prediction
+    if (is.null(prediction) || current_model() != 1L) {
+      session$sendCustomMessage("ram-confidence", list(clear = TRUE))
+    } else {
+      plot_data <- tryCatch(
+        ram_pae_plot_data(prediction, structure$torsions),
+        error = function(e) NULL
+      )
+      session$sendCustomMessage("ram-confidence",
+        if (is.null(plot_data)) list(clear = TRUE)
+        else plot_data)
+    }
   })
 
   comparison_torsions <- reactive({

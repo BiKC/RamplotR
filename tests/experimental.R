@@ -32,4 +32,17 @@ assert(summary$matched==2L && summary$official_rotamer_outliers==2L &&
        "Independent report counts must use only matched residues.")
 bad <- try(ram_external_validation_read(source_file,max_bytes=8L),silent=TRUE)
 assert(inherits(bad,"try-error"),"Oversized XML must be rejected.")
+gzpath <- tempfile(fileext=".xml.gz")
+con <- gzfile(gzpath,open="wb")
+writeBin(readBin(source_file,what="raw",n=file.info(source_file)$size),con)
+close(con)
+on.exit_gz <- function() unlink(gzpath)
+compressed <- ram_external_validation_read(gzpath)
+assert(nrow(compressed)==nrow(official),
+       "The streamed gzip parser must preserve every official record.")
+blocked <- try(ram_external_validation_read(gzpath,max_bytes=32L),
+               silent=TRUE)
+assert(inherits(blocked,"try-error"),
+       "Uncompressed XML limits must also apply to compressed reports.")
+on.exit_gz()
 message("External wwPDB geometry/rotamer/clash XML import tests passed.")

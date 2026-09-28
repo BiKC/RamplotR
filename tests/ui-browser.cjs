@@ -64,6 +64,11 @@ const assert = require("node:assert/strict");
         yAnchor: p._fullLayout.yaxis.scaleanchor,
         xRange: p._fullLayout.xaxis.range,
         yRange: p._fullLayout.yaxis.range,
+        axisPixels: {
+          x: p._fullLayout.xaxis._length,
+          y: p._fullLayout.yaxis._length
+        },
+        renderedHeight: p.getBoundingClientRect().height,
         status: document.getElementById("ram-current-structure").textContent,
         width: p.getBoundingClientRect().width
       };
@@ -76,6 +81,9 @@ const assert = require("node:assert/strict");
               Math.abs(plot.yRange[1] - 180) < 1,
               "The plot must keep both -180° to 180° angular ranges.");
     assert.ok(plot.status.includes("plotted residues"), "No plotted residues");
+    assert.ok(plot.axisPixels.x >= 0.48 * plot.width &&
+              plot.axisPixels.y >= 0.48 * plot.width,
+              "Angular axes must use at least half of the plot panel width.");
     await page.screenshot({
       path: "benchmarks/output/ui-preview/desktop-loaded.png", fullPage: true
     });

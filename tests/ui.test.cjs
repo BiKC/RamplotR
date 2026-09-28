@@ -117,7 +117,7 @@ assert.equal(empty.hidden, true);
 assert.ok(badge.textContent.includes("1 plotted residues"));
 // Plotly.react promises resolve on the next microtask; point-click handlers
 // are registered after rendering, not before.
-Promise.resolve().then(() => {
+setImmediate(() => {
   assert.equal(typeof events.plotly_click, "function");
   assert.equal(rendered.traces[4].customdata[0][2], "A",
                "Insertions must stay attached to the plotted residue.");

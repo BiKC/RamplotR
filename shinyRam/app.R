@@ -343,8 +343,6 @@ ui <- fluidPage(
 )
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
-  output$dummy <- reactive(FALSE)
-  outputOptions(output, "dummy", suspendWhenHidden = FALSE)
   # session$onSessionEnded(stopApp)
   session$userData$previousPDB <- ""
   # reactive(bio3d::write.pdb(pdb = pdb(), file = paste0(accPDB(), '.pdb')))
@@ -451,8 +449,9 @@ server <- function(input, output, session) {
       }
     })
 
-  output$dummy <- reactive({
-    input$submit
+  # Process a structure only when requested. A newly opened session starts
+  # with the empty plot rather than fetching the default PDB automatically.
+  observeEvent(input$submit, {
     withProgress(message = "Making plot", value = 0, {
       inputType<-""
       isolate({
@@ -731,7 +730,7 @@ server <- function(input, output, session) {
         )
       })
     })
-  })
+  }, ignoreInit = TRUE)
 }
 
 

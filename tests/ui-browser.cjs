@@ -100,8 +100,8 @@ const assert = require("node:assert/strict");
       ["cartoon","ribbon","licorice","ball+stick","surface"]);
     assert.equal(cleanControls.selectedStyle, "cartoon",
       "Cartoon must be the default molecular representation.");
-    assert.equal(cleanControls.visibleLayers, true,
-      "Molecular layers and motion switches should be visible without a disclosure.");
+    assert.equal(cleanControls.visibleLayers, false,
+      "Secondary molecular layers should start collapsed to save space.");
     assert.equal(plot.yAnchor, "x", "Axes must be equally scaled.");
     assert.ok(Math.abs(plot.xRange[0] + 180) < 1 &&
               Math.abs(plot.xRange[1] - 180) < 1 &&
@@ -123,6 +123,18 @@ const assert = require("node:assert/strict");
     await page.screenshot({
       path: "benchmarks/output/ui-preview/desktop-loaded.png", fullPage: true
     });
+    // Layer switches remain accessible in one compact disclosure.
+    await page.click(".ram-viewer-details > summary");
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll(
+        '.ram-viewer-details input[type="checkbox"]')].length === 5 &&
+      [...document.querySelectorAll(
+        '.ram-viewer-details input[type="checkbox"]')].every(input =>
+        input.getBoundingClientRect().height > 0),
+      {timeout:10000});
+    await page.click(".ram-viewer-details > summary");
+    assert.equal(await page.$eval(".ram-viewer-details", el => el.open),false,
+      "Secondary viewer controls should collapse again.");
 
     // A standard laptop should show the analysis, not a full-height landing
     // page. Focus mode is reversible and must preserve the live plot.
@@ -141,6 +153,8 @@ const assert = require("node:assert/strict");
         introHidden: getComputedStyle(intro).display === "none",
         sourceHeight: source.getBoundingClientRect().height,
         plotBottom: p.getBoundingClientRect().bottom,
+        viewerHeight: document.querySelector(".ram-ngl")
+          .getBoundingClientRect().height,
         viewportHeight: window.innerHeight
       };
     });
@@ -150,6 +164,8 @@ const assert = require("node:assert/strict");
               "The loaded structure toolbar should remain compact.");
     assert.ok(laptop.plotBottom <= laptop.viewportHeight+95,
               "The laptop plot should fit mostly inside the first screen.");
+    assert.ok(laptop.viewerHeight >= 290 && laptop.viewerHeight < 380,
+              "The molecular viewer should fit a short laptop viewport.");
     await page.screenshot({
       path:"benchmarks/output/ui-preview/laptop-compact.png",fullPage:true
     });

@@ -660,7 +660,25 @@ body > .container-fluid { max-width: none; padding: 0; }
 }
 .ram-source-controls { gap: 12px; grid-template-columns: minmax(195px,235px) minmax(0,1fr) auto; }
 .ram-source .ram-submit { padding-bottom: 0; }
-.ram-has-data .ram-source-controls { grid-template-columns: minmax(178px,210px) minmax(0,1fr) auto; }
+.ram-has-data .ram-source-controls {
+  grid-template-columns: minmax(235px,260px) minmax(140px,1fr) auto;
+}
+@media (min-width:900px) {
+  .ram-has-data .ram-source-choice .shiny-options-group { flex-wrap:nowrap; }
+  .ram-has-data .ram-source-choice .radio-inline {
+    min-width:0; padding:7px 8px !important; font-size:11px;
+  }
+}
+/* Separate control labels from guidance without hiding any viewer settings. */
+.ram-viewer-control-heading {
+  display:flex; align-items:baseline; justify-content:space-between;
+  flex-wrap:wrap; gap:4px 10px; margin-bottom:7px;
+  color:#2b5660; font-size:11px; font-weight:750;
+}
+.ram-viewer-control-note {
+  color:#65808a; font-size:10px; font-weight:450; line-height:1.35;
+}
+.ram-layer-heading { margin-top:12px; }
 
 /* Keep the NGL model front and centre. A small style selector is always
    available; overlays and animation live in one tidy disclosure. */

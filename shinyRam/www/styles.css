@@ -314,3 +314,17 @@ body > .container-fluid { max-width: none; padding: 0; }
 
 /* The NGL canvas now uses a light stage; keep its surrounding card consistent. */
 .ram-ngl { background: #f7fafb; border-radius: 9px; overflow: hidden; }
+
+/* One selection state is reflected in the plot, 3D viewer and residue list. */
+.ram-selected-residue { display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px; padding: 12px 16px; margin: 0 0 14px;
+  background: #f2f8f7; border: 1px solid #c7e0dc; border-radius: 9px;
+  color: #244f55; font-size: 12px; }
+.ram-selected-residue strong { color: #12595b; }
+.ram-selected-residue .btn { padding: 5px 11px; border: 1px solid #bad6d3;
+  color: #22575d; background: white; border-radius: 7px; font-weight: 650; }
+.ram-main table.dataTable tbody tr.selected,
+.ram-main table.dataTable tbody tr.selected > * { background: #d8ece7 !important;
+  color: #173e43 !important; }
+.ram-main table.dataTable tbody tr { cursor: pointer; }
+@media (max-width: 580px) { .ram-selected-residue { align-items: flex-start; } }

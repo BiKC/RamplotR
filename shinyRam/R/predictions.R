@@ -256,6 +256,7 @@ ram_download_afdb <- function(entry,
   }
   on_error <- FALSE
   list(structure = coord, pae = pae, notes = notes,
+       pae_source = if (!is.null(pae)) entry$pae_url else "",
        original_name = paste0("AF-", entry$accession, ext))
 }
 
@@ -266,6 +267,8 @@ ram_prepare_prediction <- function(pdb, torsions, source, sidecar = NULL,
                                    summary_file = NULL, notes = character(),
                                    model_id = "") {
   baseline <- ram_prediction_from_atoms(pdb, torsions, source)
+  if (source == "esmfold" && !is.null(sidecar) && nzchar(sidecar))
+    stop("ESMFold does not natively generate PAE; do not attach a PAE matrix from another prediction.")
   mapped <- if (!is.null(sidecar) && nzchar(sidecar))
     ram_prediction_json(ram_read_confidence_json(sidecar), torsions,
                         atoms = pdb$atom, source = source) else NULL

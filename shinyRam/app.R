@@ -24,6 +24,7 @@ source(file.path("R", "backbone.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
 source(file.path("R", "inspection.R"), local = TRUE)
 source(file.path("R", "reports.R"), local = TRUE)
+source(file.path("R", "predictions.R"), local = TRUE)
 
 # Chain colours and contour colours are designed together for a recognisable
 # RamplotR publication identity. Region meaning is encoded by ordered contrast,
@@ -131,7 +132,8 @@ ui <- fluidPage(
             class = "ram-source-choice",
             radioButtons(
               "inputSource", "Structure source",
-              choices = c("PDB ID" = "pdb", "Upload file" = "upload"),
+              choices = c("PDB ID" = "pdb", "Upload file" = "upload",
+                           "AlphaFold DB" = "afdb"),
               selected = "pdb", inline = TRUE
             )
           ),
@@ -148,10 +150,32 @@ ui <- fluidPage(
             )
           ),
           tags$div(
+            id = "ram-afdb-wrap", class = "ram-source-picker is-hidden",
+            textInput("afdbAccession", "AlphaFold DB UniProt accession",
+                      placeholder = "e.g. P69905")
+          ),
+          tags$div(
             class = "ram-submit",
             actionButton("submit", "Analyze structure", class = "btn-primary")
           )
         ),
+        tags$div(id = "ram-prediction-upload", class = "ram-prediction-upload is-hidden",
+          tags$div(class = "ram-prediction-upload-fields",
+            selectInput("predictionSource", "Uploaded structure type",
+              choices = c("Experimental or unknown (no confidence)" = "experimental",
+                          "AlphaFold 2 / ColabFold" = "alphafold2",
+                          "AlphaFold 3" = "alphafold3",
+                          "ESMFold" = "esmfold",
+                          "Other predicted model (B-factor pLDDT)" = "other_prediction"),
+              selected = "experimental"),
+            fileInput("predictionJson", "Confidence JSON (optional)",
+              accept = c(".json")),
+            fileInput("predictionSummaryJson", "Summary JSON (optional, AF3)",
+              accept = c(".json"))
+          ),
+          tags$p(class = "ram-field-hint",
+            "pLDDT is read from B-factor fields only when you declare a predicted model. Add AF2 PAE or AF3 confidence JSON for a linked error map.")
+        )
       ),
       tags$section(
         class = "ram-global-inspector is-empty", "aria-label" = "Residue inspection",

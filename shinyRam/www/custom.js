@@ -177,16 +177,32 @@
       window.Shiny.setInputValue("ramSeqPick", pick, { priority: "event" });
   });
 
+  let lastSequenceScrollKey = "";
   function markSequenceSelection() {
     if (typeof document.querySelectorAll !== "function") return;
     const selected = selectionKey(selectedResidue);
+    let activeButton = null;
     document.querySelectorAll(".ram-seq-res").forEach(function (button) {
       const key = selectionKey({
         chain: button.dataset.chain, resi: Number(button.dataset.resi),
         insertion_code: button.dataset.insertion || ""
       });
-      button.setAttribute("aria-pressed", String(!!selected && selected === key));
+      const active = !!selected && selected === key;
+      button.setAttribute("aria-pressed", String(active));
+      if (active) activeButton = button;
     });
+    // With all chains present, keep the selected letter in view only within
+    // its own horizontal sequence row. Do not scroll the entire page.
+    if (activeButton && selected !== lastSequenceScrollKey &&
+        typeof activeButton.closest === "function") {
+      const strip = activeButton.closest(".ram-sequence-grid");
+      if (strip && strip.clientWidth && Number.isFinite(activeButton.offsetLeft)) {
+        strip.scrollLeft = Math.max(0, activeButton.offsetLeft -
+          strip.offsetLeft - strip.clientWidth / 2);
+        lastSequenceScrollKey = selected;
+      }
+    }
+    if (!selected) lastSequenceScrollKey = "";
   }
 
   function changeCompareSource() {
@@ -198,8 +214,8 @@
     if (file) file.classList.toggle("is-hidden", !upload);
   }
 
-  // A reactive sequence tab may render after the original selection message.
-  // Update its aria-pressed markers whenever Shiny inserts new HTML.
+  // The expanded all-chain navigator may render after the selection message.
+  // Re-apply selection markers whenever Shiny inserts its residue buttons.
   document.addEventListener("shiny:value", function (event) {
     if (event.target && event.target.id === "sequenceView" &&
         typeof window.requestAnimationFrame === "function") {

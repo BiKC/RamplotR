@@ -20,3 +20,11 @@ This log records the main changes and their verification status. Work happens in
 - [ ] Record independent scientific comparison and benchmark results before the preprint.
 
 The scientific classifications are tied to the bundled reference densities. Do not claim MolProbity-equivalent outlier percentages without a separate benchmark. New methods and reference datasets will be versioned.
+
+## Phase 3: scientific comparisons and timing
+
+- [x] Provide a repeatable analysis/timing script recording the structure, reference dataset, software environment and per-stage elapsed time.
+- [x] Provide an independent torsion-angle comparison with Bio3D for PDB accessions without insertion codes.
+- [ ] Run the comparison on multiple public proteins and investigate mismatches.
+- [ ] Run scaling benchmarks on large PDB/mmCIF inputs and record benchmark output.
+- [ ] Compare region labels against independently generated structural-validation reports; numerical thresholds differ across implementations.

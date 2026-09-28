@@ -397,7 +397,7 @@
   if (window.Shiny) {
     window.Shiny.addCustomMessageHandler("process", drawPlot);
     window.Shiny.addCustomMessageHandler("ram-selection", function (choice) {
-      selectedResidue = choice || null;
+      selectedResidue = choice && !choice.clear ? choice : null;
       refreshSelection();
       syncNglSelection(true);
     });

@@ -19,7 +19,15 @@ plain <- !is.na(ours$insertion_code) & ours$insertion_code == ""
 all_own_rows <- nrow(ours)
 ours <- ours[plain, , drop = FALSE]
 key <- paste(ours$resi, ours$chain, ours$resn, sep = ".")
-reference_index <- match(key, rownames(reference))
+# Bio3D pads some residue numbers with leading whitespace when building
+# its table. Normalize identifiers and reject ambiguous joins.
+source(file.path("benchmarks", "validation_helpers.R"))
+reference_index <- ram_match_reference_keys(key, rownames(reference))
+identifier_coverage <- mean(!is.na(reference_index))
+if (identifier_coverage < 0.98) {
+  stop(sprintf("Insufficient residue-ID coverage: %.2f%% matched in %s",
+               identifier_coverage * 100, accession))
+}
 message(sprintf("Residue IDs: RamplotR %d total, %d without insertion codes; Bio3D %d; %d matched keys",
                 all_own_rows, nrow(ours), nrow(reference),
                 sum(!is.na(reference_index))))
@@ -41,6 +49,11 @@ results <- lapply(c("phi", "psi"), function(angle) {
     i <- i[is.finite(reference[reference_index[i], angle])]
   }
   if (!length(i)) stop(sprintf("No comparable %s angles in %s", angle, accession))
+  coverage <- length(i) / sum(is.finite(ours[[angle]]))
+  if (!is.finite(coverage) || coverage < 0.98) {
+    stop(sprintf("Insufficient %s-angle coverage: %.2f%% in %s",
+                 angle, coverage * 100, accession))
+  }
   differences <- angle_difference(ours[[angle]][i],
                                   as.numeric(reference[reference_index[i], angle]))
   data.frame(

@@ -132,3 +132,43 @@ ram_compare_torsions <- function(a, b) {
                              "Match", "Substitution")))
   result
 }
+
+
+# Keep all selected chains available in one navigator, in first-appearance
+# order. This is intentionally independent of any "active chain" input.
+ram_sequence_groups <- function(data) {
+  residues <- ram_sequence_data(data)
+  if (!nrow(residues)) return(list())
+  chain <- ifelse(is.na(residues$chain) | !nzchar(residues$chain),
+                  "Unassigned", residues$chain)
+  split(residues, factor(chain, levels = unique(chain)), drop = TRUE)
+}
+
+ram_sequence_status <- function(region) {
+  out <- rep("missing", length(region))
+  out[!is.na(region) & region == "Favoured"] <- "favoured"
+  out[!is.na(region) & region == "Allowed"] <- "allowed"
+  out[!is.na(region) & region == "Generously allowed"] <- "generously-allowed"
+  out[!is.na(region) & region == "Not allowed"] <- "outlier"
+  out
+}
+
+# Small overview strips represent *positions*, not aggregate percentages.
+# For long chains each strip cell represents a consecutive residue bin.
+# A bin takes the highest-priority review state so isolated outliers remain
+# visible instead of vanishing when hundreds of residues are compressed.
+ram_sequence_overview_bins <- function(region, max_bins = 180L) {
+  if (!length(region)) return(character(0))
+  stopifnot(is.numeric(max_bins), length(max_bins) == 1L,
+            is.finite(max_bins), max_bins >= 1L)
+  status <- ram_sequence_status(region)
+  bins <- min(length(status), as.integer(max_bins))
+  bucket <- pmin(bins, floor((seq_along(status) - 1) * bins /
+                              length(status)) + 1L)
+  priority <- c("outlier", "missing", "generously-allowed",
+                "allowed", "favoured")
+  vapply(seq_len(bins), function(i) {
+    candidates <- status[bucket == i]
+    priority[match(TRUE, priority %in% candidates)]
+  }, character(1))
+}

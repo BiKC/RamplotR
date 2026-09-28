@@ -439,6 +439,17 @@
     observer.observe(plot.parentElement || plot);
   }
 
+  // Plotly's own responsive listener can update SVG width while retaining its
+  // old desktop height. Run our dimensions after the browser finishes
+  // dispatching the resize event, including when revisiting the plot tab.
+  if (typeof window.addEventListener === "function") {
+    window.addEventListener("resize", function () {
+      if (typeof window.requestAnimationFrame === "function")
+        window.requestAnimationFrame(resizePlot);
+      else resizePlot();
+    });
+  }
+
   // Bootstrap 3 dispatches tab events through jQuery, not DOM EventTarget.
   if (window.jQuery) {
     window.jQuery(document).on("shown.bs.tab", function () {

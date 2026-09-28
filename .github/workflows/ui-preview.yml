@@ -40,6 +40,12 @@ jobs:
             -o benchmarks/output/ui-preview/1CRN.pdb
           sha256sum benchmarks/output/ui-preview/1CRN.pdb \
             > benchmarks/output/ui-preview/structure.sha256
+          # A genuine multimer for simultaneous all-chain sequence navigation.
+          curl --fail --silent --show-error --location \
+            https://files.rcsb.org/download/1BBB.pdb \
+            -o benchmarks/output/ui-preview/1BBB.pdb
+          sha256sum benchmarks/output/ui-preview/1BBB.pdb \
+            >> benchmarks/output/ui-preview/structure.sha256
       - name: Verify a real multi-model NMR structure
         shell: bash
         run: |

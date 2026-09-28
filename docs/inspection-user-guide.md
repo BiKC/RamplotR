@@ -1,6 +1,6 @@
 # RamplotR inspection and publication workflow
 
-The everyday workflow is deliberately short: load a PDB/mmCIF structure, inspect its Ramachandran plot and molecular viewer, select a residue, and review its details. Other workflows are in dedicated **Residue list**, **Sequence**, **Compare** and **Summary** tabs.
+The everyday workflow is deliberately short: load a PDB/mmCIF structure, inspect its Ramachandran plot and molecular viewer, select a residue, and review its details. A compact multi-chain sequence navigator is integrated below the 2D/3D views. Additional workflows use **Residue list**, **Compare** and **Summary** tabs. After loading a structure, the introductory form becomes a slim toolbar; use **Hide settings** for more plotting space on a laptop.
 
 ## Selection remains visible across views
 

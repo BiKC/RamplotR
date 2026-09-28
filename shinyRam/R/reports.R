@@ -138,7 +138,10 @@ ram_save_html_report <- function(path, data, metadata, svg_path,
         "Portable report: figure, counts, geometry and provenance. Native and independent results are reported separately."),
       htmltools::tags$section(htmltools::tags$h2("Ramachandran plot"),chart),
       htmltools::tags$section(htmltools::tags$h2("RamplotR region counts"),
-        table_for(data.frame(Region=names(tally),Residues=as.integer(tally)))),
+        table_for(data.frame(
+          Region=c(names(tally),"Missing angles","All selected residues"),
+          Residues=c(as.integer(tally),
+            sum(is.na(data$phi)|is.na(data$psi)),nrow(data))))),
       if("omega_status" %in% names(data))
         htmltools::tags$section(
           htmltools::tags$h2("Additional descriptive geometry"),

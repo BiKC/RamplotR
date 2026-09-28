@@ -10,6 +10,20 @@ The inspector beneath the structure input is shared across tabs. Selecting a res
 
 On a loaded screen with no selected residue, the inspector is reduced to a single review action. After selecting a residue, navigation controls become available. Representation buttons and the ligand, DNA, RNA, spin and rock switches remain visible beneath the viewer, so users can discover them without opening a settings menu.
 
+## Compact multi-chain sequence map
+
+The overview directly under the Ramachandran plot shows every selected
+protein chain at the same time. Its small, position-based bars retain the
+original residue order; for long chains, bins preserve isolated outliers
+and missing-angle positions. Expand the navigator to reveal independently
+scrollable, one-letter residue strips for all selected chains. Clicking a
+letter updates the same inspector, Ramachandran point and NGL focus.
+
+The map always retains full biological sequence positions, even when
+amino-acid or pre-proline filters hide most plotted points. Residues excluded
+by those filters appear dimmed and cannot be selected until the filters are
+relaxed; the sequence itself is never shortened into an artificial fragment.
+
 ## The residue table
 
 The table uses a single HTML table for headings and rows, without separate DataTables horizontal-scrolling header clones. Columns and angles are readable; displayed angles and density-percentile values are rounded to one decimal place. Exported CSV retains the unrounded values. **Region** and **Review** filters can be combined; selecting a row updates the shared inspector and both visualisations.

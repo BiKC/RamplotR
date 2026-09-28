@@ -198,6 +198,15 @@
     if (file) file.classList.toggle("is-hidden", !upload);
   }
 
+  // A reactive sequence tab may render after the original selection message.
+  // Update its aria-pressed markers whenever Shiny inserts new HTML.
+  document.addEventListener("shiny:value", function (event) {
+    if (event.target && event.target.id === "sequenceView" &&
+        typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(markSequenceSelection);
+    }
+  });
+
   function changeSource() {
     const selected = document.querySelector('input[name="inputSource"]:checked');
     const upload = selected && selected.value === "upload";
@@ -593,11 +602,12 @@
     }
   }
   document.addEventListener("shown.bs.tab", function () {
-    scheduleResize(); adjustVisibleTables();
+    scheduleResize(); adjustVisibleTables(); markSequenceSelection();
   });
   if (window.jQuery) {
     window.jQuery(document).on("shown.bs.tab", function () {
       scheduleResize();
+      markSequenceSelection();
       // Wait for the Bootstrap pane to finish its layout before measuring DT.
       if (window.requestAnimationFrame)
         window.requestAnimationFrame(adjustVisibleTables);

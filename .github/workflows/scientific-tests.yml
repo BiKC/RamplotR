@@ -32,6 +32,8 @@ jobs:
         run: |
           node --check shinyRam/www/custom.js
           node --check shinyRam/www/prediction.js
+          node --check shinyRam/www/density.js
+          node tests/density-ui.test.cjs
           node tests/ui.test.cjs
           node tests/prediction-ui.test.cjs
         shell: bash

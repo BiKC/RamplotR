@@ -153,6 +153,42 @@ const assert = require("node:assert/strict");
       return count === expected;
     }, { timeout: 18000 }, fullCount);
 
+    // Instrument the actual NGL widget: a plot click must turn on the
+    // persistent ball-and-stick representation AND animate camera focus.
+    await page.waitForFunction(() => window.getNGLStage &&
+      window.getNGLStructure && window.getNGLStructure("NGL") &&
+      window.getNGLStructure("NGL").length &&
+      window.getNGLStage("NGL").getRepresentationsByName("ram-highlight")
+        .list.length > 0, { timeout: 25000 });
+    await page.evaluate(() => {
+      const stage = window.getNGLStage("NGL");
+      const component = window.getNGLStructure("NGL")[0];
+      window.__ramZoomCalls = [];
+      window.__ramStickSelections = [];
+      window.__ramOverviewCalls = [];
+      const autoView = component.autoView.bind(component);
+      component.autoView = (sele, duration) => {
+        window.__ramZoomCalls.push({ sele, duration });
+        return autoView(sele, duration);
+      };
+      const overview = stage.autoView.bind(stage);
+      stage.autoView = duration => {
+        window.__ramOverviewCalls.push(duration);
+        return overview(duration);
+      };
+      const getRepresentations = stage.getRepresentationsByName.bind(stage);
+      stage.getRepresentationsByName = name => {
+        const group = getRepresentations(name);
+        if (name === "ram-highlight" && group && group.setSelection) {
+          const setSelection = group.setSelection.bind(group);
+          group.setSelection = sele => {
+            window.__ramStickSelections.push(sele);
+            return setSelection(sele);
+          };
+        }
+        return group;
+      };
+    });
     const firstPoint = await page.evaluate(() => {
       const trace = document.getElementById("plotly").data.find(t =>
         t.customdata && t.customdata.length);
@@ -163,11 +199,21 @@ const assert = require("node:assert/strict");
         points: [{ customdata: detail }]
       });
     }, firstPoint);
-    await page.waitForFunction(() => {
+    const firstNglSelector = firstPoint[1] +
+      (firstPoint[2] ? "^" + firstPoint[2] : "") +
+      (firstPoint[0] ? ":" + firstPoint[0] : "");
+    await page.waitForFunction(expected => {
       const p = document.getElementById("plotly");
       return document.querySelector("#selectedResidueInfo strong") &&
-        p.data[p.data.length - 1].x.length === 1;
-    }, { timeout: 18000 });
+        p.data[p.data.length - 1].x.length === 1 &&
+        window.__ramStickSelections.includes(expected) &&
+        window.__ramZoomCalls.some(call =>
+          call.sele === expected && call.duration === 650);
+    }, { timeout: 20000 }, firstNglSelector);
+    await page.screenshot({
+      path: "benchmarks/output/ui-preview/desktop-residue-zoom.png",
+      fullPage: true
+    });
 
     // The residue table should also select the same entry, and clicking
     // another row should move the plot highlight back to that residue.
@@ -191,7 +237,9 @@ const assert = require("node:assert/strict");
       await page.waitForFunction(() => {
         const p = document.getElementById("plotly");
         return !document.querySelector("#selectedResidueInfo strong") &&
-          p.data[p.data.length - 1].x.length === 0;
+          p.data[p.data.length - 1].x.length === 0 &&
+          window.__ramStickSelections.includes("none") &&
+          window.__ramOverviewCalls.includes(450);
       }, { timeout: 12000 });
     } catch (e) {
       const state = await page.evaluate(() => {

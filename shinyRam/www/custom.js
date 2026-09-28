@@ -226,10 +226,15 @@
   function changeSource() {
     const selected = document.querySelector('input[name="inputSource"]:checked');
     const upload = selected && selected.value === "upload";
+    const afdb = selected && selected.value === "afdb";
     const pdbWrap = document.getElementById("ram-pdb-wrap");
     const uploadWrap = document.getElementById("ram-upload-wrap");
-    if (pdbWrap) pdbWrap.classList.toggle("is-hidden", upload);
+    const afdbWrap = document.getElementById("ram-afdb-wrap");
+    const predictionFields = document.getElementById("ram-prediction-upload");
+    if (pdbWrap) pdbWrap.classList.toggle("is-hidden", !!(upload || afdb));
     if (uploadWrap) uploadWrap.classList.toggle("is-hidden", !upload);
+    if (afdbWrap) afdbWrap.classList.toggle("is-hidden", !afdb);
+    if (predictionFields) predictionFields.classList.toggle("is-hidden", !upload);
   }
 
   function initSourceControl() {

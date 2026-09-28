@@ -437,33 +437,48 @@
     }
   }
 
+  // Both a window resize and a change in the plotting card can affect plot
+  // geometry. Resize after layout has settled to avoid racing browser reflow
+  // or the NGL widget's own resize handler.
+  let pendingResize = null;
+  function scheduleResize() {
+    if (typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(function () {
+        window.requestAnimationFrame(resizePlot);
+      });
+    } else {
+      resizePlot();
+    }
+    if (typeof window.setTimeout === "function") {
+      if (pendingResize !== null && typeof window.clearTimeout === "function")
+        window.clearTimeout(pendingResize);
+      pendingResize = window.setTimeout(function () {
+        pendingResize = null;
+        resizePlot();
+      }, 160);
+    }
+  }
+
   if (plot && window.ResizeObserver) {
     let previousWidth = 0;
     const observer = new ResizeObserver(function () {
       const width = plot.clientWidth;
-      if (!width || Math.abs(width - previousWidth) < 5 ||
-          !plot.classList.contains("js-plotly-plot")) return;
-      previousWidth = width;
-      resizePlot();
+      if (!width || !plot.classList.contains("js-plotly-plot")) return;
+      if (Math.abs(width - previousWidth) >= 2 ||
+          !plot._fullLayout ||
+          Math.abs(plot._fullLayout.width - width) >= 2) {
+        previousWidth = width;
+        scheduleResize();
+      }
     });
-    observer.observe(plot.parentElement || plot);
+    observer.observe(plot);
+    if (plot.parentElement) observer.observe(plot.parentElement);
   }
-
-  // Plotly's own responsive listener can update SVG width while retaining its
-  // old desktop height. Run our dimensions after the browser finishes
-  // dispatching the resize event, including when revisiting the plot tab.
-  if (typeof window.addEventListener === "function") {
-    window.addEventListener("resize", function () {
-      if (typeof window.requestAnimationFrame === "function")
-        window.requestAnimationFrame(resizePlot);
-      else resizePlot();
-    });
-  }
+  if (typeof window.addEventListener === "function")
+    window.addEventListener("resize", scheduleResize);
 
   // Bootstrap 3 dispatches tab events through jQuery, not DOM EventTarget.
-  if (window.jQuery) {
-    window.jQuery(document).on("shown.bs.tab", function () {
-      resizePlot();
-    });
-  }
+  if (window.jQuery)
+    window.jQuery(document).on("shown.bs.tab", scheduleResize);
+
 })();

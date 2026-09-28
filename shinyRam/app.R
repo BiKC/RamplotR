@@ -168,13 +168,16 @@ ui <- fluidPage(
                           "ESMFold" = "esmfold",
                           "Other predicted model (B-factor pLDDT)" = "other_prediction"),
               selected = "experimental"),
-            fileInput("predictionJson", "Confidence JSON (optional)",
-              accept = c(".json")),
-            fileInput("predictionSummaryJson", "Summary JSON (optional, AF3)",
-              accept = c(".json"))
+            tags$div(id = "ram-confidence-sidecars",
+              class = "ram-prediction-sidecars is-hidden",
+              fileInput("predictionJson", "PAE / full confidence JSON",
+                accept = c(".json")),
+              fileInput("predictionSummaryJson", "Summary JSON (AF3, optional)",
+                accept = c(".json"))
+            )
           ),
           tags$p(class = "ram-field-hint",
-            "pLDDT is read from B-factor fields only when you declare a predicted model. Add AF2 PAE or AF3 confidence JSON for a linked error map.")
+            "For declared predictions, pLDDT is read from B-factors or verified AF3 atom confidence. AlphaFold supports optional PAE; ESMFold provides local pLDDT but not native PAE.")
         )
       ),
       tags$section(
@@ -669,6 +672,8 @@ server <- function(input, output, session) {
             NULL
           }
         )
+        if (!is.null(prediction) && is_afdb)
+          prediction$confidence_file <- afdb_files$pae_source
         if (!is.null(prediction) && length(prediction$notes))
           showNotification(paste(prediction$notes, collapse = " "),
                            type = "warning", duration = 14)

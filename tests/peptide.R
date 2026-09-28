@@ -33,3 +33,48 @@ assert(is.na(ram_dihedral(c(0, 0, 0), c(1, 0, 0),
                          c(2, 0, 0), c(3, 0, 0))),
        "Collinear coordinates should not produce fabricated torsion angles")
 message("Peptide continuity and insertion-code tests passed")
+
+# Many short disconnected chains exercise the preallocated output path.
+copies <- lapply(seq_len(250L), function(k) {
+  make_atoms(sprintf("chain%03d", k), 1L, "", "ALA", shift = k * 100)
+})
+many <- ram_extract_torsions(list(atom = do.call(rbind, copies)))
+assert(nrow(many) == 250L, "Every distinct chain must be retained")
+assert(all(!many$bonded_to_next), "Output allocation must not cross chains")
+assert(all(is.na(many$phi) & is.na(many$psi)),
+       "Disconnected single-residue chains have undefined torsions")
+message("Preallocated output regression tests passed")
+
+# Vectorized dihedrals must equal the scalar implementation, including
+# collinear and incomplete atom coordinates.
+p0 <- rbind(c(0, 1, 2), c(3, 1, 4), c(0, 0, 0), c(NA, 0, 0))
+p1 <- rbind(c(1, 1, 0), c(1, 3, 2), c(1, 0, 0), c(0, 0, 0))
+p2 <- rbind(c(0, 2, 1), c(4, 0, 1), c(2, 0, 0), c(1, 0, 0))
+p3 <- rbind(c(1, 2, 3), c(5, 3, 2), c(3, 0, 0), c(2, 0, 0))
+scalar <- vapply(seq_len(nrow(p0)), function(i) {
+  ram_dihedral(p0[i, ], p1[i, ], p2[i, ], p3[i, ])
+}, numeric(1))
+batch <- ram_dihedral_batch(p0, p1, p2, p3)
+assert(isTRUE(all.equal(batch, scalar, tolerance = 1e-10)),
+       "Vectorized dihedral values must match the scalar implementation")
+assert(length(ram_dihedral_batch(matrix(numeric(), ncol = 3),
+                                 matrix(numeric(), ncol = 3),
+                                 matrix(numeric(), ncol = 3),
+                                 matrix(numeric(), ncol = 3))) == 0L,
+       "An empty dihedral batch should be supported")
+message("Vectorized dihedral tests passed")
+
+# Alternate-location B atoms must not displace blank or A coordinates.
+with_alt <- rbind(make_atoms("A", 1L, "", "ALA", 0),
+                  make_atoms("A", 2L, "", "PRO", 2.5))
+expected <- ram_extract_torsions(list(atom = with_alt))
+noise <- with_alt[with_alt$elety == "CA" & with_alt$resno == 1L, , drop = FALSE]
+noise$alt <- "B"
+noise$x <- 900
+observed <- ram_extract_torsions(list(atom = rbind(noise, with_alt)))
+assert(identical(expected$resn, observed$resn),
+       "Alternate coordinates must not create an extra residue")
+assert(isTRUE(all.equal(expected$phi, observed$phi)) &&
+       isTRUE(all.equal(expected$psi, observed$psi)),
+       "Alternate B must not change backbone angles")
+message("Atom-matrix extraction regression tests passed")

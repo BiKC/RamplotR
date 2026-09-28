@@ -16,9 +16,17 @@ if (!nrow(ours) || !nrow(reference)) stop("No comparable residues")
 # Compare only rows with no insertion code so that atom numbering cannot
 # ambiguously match two distinct residues in this first cross-check.
 plain <- !is.na(ours$insertion_code) & ours$insertion_code == ""
+all_own_rows <- nrow(ours)
 ours <- ours[plain, , drop = FALSE]
 key <- paste(ours$resi, ours$chain, ours$resn, sep = ".")
 reference_index <- match(key, rownames(reference))
+message(sprintf("Residue IDs: RamplotR %d total, %d without insertion codes; Bio3D %d; %d matched keys",
+                all_own_rows, nrow(ours), nrow(reference),
+                sum(!is.na(reference_index))))
+if (anyNA(reference_index)) {
+  message("Example unmatched RamplotR keys: ",
+          paste(utils::head(unique(key[is.na(reference_index)])), collapse = ", "))
+}
 angle_difference <- function(a, b) abs(((a - b + 180) %% 360) - 180)
 
 results <- lapply(c("phi", "psi"), function(angle) {
@@ -30,7 +38,15 @@ results <- lapply(c("phi", "psi"), function(angle) {
   differences <- angle_difference(ours[[angle]][i],
                                   as.numeric(reference[reference_index[i], angle]))
   data.frame(
-    accession = accession, angle = angle, matched = length(i),
+    accession = accession, angle = angle,
+    total_own_residues = all_own_rows,
+    own_residues_without_insertion = nrow(ours),
+    bio3d_residues = nrow(reference),
+    matched_residue_ids = sum(!is.na(reference_index)),
+    ramplotr_finite = sum(is.finite(ours[[angle]])),
+    bio3d_finite = sum(is.finite(reference[, angle])),
+    matched = length(i),
+    coverage_of_own_finite = length(i) / max(1L, sum(is.finite(ours[[angle]]))),
     max_abs_degrees = max(differences),
     median_abs_degrees = median(differences),
     mismatches_over_0.5_degrees = sum(differences > 0.5),

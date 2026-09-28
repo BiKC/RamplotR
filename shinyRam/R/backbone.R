@@ -7,6 +7,7 @@ ram_cross <- function(a, b) {
 }
 
 ram_dihedral <- function(p0, p1, p2, p3) {
+  if (any(!is.finite(c(p0, p1, p2, p3)))) return(NA_real_)
   b0 <- p0 - p1
   b1 <- p2 - p1
   b2 <- p3 - p2
@@ -19,6 +20,36 @@ ram_dihedral <- function(p0, p1, p2, p3) {
     return(NA_real_)
   }
   atan2(sum(ram_cross(b1, v) * w), sum(v * w)) * 180 / pi
+}
+
+
+# Compute many dihedral angles at once. Rows of each argument are XYZ points.
+ram_dihedral_batch <- function(p0, p1, p2, p3) {
+  n <- nrow(p0)
+  stopifnot(is.matrix(p0), all(dim(p0) == c(n, 3L)),
+            identical(dim(p0), dim(p1)), identical(dim(p0), dim(p2)),
+            identical(dim(p0), dim(p3)))
+  if (n == 0L) return(numeric())
+  b0 <- p0 - p1
+  b1 <- p2 - p1
+  b2 <- p3 - p2
+  len <- sqrt(rowSums(b1^2))
+  u <- b1 / pmax(len, 1e-10)
+  v <- b0 - u * rowSums(b0 * u)
+  w <- b2 - u * rowSums(b2 * u)
+  good <- complete.cases(cbind(p0, p1, p2, p3)) &
+    len > 1e-10 & sqrt(rowSums(v^2)) > 1e-10 &
+    sqrt(rowSums(w^2)) > 1e-10
+  out <- rep(NA_real_, n)
+  if (!any(good)) return(out)
+  uv <- cbind(
+    u[, 2L] * v[, 3L] - u[, 3L] * v[, 2L],
+    u[, 3L] * v[, 1L] - u[, 1L] * v[, 3L],
+    u[, 1L] * v[, 2L] - u[, 2L] * v[, 1L]
+  )
+  out[good] <- atan2(rowSums((uv * w)[good, , drop = FALSE]),
+                     rowSums((v * w)[good, , drop = FALSE])) * 180 / pi
+  out
 }
 
 ram_extract_torsions <- function(pdb, amino_acids = c(
@@ -55,60 +86,77 @@ ram_extract_torsions <- function(pdb, amino_acids = c(
   atoms <- atoms[!is.na(atoms$resid) & atoms$resid %in% amino_acids, , drop = FALSE]
   if (!nrow(atoms)) return(empty)
 
-  # The ordered group index prevents accidental joins between insertion codes
-  # or chains that reuse the same residue numbering.
+  # Preserve first-observed residue order without copying a data frame per
+  # residue. The triple key also distinguishes insertion codes and chains.
   key <- paste(atoms$chain, atoms$resno, atoms$insert, sep = "\r")
-  indices <- split(seq_len(nrow(atoms)), factor(key, levels = unique(key)))
-  pick_atom <- function(record, atom_name) {
-    options <- record[record$elety == atom_name &
-                      record$alt %in% c("", "A") &
-                      is.finite(record$x) & is.finite(record$y) &
-                      is.finite(record$z), , drop = FALSE]
-    if (!nrow(options)) return(rep(NA_real_, 3L))
-    # Prefer the unlabelled conformation, followed by alternate A.
-    chosen <- if (any(options$alt == "")) {
-      options[which(options$alt == "")[1L], , drop = FALSE]
-    } else options[1L, , drop = FALSE]
-    as.numeric(unlist(chosen[1L, c("x", "y", "z")], use.names = FALSE))
-  }
-  records <- lapply(indices, function(idx) {
-    rec <- atoms[idx, , drop = FALSE]
-    list(
-      resi = rec$resno[1L], insertion_code = rec$insert[1L],
-      chain = rec$chain[1L], resn = rec$resid[1L],
-      N = pick_atom(rec, "N"), CA = pick_atom(rec, "CA"),
-      C = pick_atom(rec, "C")
+  residue_index <- match(key, unique(key))
+  n <- max(residue_index)
+  first_rows <- match(seq_len(n), residue_index)
+  chains <- as.character(atoms$chain[first_rows])
+  residue_names <- as.character(atoms$resid[first_rows])
+
+  # Gather N, CA and C into XYZ matrices with a single scan of the atom table.
+  # Empty alternate locations take precedence over alternate A. Others are
+  # ignored, matching the previous per-residue atom-selection behaviour.
+  pick_coords <- function(atom_name) {
+    out <- matrix(NA_real_, nrow = n, ncol = 3L)
+    candidates <- which(
+      atoms$elety == atom_name & atoms$alt %in% c("", "A") &
+      is.finite(atoms$x) & is.finite(atoms$y) & is.finite(atoms$z)
     )
-  })
-  n <- length(records)
-  connected <- function(i, j) {
-    if (i < 1L || j > n || records[[i]]$chain != records[[j]]$chain) {
-      return(FALSE)
+    if (!length(candidates)) return(out)
+    ordered <- candidates[order(
+      residue_index[candidates], atoms$alt[candidates] != "", candidates
+    )]
+    selected <- ordered[!duplicated(residue_index[ordered])]
+    out[residue_index[selected], ] <- as.matrix(atoms[selected,
+      c("x", "y", "z"), drop = FALSE])
+    out
+  }
+  nxyz <- pick_coords("N")
+  caxyz <- pick_coords("CA")
+  cxyz <- pick_coords("C")
+
+  bonded_to_next <- rep(FALSE, n)
+  next_resn <- rep(NA_character_, n)
+  if (n > 1L) {
+    i <- seq_len(n - 1L)
+    j <- i + 1L
+    offset <- cxyz[i, , drop = FALSE] - nxyz[j, , drop = FALSE]
+    dist <- sqrt(rowSums(offset^2))
+    bonded_to_next[i] <- chains[i] == chains[j] & is.finite(dist) &
+      dist >= min_peptide_bond & dist <= max_peptide_bond
+    next_resn[i[bonded_to_next[i]]] <- residue_names[j[bonded_to_next[i]]]
+  }
+
+  valid_backbone <- complete.cases(cbind(nxyz, caxyz, cxyz))
+  phi <- rep(NA_real_, n)
+  psi <- rep(NA_real_, n)
+  if (n > 1L) {
+    i_phi <- which(bonded_to_next[seq_len(n - 1L)] &
+                     valid_backbone[2L:n]) + 1L
+    if (length(i_phi)) {
+      phi[i_phi] <- ram_dihedral_batch(
+        cxyz[i_phi - 1L, , drop = FALSE],
+        nxyz[i_phi, , drop = FALSE],
+        caxyz[i_phi, , drop = FALSE],
+        cxyz[i_phi, , drop = FALSE])
     }
-    c_atom <- records[[i]]$C
-    n_atom <- records[[j]]$N
-    if (anyNA(c_atom) || anyNA(n_atom)) return(FALSE)
-    distance <- sqrt(sum((c_atom - n_atom)^2))
-    is.finite(distance) && distance >= min_peptide_bond &&
-      distance <= max_peptide_bond
+    i_psi <- which(bonded_to_next[seq_len(n - 1L)] &
+                     valid_backbone[seq_len(n - 1L)])
+    if (length(i_psi)) {
+      psi[i_psi] <- ram_dihedral_batch(
+        nxyz[i_psi, , drop = FALSE],
+        caxyz[i_psi, , drop = FALSE],
+        cxyz[i_psi, , drop = FALSE],
+        nxyz[i_psi + 1L, , drop = FALSE])
+    }
   }
-  result <- empty
-  for (i in seq_len(n)) {
-    rec <- records[[i]]
-    prev_bond <- connected(i - 1L, i)
-    next_bond <- connected(i, i + 1L)
-    phi <- if (prev_bond && !anyNA(c(rec$N, rec$CA, rec$C))) {
-      ram_dihedral(records[[i - 1L]]$C, rec$N, rec$CA, rec$C)
-    } else NA_real_
-    psi <- if (next_bond && !anyNA(c(rec$N, rec$CA, rec$C))) {
-      ram_dihedral(rec$N, rec$CA, rec$C, records[[i + 1L]]$N)
-    } else NA_real_
-    result[nrow(result) + 1L, ] <- list(
-      as.integer(rec$resi), as.character(rec$insertion_code),
-      as.character(rec$chain), as.character(rec$resn),
-      phi, psi, if (next_bond) records[[i + 1L]]$resn else NA_character_,
-      next_bond
-    )
-  }
-  result
+  data.frame(
+    resi = as.integer(atoms$resno[first_rows]),
+    insertion_code = as.character(atoms$insert[first_rows]),
+    chain = chains, resn = residue_names,
+    phi = phi, psi = psi, next_resn = next_resn,
+    bonded_to_next = bonded_to_next, stringsAsFactors = FALSE
+  )
 }

@@ -21,8 +21,13 @@ Chi1 is a measurement, not a rotamer outlier prediction.
 ## Independent experimental validation
 
 For a deposited structure, obtain the official wwPDB validation XML or
-`XML.gz` for the corresponding entry. Attach the report in the expandable
-verification panel. The report is parsed locally and matched by **model,
+`XML.gz` for the **same deposited entry and structural model**. Attach it in
+the expandable verification panel and confirm that it belongs to the
+loaded experimental structure. The app rejects official reports for declared
+predicted-model inputs, including AlphaFold DB. For local or accession-loaded
+experimental structures, you must still verify accession/model provenance:
+matching sequence numbering alone cannot establish that two deposits are the
+same experiment. The report is parsed locally and matched by **model,
 chain, residue number, insertion code and residue type**, with unlabelled
 alternate conformations preferred over alternate A.
 

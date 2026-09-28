@@ -1,0 +1,8 @@
+accession,chain,residue_number,insertion_code,residue_name,ramplotr_group,ramplotr_region,ramplotr_crosswalk,wwpdb_region,phi,psi
+2DQ4,A,230,,SER,General,Generously allowed,allowed,outlier,-172.958321106555,-93.9306752063234
+2DQ4,A,292,,TRP,General,Allowed,favored,outlier,95.0139662129963,-35.3026228922631
+2DQ4,A,329,,LEU,General,Generously allowed,allowed,outlier,-50.8367889182341,-85.0415192388409
+2DQ4,A,330,,ALA,General,Generously allowed,allowed,outlier,-36.1059935790808,-20.1021514462383
+2DQ4,A,333,,GLN,General,Generously allowed,allowed,outlier,-10.3682756417667,-65.850200443316
+2DQ4,B,230,,SER,General,Generously allowed,allowed,outlier,-159.257183452064,-89.3876456247248
+2DQ4,B,292,,TRP,General,Generously allowed,allowed,outlier,97.0848712741078,-40.4428193818336

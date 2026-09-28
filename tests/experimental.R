@@ -40,9 +40,18 @@ on.exit_gz <- function() unlink(gzpath)
 compressed <- ram_external_validation_read(gzpath)
 assert(nrow(compressed)==nrow(official),
        "The streamed gzip parser must preserve every official record.")
-blocked <- try(ram_external_validation_read(gzpath,max_bytes=32L),
+# A tiny compressed file that expands beyond the configured limit must
+# fail while streaming, not after allocating its entire inflated contents.
+bombpath <- tempfile(fileext=".xml.gz")
+bombcon <- gzfile(bombpath,open="wb")
+writeBin(charToRaw(paste0("<root>",strrep(" ",50000),"</root>")),bombcon)
+close(bombcon)
+assert(file.info(bombpath)$size < 1024L,
+       "Synthetic gzip fixture must be smaller than the upload limit.")
+blocked <- try(ram_external_validation_read(bombpath,max_bytes=1024L),
                silent=TRUE)
 assert(inherits(blocked,"try-error"),
-       "Uncompressed XML limits must also apply to compressed reports.")
+       "Expanded XML limits must also apply to compressed reports.")
+unlink(bombpath)
 on.exit_gz()
 message("External wwPDB geometry/rotamer/clash XML import tests passed.")

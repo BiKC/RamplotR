@@ -24,8 +24,8 @@ source(file.path("R", "backbone.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
 
 color_set <- c(
-  "#7FC97F", "#BEAED4", "#FDC086", "#FFFF99",
-  "#386CB0", "#F0027F", "#BF5B17", "#666666"
+  "#137C79", "#8662A8", "#C47B36", "#4E86B3",
+  "#648E5E", "#B95873", "#9C7545", "#62798D"
 )
 
 rampage<-c("#F1EEF6","#BDC9E1","#74A9CF","#0570B0")
@@ -73,151 +73,269 @@ allAA <- c(
   "VAL"
 )
 
-# Define UI for application that draws a histogram
+# Presentation stays separate from scientific analysis. Input and output IDs
+# are preserved for compatibility with plotting and the molecular viewer.
 ui <- fluidPage(
-  # Application title
-  titlePanel("RamplotR"),
   tags$head(
+    tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
+    tags$title("RamplotR | Ramachandran analysis"),
+    tags$link(rel = "stylesheet", type = "text/css", href = "styles.css"),
     tags$script(src = "https://cdn.plot.ly/plotly-2.14.0.min.js")
   ),
-  # Sidebar with a slider input for number of bins
-  fluidPage(fluidRow(
-    column(
-      4,
-      fluidRow(
-        column(6,
-          textInput(
-            inputId = "PDB",
-            label = "PDB-code:",
-            value = "1BBB"
-          ),
-          actionButton("submit", "Apply Changes", class = "btn-primary btn-lg")
-        ),
-        column(6,
-          fileInput("structfile",label = "Upload a structure file",
-                    accept = c(".pdb", ".ent", ".cif", ".mmcif", ".mcif"))
-        )
-      ),
-      
-      radioButtons("inputSource", "Use structure from",
-                   choices = c("PDB accession" = "pdb", "Uploaded file" = "upload"),
-                   selected = "pdb", inline = TRUE),
-      hr(),
-      h4("Background settings"),
-      selectInput("validationMode", "Residue classification",
-                  c("Residue-aware (recommended)" = "residue",
-                    "Selected background (legacy)" = "legacy")),
-      fluidRow(
-        column(6,selectInput(
-          "bgtype","Reference dataset for background density",
-          c("original","alphafold","alphafold_filtered","astral2.08","custom_high_resolution")
-        )),
-        column(6,selectInput(
-          "background", "Choose background plot",
-          c("General", "Glycine", "Preproline", "Proline")
-        ))
-      ),
-      dropdown(
-        list(
-          colourpicker::colourInput("bg1", "Not allowed region",
-                                    value = "#F1EEF6"
-          ),
-          colourpicker::colourInput("bg2", "Generously allowed regions",
-                                    value = "#BDC9E1"
-          ),
-          colourpicker::colourInput("bg3", "Allowed regions",
-                                    value = "#74A9CF"
-          ),
-          colourpicker::colourInput("bg4", "Favoured regions",
-                                    value = "#0570B0"
-          ),
-          selectInput("colorscheme","Default colorscheme", choices = c("Rampage","PDBSum","custom"),selected = "Rampage")
-        ),
-        label = "Background colors"
-      ),
-      hr(),
-      fluidRow(
-        column(6,
-          pickerInput(
-            "AA",
-            "Amino acid selection",
-            allAA,
-            multiple = T,
-            options = list(`actions-box` = TRUE),
-            selected = allAA
+  tags$div(
+    class = "ram-app",
+    tags$header(
+      class = "ram-header",
+      tags$div(
+        class = "ram-inner",
+        tags$div(
+          class = "ram-brand",
+          tags$span(class = "ram-brand-mark", "φψ", "aria-hidden" = "true"),
+          tags$div(
+            tags$div(class = "ram-brand-name", "RamplotR"),
+            tags$div(class = "ram-brand-subtitle", "Protein structure analysis")
           )
         ),
-        column(6,
-          uiOutput("chains")
-        )
-      ),
-      
-      hr(),
-      tags$label("Chain colors",class="control-label"),
-      uiOutput("chainColors"),
-      hr(),
-      h4("3D view options"),
-      fluidRow(
-        column(4,
-               checkboxInput("ligands",label = "Show ligands"),
-        ),
-        column(4,
-               checkboxInput("dna",label = "Show DNA"),
-        ),
-        column(4,
-               checkboxInput("rna",label = "Show RNA"),
-        )
-      ),
-      fluidRow(
-        column(4,
-               checkboxInput("spinning",label = "Spinning"),
-        ),
-        column(4,
-               checkboxInput("rocking",label = "Rocking",value=T),
-        )
-      ),
-      fluidRow(
-        NGLVieweR::NGLVieweROutput("NGL"),
-        # tags$div(id = "viewport", style = "width:600px; height:600px;"),
-        # tags$script(
-        #  "var stage = new NGL.Stage('viewport',{backgroundColor:'white'})"
-        # ),
-        # tags$script(
-        #  "
-        # Shiny.addCustomMessageHandler('updateFig', function(pdbcode) {
-        #  stage.removeAllComponents();
-        #  stage.loadFile('rcsb://'+pdbcode, {defaultRepresentation: true});
-        # });
-        # "
-        # ),
-        tags$script(src = "custom.js")
+        tags$div(class = "ram-header-badge", "Interactive structural validation")
       )
     ),
-    column(
-      8,
-      # Output panel (tabsetpanel)
-      mainPanel(
-        tabsetPanel(
-          tabPanel("Ramachandran plot", tags$div(id = "plotly", style = "height:800px;width:891px")),
-          tabPanel(
-            "Residues list",
-            selectInput("regionselect", "Show residues for region", c("Not allowed", "Generously allowed", "Allowed", "Favoured", "All")),
-            dataTableOutput("regions")
+    tags$div(
+      class = "ram-inner",
+      tags$div(
+        class = "ram-intro",
+        tags$p(class = "ram-overline", "Ramachandran analysis"),
+        tags$h1("Explore backbone geometry."),
+        tags$p("Inspect residue conformations, compare reference distributions and examine the protein in 3D.")
+      ),
+      tags$section(
+        class = "ram-source", "aria-label" = "Structure input",
+        tags$div(
+          class = "ram-section-heading",
+          tags$div(
+            tags$h2("Load a structure"),
+            tags$p("Enter a PDB accession or use a local PDB/mmCIF file.")
+          )
+        ),
+        tags$div(
+          class = "ram-source-controls",
+          tags$div(
+            class = "ram-source-choice",
+            radioButtons(
+              "inputSource", "Structure source",
+              choices = c("PDB accession" = "pdb", "Uploaded file" = "upload"),
+              selected = "pdb", inline = TRUE
+            )
           ),
-          tabPanel(
-            "Summary statistics",
-            htmlOutput("summary")
+          tags$div(
+            id = "ram-pdb-wrap", class = "ram-source-picker",
+            textInput("PDB", "PDB accession", value = "1BBB",
+                      placeholder = "e.g. 1CRN")
+          ),
+          tags$div(
+            id = "ram-upload-wrap", class = "ram-source-picker is-hidden",
+            fileInput(
+              "structfile", "Structure file",
+              accept = c(".pdb", ".ent", ".cif", ".mmcif", ".mcif")
+            )
+          ),
+          tags$div(
+            class = "ram-submit",
+            actionButton("submit", "Analyze structure", class = "btn-primary")
+          )
+        ),
+        tags$p(
+          class = "ram-tip",
+          "Classification uses the selected reference dataset; the plotted background can be changed independently."
+        )
+      ),
+      tags$div(
+        class = "ram-workspace",
+        tags$aside(
+          id = "ram-settings", class = "ram-sidebar", "aria-label" = "Analysis settings",
+          tags$section(
+            class = "ram-panel",
+            tags$div(
+              class = "ram-section-heading",
+              tags$div(
+                tags$h3("Reference & validation"),
+                tags$p("Choose how residues and plot regions are interpreted.")
+              )
+            ),
+            selectInput(
+              "validationMode", "Residue classification",
+              c("Residue-aware (recommended)" = "residue",
+                "Selected background (legacy)" = "legacy")
+            ),
+            selectInput(
+              "bgtype", "Reference dataset",
+              c("original", "alphafold", "alphafold_filtered",
+                "astral2.08", "custom_high_resolution")
+            ),
+            selectInput(
+              "background", "Plot background",
+              c("General", "Glycine", "Preproline", "Proline")
+            ),
+            tags$p(class = "ram-field-hint",
+                   "Residue-aware mode evaluates glycine, proline and pre-proline against their own reference distributions.")
+          ),
+          tags$section(
+            class = "ram-panel",
+            tags$div(
+              class = "ram-section-heading",
+              tags$div(
+                tags$h3("Residue selection"),
+                tags$p("Focus on individual amino acids and protein chains.")
+              )
+            ),
+            pickerInput(
+              "AA", "Amino acids", choices = allAA, multiple = TRUE,
+              options = list("actions-box" = TRUE),
+              selected = allAA
+            ),
+            uiOutput("chains"),
+            tags$p(class = "ram-field-hint",
+                   "Selections apply to the plot, residue list and summary.")
+          ),
+          tags$section(
+            class = "ram-panel",
+            tags$div(
+              class = "ram-section-heading",
+              tags$div(
+                tags$h3("Appearance"),
+                tags$p("Keep the default palette or customize the contours.")
+              )
+            ),
+            selectInput(
+              "colorscheme", "Contour palette",
+              choices = c("Rampage", "PDBSum", "custom"),
+              selected = "Rampage"
+            ),
+            tags$details(
+              class = "ram-details",
+              tags$summary("Customize region colors"),
+              tags$div(
+                class = "ram-details-body ram-appearance-controls",
+                colourpicker::colourInput("bg1", "Not allowed", value = "#F1EEF6"),
+                colourpicker::colourInput("bg2", "Generously allowed", value = "#BDC9E1"),
+                colourpicker::colourInput("bg3", "Allowed", value = "#74A9CF"),
+                colourpicker::colourInput("bg4", "Favoured", value = "#0570B0")
+              )
+            ),
+            tags$div(class = "ram-panel-divider"),
+            tags$div(class = "ram-chain-controls", uiOutput("chainColors"))
+          )
+        ),
+        tags$main(
+          class = "ram-main",
+          tabsetPanel(
+            id = "analysisTabs",
+            tabPanel(
+              title = "Ramachandran plot", value = "plot",
+              tags$div(
+                class = "ram-result-head",
+                tags$div(
+                  tags$h2("Conformation overview"),
+                  tags$p("Use the plot to inspect phi (φ) and psi (ψ) backbone angles.")
+                ),
+                tags$div(
+                  class = "ram-result-actions",
+                  tags$a(class = "ram-mobile-settings-link",
+                         href = "#ram-settings", "Analysis settings"),
+                  tags$span(id = "ram-current-structure",
+                            class = "ram-status", "No structure loaded")
+                )
+              ),
+              tags$div(
+                class = "ram-charts",
+                tags$section(
+                  class = "ram-chart-card", "aria-label" = "Ramachandran plot",
+                  tags$h3(class = "ram-chart-label", "Residue distribution"),
+                  tags$p(class = "ram-chart-help",
+                         "Hover over a point to identify its chain and residue."),
+                  tags$div(
+                    id = "plot-empty", class = "ram-plot-empty",
+                    tags$span(class = "ram-empty-mark",
+                              "aria-hidden" = "true", "φψ"),
+                    tags$strong("Your plot will appear here"),
+                    tags$p("Enter an accession and select Analyze structure.")
+                  ),
+                  tags$div(id = "plotly", class = "ram-plot",
+                           role = "img", "aria-label" = "Interactive Ramachandran plot")
+                ),
+                tags$section(
+                  class = "ram-chart-card", "aria-label" = "3D molecular viewer",
+                  tags$h3(class = "ram-chart-label", "Molecular structure"),
+                  tags$p(class = "ram-chart-help",
+                         "Drag to rotate, scroll to zoom."),
+                  tags$div(class = "ram-ngl",
+                           NGLVieweR::NGLVieweROutput("NGL")),
+                  tags$div(
+                    class = "ram-viewer-options",
+                    tags$div(class = "ram-viewer-options-title", "Display"),
+                    tags$div(
+                      class = "ram-toggles",
+                      checkboxInput("ligands", "Ligands"),
+                      checkboxInput("dna", "DNA"),
+                      checkboxInput("rna", "RNA"),
+                      checkboxInput("spinning", "Spin"),
+                      checkboxInput("rocking", "Rock", value = TRUE)
+                    )
+                  )
+                )
+              )
+            ),
+            tabPanel(
+              title = "Residue list", value = "residues",
+              tags$div(
+                class = "ram-subtab-content",
+                tags$div(
+                  class = "ram-result-head",
+                  tags$div(
+                    tags$h2("Residue details"),
+                    tags$p("Filter results by region and search individual residues.")
+                  )
+                ),
+                selectInput(
+                  "regionselect", "Region",
+                  c("All", "Not allowed", "Generously allowed",
+                    "Allowed", "Favoured"),
+                  selected = "All"
+                ),
+                dataTableOutput("regions")
+              )
+            ),
+            tabPanel(
+              title = "Summary", value = "summary",
+              tags$div(
+                class = "ram-subtab-content",
+                tags$div(
+                  class = "ram-result-head",
+                  tags$div(
+                    tags$h2("Classification summary"),
+                    tags$p("Counts and percentages for the selected residues and chains.")
+                  )
+                ),
+                htmlOutput("summary")
+              )
+            )
           )
         )
       )
+    ),
+    tags$footer(
+      class = "ram-foot",
+      tags$div(
+        class = "ram-inner",
+        "RamplotR · Interactive Ramachandran analysis · ",
+        tags$a(href = "https://github.com/BiKC/RamplotR",
+               "Source code", target = "_blank", rel = "noopener noreferrer")
+      )
     )
-  ))
+  ),
+  tags$script(src = "custom.js")
 )
-
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
-  output$dummy <- reactive(FALSE)
-  outputOptions(output, "dummy", suspendWhenHidden = FALSE)
   # session$onSessionEnded(stopApp)
   session$userData$previousPDB <- ""
   # reactive(bio3d::write.pdb(pdb = pdb(), file = paste0(accPDB(), '.pdb')))
@@ -324,8 +442,9 @@ server <- function(input, output, session) {
       }
     })
 
-  output$dummy <- reactive({
-    input$submit
+  # Process a structure only when requested. A newly opened session starts
+  # with the empty plot rather than fetching the default PDB automatically.
+  observeEvent(input$submit, {
     withProgress(message = "Making plot", value = 0, {
       inputType<-""
       isolate({
@@ -364,7 +483,9 @@ server <- function(input, output, session) {
           # Shiny upload paths lack an extension; identify the format explicitly.
           viewer_format <- if (inputType == "file")
             ram_detect_format(input$structfile$name) else NULL
-          nglview <- NGLVieweR(data = accPDB, format = viewer_format) %>% setRock()
+          nglview <- NGLVieweR(data = accPDB, format = viewer_format) %>%
+            NGLVieweR::stageParameters(backgroundColor = "#f7fafb") %>%
+            setRock()
           counter=1
           for (i in unique(chains)) {
             #print(i)
@@ -520,37 +641,69 @@ server <- function(input, output, session) {
           # create html output to display the statistics
         
             output$summary <- renderUI({
-  HTML(paste0(
-    "<div style='font-size:16px; line-height:1.6;'>",
-    "<p><b>Statistics for the regions:</b></p>",
-    "<table>",
-    "<tr><th style='padding: 0 1em;'>Region</th><th style='padding: 0 1em;'>No. of residues</th><th style='padding: 0 1em;'>%</th></tr>",
-    "<tr><td style='padding: 0 1em;'>Favoured regions:</td><td style='padding: 0 1em;'>", fr_count, "</td><td style='padding: 0 1em;'>(", fr_percent, "%)</td></tr>",
-    "<tr><td style='padding: 0 1em;'>Allowed regions:</td><td style='padding: 0 1em;'>", ar_count, "</td><td style='padding: 0 1em;'>(", ar_percent, "%)</td></tr>",
-    "<tr><td style='padding: 0 1em;'>Generously allowed regions:</td><td style='padding: 0 1em;'>", gar_count, "</td><td style='padding: 0 1em;'>(", gar_percent, "%)</td></tr>",
-    "<tr><td style='padding: 0 1em;'>Not allowed regions:</td><td style='padding: 0 1em;'>", nar_count, "</td><td style='padding: 0 1em;'>(", nar_percent, "%)</td></tr>",
-    "<tr><td style='padding: 0 1em;'>Non-glycine and non-proline residues:</td><td style='padding: 0 1em;'>", total_count, "</td><td style='padding: 0 1em;'>(", total_percent, "%)</td></tr>",
-    "</table>",
-    "<hr>",
-    "<p><b>End-residues (Excl. Gly and Pro)</b></p>",
-    "<table>",
-    "<tr><td style='padding: 0 1em;'>Total no. of end-residues:</td><td style='padding: 0 1em;'>", end_count, "</td></tr>",
-    "</table>",
-    "<hr>",
-    "<p><b>Glycine and proline residues</b></p>",
-    "<table>",
-    "<tr><td style='padding: 0 1em;'>Glycine residues:</td><td style='padding: 0 1em;'>", gly_count, "</td></tr>",
-    "<tr><td style='padding: 0 1em;'>Proline residues:</td><td style='padding: 0 1em;'>", pro_count, "</td></tr>",
-    "</table>",
-    "<hr>",
-    "<p><b>Total no. of residues</b></p>",
-    "<table>",
-    "<tr><td style='padding: 0 1em;'>Total no. of residues:</td><td style='padding: 0 1em;'>", total_count2, "</td></tr>",
-    "</table>",
-    "</div>"
-  ))
+  percent_label <- function(p) {
+    if (is.na(p)) "n/a" else sprintf("%.2f%%", p)
+  }
+  metric <- function(label, value, hint) {
+    tags$div(
+      class = "ram-summary-metric",
+      tags$span(class = "ram-summary-metric-label", label),
+      tags$strong(as.character(value)),
+      tags$small(hint)
+    )
+  }
+  region_row <- function(label, count, percent) {
+    tags$tr(
+      tags$td(label),
+      tags$td(class = "ram-numeric", format(count, big.mark = ",")),
+      tags$td(class = "ram-numeric", percent_label(percent))
+    )
+  }
+  tags$div(
+    class = "ram-summary",
+    tags$div(
+      class = "ram-summary-metrics",
+      metric("Selected residues", total_count2, "Across selected chains"),
+      metric("Classified, excluding Gly/Pro", total_count,
+             "Residues with defined backbone angles"),
+      metric("Outliers", nar_count, "Outside the selected reference regions")
+    ),
+    tags$h3("Region breakdown"),
+    tags$p(class = "ram-summary-note",
+           "Percentages use classified residues other than glycine and proline as the denominator."),
+    tags$div(
+      class = "ram-summary-table-wrap",
+      tags$table(
+        class = "ram-summary-table",
+        tags$thead(
+          tags$tr(tags$th("Region"), tags$th("Residues"), tags$th("Share"))
+        ),
+        tags$tbody(
+          region_row("Favoured", fr_count, fr_percent),
+          region_row("Allowed", ar_count, ar_percent),
+          region_row("Generously allowed", gar_count, gar_percent),
+          region_row("Not allowed", nar_count, nar_percent),
+          region_row("Total classified", total_count, total_percent)
+        )
+      )
+    ),
+    tags$div(
+      class = "ram-summary-footnotes",
+      tags$div(
+        tags$strong(format(end_count, big.mark = ",")),
+        tags$span("Missing or terminal angles (excluding Gly/Pro)")
+      ),
+      tags$div(
+        tags$strong(format(gly_count, big.mark = ",")),
+        tags$span("Glycine residues")
+      ),
+      tags$div(
+        tags$strong(format(pro_count, big.mark = ",")),
+        tags$span("Proline residues")
+      )
+    )
+  )
 })
-
 
 
         name<-ifelse(inputType=="file",tools::file_path_sans_ext(basename(input$structfile$name)),accPDB)
@@ -572,7 +725,7 @@ server <- function(input, output, session) {
         )
       })
     })
-  })
+  }, ignoreInit = TRUE)
 }
 
 

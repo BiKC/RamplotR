@@ -1,0 +1,61 @@
+name: Interface browser preview
+
+on:
+  pull_request:
+    paths:
+      - "shinyRam/app.R"
+      - "shinyRam/www/**"
+      - "tests/ui-browser.cjs"
+      - ".github/workflows/ui-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  visual-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - name: Install the application's R dependencies
+        run: |
+          Rscript -e 'install.packages(c("shiny", "shinyWidgets", "colourpicker", "bio3d", "NGLVieweR"))'
+      - name: Install headless-browser controller
+        run: npm install --no-save --no-package-lock puppeteer-core@24
+      - name: Prepare a small local PDB for upload
+        shell: bash
+        run: |
+          mkdir -p benchmarks/output/ui-preview
+          curl --fail --silent --show-error --location \
+            https://files.rcsb.org/download/1CRN.pdb \
+            -o benchmarks/output/ui-preview/1CRN.pdb
+          sha256sum benchmarks/output/ui-preview/1CRN.pdb \
+            > benchmarks/output/ui-preview/structure.sha256
+      - name: Start the Shiny application
+        shell: bash
+        run: |
+          Rscript -e 'shiny::runApp("shinyRam", host="127.0.0.1", port=8765, launch.browser=FALSE)' \
+            > benchmarks/output/ui-preview/shiny.log 2>&1 &
+          echo $! > benchmarks/output/ui-preview/server.pid
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8765/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat benchmarks/output/ui-preview/shiny.log
+          exit 1
+      - name: Exercise real browser and capture screenshots
+        run: node tests/ui-browser.cjs
+      - name: Archive desktop/mobile screenshot previews and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ramplotr-interface-preview
+          path: benchmarks/output/ui-preview/
+          retention-days: 14
+          if-no-files-found: warn

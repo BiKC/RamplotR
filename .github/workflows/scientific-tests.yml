@@ -25,6 +25,14 @@ jobs:
       - name: Check source syntax
         run: Rscript -e 'for (p in c("shinyRam/app.R", list.files("shinyRam/R", full.names=TRUE))) parse(file=p)'
         shell: bash
+      - name: Check the responsive interface and preserved Shiny IDs
+        run: Rscript tests/ui-contract.R
+        shell: bash
+      - name: Test browser message handler and source selection
+        run: |
+          node --check shinyRam/www/custom.js
+          node tests/ui.test.cjs
+        shell: bash
       - name: Verify residue classifications and density thresholds
         run: Rscript tests/scientific.R
         shell: bash

@@ -25,6 +25,10 @@ Reference density grids are in `shinyRam/static/`. They include the original dis
 
 Reference distributions and density-percentile thresholds in RamplotR must not be described as equivalent to MolProbity quality metrics without independent validation. Save the selected reference dataset, scientific mode, threshold settings and application version alongside published results.
 
+## Interface
+
+The current version has a responsive scientific workspace with the Ramachandran plot and 3D viewer alongside one another on wide screens. Reference controls and residue filters are grouped in the sidebar. The full UI changes and manual browser checks are documented in [interface-refresh.md](docs/interface-refresh.md).
+
 ## Regression tests
 
 Pure-R tests do not require Shiny or Bio3D. From the repository root:

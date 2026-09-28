@@ -10,11 +10,14 @@ The historical application remains available as v0.1.0-legacy.
   or the PDB/mmCIF upload control, with one analysis button.
 - Reference dataset, scientific classification, filters and color controls
   are grouped into a sidebar. Detailed palette controls are collapsible.
-- The Ramachandran plot and NGL structure viewer share the main analysis tab.
+- The Ramachandran plot and NGL structure viewer share the main analysis tab. On mobile, results appear above advanced settings, with a direct Settings shortcut.
   The residue table and summary have dedicated tabs.
 - Plotly uses a responsive container, equal axis scaling, clearer hover labels,
   smaller outlined chain markers, a non-overlapping horizontal legend for up to
   eight chains and image export through the existing mode bar.
+- The 3D viewer now uses a soft light background, stronger chain colors and
+  controls located directly beneath the molecular structure, rather than
+  occupying a separate sidebar panel.
 - The summary uses larger totals and an aligned table while preserving the
   exact existing counts. Undefined-angle counts include broken or incomplete
   backbones as well as genuine termini.
@@ -42,8 +45,9 @@ In a browser, check both a wide desktop window and a mobile-width window:
 2. Change background/reference choices, filter chains and amino acids and
    confirm the plot, residue list and summary remain consistent.
 3. Confirm the angular axes stay equally scaled when resizing the browser.
-4. Switch between Plot, Residue list and Summary tabs, and use the
-   3D viewer controls.
+4. Switch between Plot, Residue list and Summary tabs. Test the 3D controls
+   beneath the viewer. On mobile, confirm the results appear before the
+   settings and that the shortcut scrolls to the settings.
 5. Test a structure with many chains and a structure with missing angles,
    then download a PNG with the Plotly toolbar.
 

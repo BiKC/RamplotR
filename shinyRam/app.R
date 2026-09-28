@@ -650,15 +650,35 @@ server <- function(input, output, session) {
       )
       if (is.null(torsions)) return()
       chains <- unique(torsions$chain)
-      name <- if (type == "file")
+      name <- if (is_afdb) paste0("AF-", source_label) else if (is_upload)
         tools::file_path_sans_ext(basename(input$structfile$name)) else source_id
+      prediction <- NULL
+      if (!identical(declared_source, "experimental")) {
+        incProgress(0.15, detail = "Reading prediction confidence")
+        confidence_file <- if (is_afdb) afdb_files$pae else sidecar
+        prediction <- tryCatch(
+          ram_prepare_prediction(
+            ram_model_at(pdb, 1L), torsions, declared_source,
+            sidecar = confidence_file, summary_file = summary_file,
+            notes = if (is_afdb) afdb_files$notes else character(),
+            model_id = name
+          ), error = function(e) {
+            showNotification(paste("Prediction confidence:",
+              conditionMessage(e)), type = "warning", duration = 15)
+            NULL
+          }
+        )
+        if (!is.null(prediction) && length(prediction$notes))
+          showNotification(paste(prediction$notes, collapse = " "),
+                           type = "warning", duration = 14)
+      }
 
       # Invalidate selections before changing the 3D stage, even if a prior
       # structure used the same chain and residue numbering.
       selected_residue(NULL)
       viewer_ready(FALSE)
-      viewer_format <- if (type == "file")
-        ram_detect_format(input$structfile$name) else NULL
+      viewer_format <- if (is_upload || is_afdb)
+        ram_detect_format(original_name) else NULL
       widget <- NGLVieweR(data = source_id, format = viewer_format) %>%
         NGLVieweR::stageParameters(backgroundColor = "#f7fafb") %>%
         setRock()
@@ -698,7 +718,7 @@ server <- function(input, output, session) {
       })
       loaded(list(key = key, name = name, torsions = torsions, chains = chains,
                   pdb = pdb, nmodels = ram_model_count(pdb), source_id = source_id,
-                  viewer_format = viewer_format))
+                  viewer_format = viewer_format, prediction = prediction))
       incProgress(0.25, detail = "Preparing interactive views")
     })
   }, ignoreInit = TRUE)

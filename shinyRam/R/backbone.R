@@ -92,23 +92,36 @@ ram_extract_torsions <- function(pdb, amino_acids = c(
     is.finite(distance) && distance >= min_peptide_bond &&
       distance <= max_peptide_bond
   }
-  result <- empty
+  # Allocate output once. Appending rows to a data frame for each residue
+  # repeatedly copies the growing table on large structures.
+  phi <- rep(NA_real_, n)
+  psi <- rep(NA_real_, n)
+  bonded_to_next <- rep(FALSE, n)
+  next_resn <- rep(NA_character_, n)
+  if (n > 1L) {
+    for (i in seq_len(n - 1L)) {
+      bonded_to_next[[i]] <- connected(i, i + 1L)
+      if (bonded_to_next[[i]]) next_resn[[i]] <- records[[i + 1L]]$resn
+    }
+  }
   for (i in seq_len(n)) {
     rec <- records[[i]]
-    prev_bond <- connected(i - 1L, i)
-    next_bond <- connected(i, i + 1L)
-    phi <- if (prev_bond && !anyNA(c(rec$N, rec$CA, rec$C))) {
-      ram_dihedral(records[[i - 1L]]$C, rec$N, rec$CA, rec$C)
-    } else NA_real_
-    psi <- if (next_bond && !anyNA(c(rec$N, rec$CA, rec$C))) {
-      ram_dihedral(rec$N, rec$CA, rec$C, records[[i + 1L]]$N)
-    } else NA_real_
-    result[nrow(result) + 1L, ] <- list(
-      as.integer(rec$resi), as.character(rec$insertion_code),
-      as.character(rec$chain), as.character(rec$resn),
-      phi, psi, if (next_bond) records[[i + 1L]]$resn else NA_character_,
-      next_bond
-    )
+    if (anyNA(c(rec$N, rec$CA, rec$C))) next
+    if (i > 1L && bonded_to_next[[i - 1L]]) {
+      phi[[i]] <- ram_dihedral(records[[i - 1L]]$C, rec$N, rec$CA, rec$C)
+    }
+    if (bonded_to_next[[i]]) {
+      psi[[i]] <- ram_dihedral(rec$N, rec$CA, rec$C, records[[i + 1L]]$N)
+    }
   }
-  result
+  data.frame(
+    resi = vapply(records, function(rec) as.integer(rec$resi), integer(1)),
+    insertion_code = vapply(records, function(rec) as.character(rec$insertion_code),
+                            character(1)),
+    chain = vapply(records, function(rec) as.character(rec$chain), character(1)),
+    resn = vapply(records, function(rec) as.character(rec$resn), character(1)),
+    phi = phi, psi = psi, next_resn = next_resn,
+    bonded_to_next = bonded_to_next,
+    stringsAsFactors = FALSE
+  )
 }

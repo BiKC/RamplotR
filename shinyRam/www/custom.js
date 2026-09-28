@@ -325,7 +325,10 @@
       automargin: true
     };
     const layout = {
-      autosize: true,
+      // Explicit dimensions prevent Plotly's built-in resize handler from
+      // replacing the requested height with CSS min-height on narrow screens.
+      autosize: false,
+      width: plot.clientWidth,
       height: plotHeight(),
       paper_bgcolor: "#ffffff",
       plot_bgcolor: "#fafcfc",
@@ -420,15 +423,14 @@
     // otherwise remeasures CSS min-height (270px on mobile) and silently
     // undoes the intended square-plot dimensions.
     plot.style.height = height + "px";
-    // Plotly can retain both the original desktop SVG width and height.
-    // Update both dimensions to keep the full -180°..180° square visible.
+    // Relayout both dimensions ourselves. Calling Plots.resize afterward
+    // overrides the explicit height with the CSS minimum (270 px on mobile)
+    // and collapses the scientific plotting area.
     if (Math.abs((plot._fullLayout && plot._fullLayout.height || 0) - height) >= 2 ||
         Math.abs((plot._fullLayout && plot._fullLayout.width || 0) - width) >= 2) {
-      window.Plotly.relayout(plot, { width: width, height: height }).then(function () {
-        window.Plotly.Plots.resize(plot);
+      window.Plotly.relayout(plot, {
+        autosize: false, width: width, height: height
       });
-    } else {
-      window.Plotly.Plots.resize(plot);
     }
   }
 

@@ -538,12 +538,20 @@ server <- function(input, output, session) {
 
   output$regions <- DT::renderDT({
     data <- table_rows()
+    # Keep a previous plot or 3D pick highlighted when the table tab is
+    # opened for the first time, before its DT proxy has been initialized.
+    selected <- selected_residue()
+    marked <- if (is.null(selected)) integer(0) else which(
+      data$chain == selected$chain & data$resi == selected$resi &
+      data$insertion_code == selected$insertion_code
+    )
     columns <- c("chain", "resi", "insertion_code", "resn",
                  "phi", "psi", "region", "density")
     DT::datatable(
       data[, columns, drop = FALSE],
       rownames = FALSE,
-      selection = "single",
+      selection = list(mode = "single",
+                       selected = if (length(marked)) marked[[1L]] else integer(0)),
       options = list(
         pageLength = 12, scrollX = TRUE, autoWidth = TRUE,
         dom = "ftip", order = list(list(0, "asc"), list(1, "asc")),

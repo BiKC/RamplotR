@@ -13,7 +13,7 @@ The original app has been hosted at https://bioit.shinyapps.io/RamplotR/. The ho
 To run this repository locally, install a current R 4.x and the following CRAN packages:
 
 ```r
-install.packages(c("shiny", "shinyWidgets", "colourpicker", "bio3d", "NGLVieweR"))
+install.packages(c("shiny", "shinyWidgets", "colourpicker", "bio3d", "NGLVieweR", "DT"))
 shiny::runApp("shinyRam")
 ```
 
@@ -26,6 +26,14 @@ Reference density grids are in `shinyRam/static/`. They include the original dis
 Reference distributions and density-percentile thresholds in RamplotR must not be described as equivalent to MolProbity quality metrics without independent validation. Save the selected reference dataset, scientific mode, threshold settings and application version alongside published results.
 
 ## Interface
+
+Once a structure is loaded, changing filters, the reference dataset, the
+classification mode or plot/chain colours updates the plot and statistics
+automatically. Click any residue on the Ramachandran plot, in the 3D structure,
+or in the searchable residue list to highlight it across all three views.
+Use **Clear selection** to dismiss the highlight. Press **Analyze structure**
+only when loading another PDB accession or uploaded structure.
+
 
 The current version has a responsive scientific workspace with the Ramachandran plot and 3D viewer alongside one another on wide screens. Reference controls and residue filters are grouped in the sidebar. The full UI changes and manual browser checks are documented in [interface-refresh.md](docs/interface-refresh.md).
 

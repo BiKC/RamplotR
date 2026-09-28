@@ -313,18 +313,18 @@ ui <- fluidPage(
                           "Surface" = "surface"),
                         selected = "cartoon", inline = TRUE)
                     ),
-                    tags$div(class = "ram-viewer-control-heading ram-layer-heading",
-                      tags$span("Layers & motion")
-                    ),
-                    tags$div(class = "ram-toggles",
-                      checkboxInput("ligands", "Ligands"),
-                      checkboxInput("dna", "DNA"),
-                      checkboxInput("rna", "RNA"),
-                      checkboxInput("spinning", "Spin"),
-                      checkboxInput("rocking", "Rock", value = TRUE)
-                    ),
-                    tags$p(class = "ram-viewer-hint",
-                      "Surface rendering can take longer for large structures.")
+                    tags$details(class = "ram-viewer-details",
+                      tags$summary("Layers & motion"),
+                      tags$div(class = "ram-toggles",
+                        checkboxInput("ligands", "Ligands"),
+                        checkboxInput("dna", "DNA"),
+                        checkboxInput("rna", "RNA"),
+                        checkboxInput("spinning", "Spin"),
+                        checkboxInput("rocking", "Rock", value = TRUE)
+                      ),
+                      tags$p(class = "ram-viewer-hint",
+                        "Surface rendering can take longer for large structures.")
+                    )
                   )
                 )
               ),

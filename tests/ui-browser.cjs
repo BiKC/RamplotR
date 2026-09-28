@@ -100,8 +100,8 @@ const assert = require("node:assert/strict");
       ["cartoon","ribbon","licorice","ball+stick","surface"]);
     assert.equal(cleanControls.selectedStyle, "cartoon",
       "Cartoon must be the default molecular representation.");
-    assert.equal(cleanControls.visibleLayers, false,
-      "Secondary molecular layers should start collapsed to save space.");
+    assert.equal(cleanControls.visibleLayers, true,
+      "All five molecular layer and motion switches must remain visible.");
     assert.equal(plot.yAnchor, "x", "Axes must be equally scaled.");
     assert.ok(Math.abs(plot.xRange[0] + 180) < 1 &&
               Math.abs(plot.xRange[1] - 180) < 1 &&
@@ -123,18 +123,11 @@ const assert = require("node:assert/strict");
     await page.screenshot({
       path: "benchmarks/output/ui-preview/desktop-loaded.png", fullPage: true
     });
-    // Layer switches remain accessible in one compact disclosure.
-    await page.click(".ram-viewer-details > summary");
-    await page.waitForFunction(() =>
-      [...document.querySelectorAll(
-        '.ram-viewer-details input[type="checkbox"]')].length === 5 &&
-      [...document.querySelectorAll(
-        '.ram-viewer-details input[type="checkbox"]')].every(input =>
-        input.getBoundingClientRect().height > 0),
-      {timeout:10000});
-    await page.click(".ram-viewer-details > summary");
-    assert.equal(await page.$eval(".ram-viewer-details", el => el.open),false,
-      "Secondary viewer controls should collapse again.");
+    // Display choices and secondary options are discoverable without
+    // opening another disclosure or leaving the molecular view.
+    assert.equal(await page.$eval('.ram-viewer-layers input[type="checkbox"]',
+      nodes => nodes.length), 5,
+      "The 3D viewer must expose all five layer and motion controls.");
 
     // A standard laptop should show the analysis, not a full-height landing
     // page. Focus mode is reversible and must preserve the live plot.

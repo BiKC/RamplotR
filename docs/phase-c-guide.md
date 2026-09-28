@@ -9,8 +9,11 @@ changing its reference densities, four-region labels, or the historical
 Once a structure loads, expand **Extended structure verification** below the
 main plots. RamplotR calculates the peptide dihedral **omega** (CA–C–N–CA)
 only across geometrically connected peptide bonds, and **chi1** (N–CA–CB–X1)
-for residues with an appropriate first side-chain atom. All angles are in
-degrees. Missing atoms, chain breaks and terminal residues have undefined
+for residues with an appropriate first side-chain atom. Cβ measurements
+include the observed **CA–CB distance** (Å) and signed N–CA–C–CB tetrahedral
+volume (Å³) for residues with all four atoms. These are descriptive
+measurements, not independently validated Cβ-deviation or chirality-outlier
+classifications. All angles are in degrees. Missing atoms, chain breaks and terminal residues have undefined
 measurements; they are not scored as outliers.
 
 For exploration, omega within 30° of 0° is labelled *cis*, omega within 30°

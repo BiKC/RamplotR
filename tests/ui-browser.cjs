@@ -74,6 +74,24 @@ const assert = require("node:assert/strict");
       };
     });
     assert.ok(plot.traces >= 5, "Expected contours and at least one chain.");
+    const cleanControls = await page.evaluate(() => ({
+      compactInspector: document.querySelector(".ram-global-inspector")
+        .classList.contains("is-empty"),
+      previousHidden: getComputedStyle(document.getElementById("prevReview")).display
+        === "none",
+      reviewLabel: document.getElementById("nextReview").textContent.trim(),
+      molecularStyles: Array.from(document.querySelector("#nglRepresentation").options)
+        .map(item => item.value),
+      advancedSettings: document.querySelector(".ram-viewer-details")
+        .hasAttribute("open")
+    }));
+    assert.ok(cleanControls.compactInspector && cleanControls.previousHidden,
+      "The empty residue inspector must not display unnecessary buttons.");
+    assert.equal(cleanControls.reviewLabel,"Review issues");
+    assert.deepEqual(cleanControls.molecularStyles,
+      ["cartoon","ribbon","licorice","ball+stick","surface"]);
+    assert.equal(cleanControls.advancedSettings,false,
+      "Advanced molecular overlays start collapsed.");
     assert.equal(plot.yAnchor, "x", "Axes must be equally scaled.");
     assert.ok(Math.abs(plot.xRange[0] + 180) < 1 &&
               Math.abs(plot.xRange[1] - 180) < 1 &&
@@ -264,6 +282,10 @@ const assert = require("node:assert/strict");
         window.__ramZoomCalls.some(call =>
           call.sele === expected && call.duration === 650);
     }, { timeout: 20000 }, firstNglSelector);
+    await page.waitForFunction(() =>
+      !document.querySelector(".ram-global-inspector").classList.contains("is-empty")
+      && getComputedStyle(document.getElementById("prevReview")).display !== "none",
+      {timeout:10000});
     await page.screenshot({
       path: "benchmarks/output/ui-preview/desktop-residue-zoom.png",
       fullPage: true
@@ -271,6 +293,37 @@ const assert = require("node:assert/strict");
 
     // The residue table should also select the same entry, and clicking
     // another row should move the plot highlight back to that residue.
+    // Change the protein representation while retaining the orange residue
+    // overlay; then restore cartoon before continuing linked-view tests.
+    await page.evaluate(() => {
+      const el = document.querySelector("#nglRepresentation");
+      if (el.selectize) el.selectize.setValue("licorice");
+      else {
+        el.value = "licorice";
+        el.dispatchEvent(new Event("change",{bubbles:true}));
+      }
+    });
+    await page.waitForFunction(() => {
+      const group = window.getNGLStage("NGL")?.getRepresentationsByName("ram-chain-A");
+      return group && group.list && group.list.some(item =>
+        (item.repr?.type || "").toLowerCase() === "licorice");
+    }, {timeout:20000});
+    await page.evaluate(() => {
+      const el = document.querySelector("#nglRepresentation");
+      if (el.selectize) el.selectize.setValue("cartoon");
+      else {
+        el.value = "cartoon";
+        el.dispatchEvent(new Event("change",{bubbles:true}));
+      }
+    });
+    await page.waitForFunction(() => {
+      const group = window.getNGLStage("NGL")?.getRepresentationsByName("ram-chain-A");
+      const highlight = window.getNGLStage("NGL")?.getRepresentationsByName("ram-highlight");
+      return group && group.list && group.list.some(item =>
+        (item.repr?.type || "").toLowerCase() === "cartoon") &&
+        highlight && highlight.list.length > 0;
+    }, {timeout:20000});
+
     await page.click('.nav-tabs a[data-value="residues"]');
     await page.waitForSelector("#regions table tbody tr", { timeout: 18000 });
     await page.waitForFunction(() =>

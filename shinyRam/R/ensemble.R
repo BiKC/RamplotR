@@ -36,6 +36,9 @@ ram_ensemble_summary <- function(models) {
   all_keys <- unique(unlist(keys,use.names=FALSE))
   n <- length(all_keys)
   nmodels <- length(models)
+  membership <- matrix(FALSE,nrow=n,ncol=nmodels)
+  for(i in seq_along(models))
+    membership[,i] <- !is.na(match(all_keys,keys[[i]]))
   if(!n) return(data.frame(chain=character(),resi=integer(),
       insertion_code=character(),resn=character(),models_present=integer(),
       phi_models=integer(),psi_models=integer(),
@@ -54,8 +57,6 @@ ram_ensemble_summary <- function(models) {
     result
   }
   phi <- get("phi");psi <- get("psi");region <- get("region","character")
-  name_rows <- data.frame(chain=character(),resi=integer(),
-    insertion_code=character(),resn=character(),stringsAsFactors=FALSE)
   # Use the first occurrence of each ID across all models, not row number.
   ids <- do.call(rbind,lapply(models,function(x)
     x[,required[1:4],drop=FALSE]))
@@ -79,7 +80,7 @@ ram_ensemble_summary <- function(models) {
     if(!length(values)) NA_real_ else max(table(values))/length(values)
   },numeric(1))
   out <- data.frame(info,
-    models_present=as.integer(rowSums(!is.na(phi)|!is.na(psi))),
+    models_present=as.integer(rowSums(membership)),
     phi_models=as.integer(rowSums(is.finite(phi))),
     psi_models=as.integer(rowSums(is.finite(psi))),
     phi_mean=ph[,"mean"],phi_sd=ph[,"sd"],

@@ -1,6 +1,16 @@
 name: Independent wwPDB validation
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "shinyRam/R/**"
+      - "benchmarks/wwpdb_helpers.R"
+      - "benchmarks/compare_wwpdb.R"
+      - "tests/wwpdb.R"
+      - "tests/phase-a-baseline.R"
+      - "validation/**"
+      - ".github/workflows/wwpdb-validation.yml"
   pull_request:
     paths:
       - "shinyRam/R/**"

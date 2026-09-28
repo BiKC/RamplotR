@@ -96,6 +96,55 @@ const assert = require("node:assert/strict");
       path: "benchmarks/output/ui-preview/desktop-loaded.png", fullPage: true
     });
 
+    // A standard laptop should show the analysis, not a full-height landing
+    // page. Focus mode is reversible and must preserve the live plot.
+    await page.setViewport({ width: 1366, height: 768, deviceScaleFactor: 1 });
+    await page.waitForFunction(() => {
+      const app = document.querySelector(".ram-app");
+      const p = document.querySelector("#plotly");
+      return app && app.classList.contains("ram-has-data") &&
+        p && p._fullLayout && Math.abs(p._fullLayout.width-p.clientWidth)<3;
+    }, {timeout:15000});
+    const laptop = await page.evaluate(() => {
+      const intro = document.querySelector(".ram-intro");
+      const source = document.querySelector(".ram-source");
+      const p = document.querySelector("#plotly");
+      return {
+        introHidden: getComputedStyle(intro).display === "none",
+        sourceHeight: source.getBoundingClientRect().height,
+        plotBottom: p.getBoundingClientRect().bottom,
+        viewportHeight: window.innerHeight
+      };
+    });
+    assert.ok(laptop.introHidden,
+              "Loaded analysis should reclaim the introductory hero area.");
+    assert.ok(laptop.sourceHeight < 100,
+              "The loaded structure toolbar should remain compact.");
+    assert.ok(laptop.plotBottom <= laptop.viewportHeight+95,
+              "The laptop plot should fit mostly inside the first screen.");
+    await page.screenshot({
+      path:"benchmarks/output/ui-preview/laptop-compact.png",fullPage:true
+    });
+    await page.click("#ram-toggle-settings");
+    await page.waitForFunction(() => {
+      const app = document.querySelector(".ram-app");
+      const sidebar = document.querySelector(".ram-sidebar");
+      return app.classList.contains("ram-focus-mode") &&
+        getComputedStyle(sidebar).display === "none" &&
+        document.querySelector("#ram-toggle-settings")
+          .getAttribute("aria-expanded") === "false";
+    });
+    await page.screenshot({
+      path:"benchmarks/output/ui-preview/laptop-focus.png",fullPage:true
+    });
+    await page.click("#ram-toggle-settings");
+    await page.waitForFunction(() =>
+      !document.querySelector(".ram-app").classList.contains("ram-focus-mode"));
+    await page.setViewport({width:1440,height:940,deviceScaleFactor:1});
+    await page.waitForFunction(() => {
+      const p = document.querySelector("#plotly");
+      return p._fullLayout && Math.abs(p._fullLayout.width-p.clientWidth)<3;
+    }, {timeout:15000});
 
     // Changing presentation controls must update the displayed plot without
     // another click on Analyze, and without loading another structure.

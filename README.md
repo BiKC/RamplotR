@@ -13,7 +13,7 @@ The original app has been hosted at https://bioit.shinyapps.io/RamplotR/. The ho
 To run this repository locally, install a current R 4.x and the following CRAN packages:
 
 ```r
-install.packages(c("shiny", "shinyWidgets", "colourpicker", "bio3d", "NGLVieweR"))
+install.packages(c("shiny", "shinyWidgets", "colourpicker", "bio3d", "NGLVieweR", "DT"))
 shiny::runApp("shinyRam")
 ```
 

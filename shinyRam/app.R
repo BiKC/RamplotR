@@ -500,7 +500,8 @@ ui <- fluidPage(
       )
     )
   ),
-  tags$script(src = "custom.js")
+  tags$script(src = "custom.js"),
+  tags$script(src = "prediction.js")
 )
 # Structure parsing is deliberately triggered by the Analyse button. Every
 # downstream result is a reactive expression, so adjusting settings never
@@ -1410,6 +1411,11 @@ server <- function(input, output, session) {
   outputOptions(output, "selectedResidueInfo", suspendWhenHidden = FALSE)
   observe({
     row <- selected_row()
+    session$sendCustomMessage("ram-confidence-selected",
+      if (is.null(row)) list(clear = TRUE) else list(
+        chain = as.character(row$chain[[1L]]),
+        resi = as.integer(row$resi[[1L]]),
+        insertion_code = as.character(row$insertion_code[[1L]])))
     session$sendCustomMessage("ram-selection", if (is.null(row)) list(clear = TRUE) else list(
       chain = as.character(row$chain[[1L]]),
       resi = as.integer(row$resi[[1L]]),

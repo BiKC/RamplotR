@@ -131,7 +131,7 @@ ui <- fluidPage(
             class = "ram-source-choice",
             radioButtons(
               "inputSource", "Structure source",
-              choices = c("PDB accession" = "pdb", "Uploaded file" = "upload"),
+              choices = c("PDB ID" = "pdb", "Upload file" = "upload"),
               selected = "pdb", inline = TRUE
             )
           ),

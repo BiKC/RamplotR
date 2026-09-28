@@ -446,18 +446,41 @@ server <- function(input, output, session) {
     for (k in seq_len(4L))
       colourpicker::updateColourInput(session, paste0("bg", k), value = colors[k])
   }
+  # Selecting a preset is authoritative immediately, without waiting for
+  # four separate colourpicker controls to acknowledge their updates.
+  pending_palette <- reactiveVal(NULL)
+  input_palette <- reactive({
+    c(input$bg1, input$bg2, input$bg3, input$bg4)
+  })
+  plot_palette <- reactive({
+    if (identical(input$colorscheme, "Rampage")) return(rampage)
+    if (identical(input$colorscheme, "PDBSum")) return(pdbsum)
+    input_palette()
+  })
   observeEvent(input$colorscheme, {
-    if (identical(input$colorscheme, "Rampage")) updateColorInputs(rampage)
-    if (identical(input$colorscheme, "PDBSum")) updateColorInputs(pdbsum)
+    preset <- switch(input$colorscheme,
+      Rampage = rampage, PDBSum = pdbsum, NULL)
+    if (is.null(preset)) return()
+    if (!identical(unname(input_palette()), unname(preset))) {
+      pending_palette(preset)
+      updateColorInputs(preset)
+    } else {
+      pending_palette(NULL)
+    }
   })
-  observe({
-    colors <- c(input$bg1, input$bg2, input$bg3, input$bg4)
+  observeEvent(input_palette(), {
+    colors <- input_palette()
     if (length(colors) != 4L || anyNA(colors)) return()
-    name <- if (identical(colors, unname(rampage))) "Rampage" else
-      if (identical(colors, unname(pdbsum))) "PDBSum" else "custom"
-    if (!identical(input$colorscheme, name))
-      updateSelectInput(session, "colorscheme", selected = name)
-  })
+    pending <- pending_palette()
+    if (!is.null(pending)) {
+      if (identical(unname(colors), unname(pending))) pending_palette(NULL)
+      return()
+    }
+    preset <- switch(isolate(input$colorscheme),
+      Rampage = rampage, PDBSum = pdbsum, NULL)
+    if (!is.null(preset) && !identical(unname(colors), unname(preset)))
+      updateSelectInput(session, "colorscheme", selected = "custom")
+  }, ignoreInit = TRUE)
 
   selected_matrix <- reactive({
     req(input$bgtype, input$background)
@@ -501,7 +524,7 @@ server <- function(input, output, session) {
       if (!is.null(widget) && nzchar(widget)) widget else
         color_set[((match(chain, available_chains()) - 1L) %% length(color_set)) + 1L]
     }, character(1))
-    palette <- c(input$bg1, input$bg2, input$bg3, input$bg4)
+    palette <- plot_palette()
     req(length(palette) == 4L, all(nzchar(palette)))
     matrix <- selected_matrix()
     session$sendCustomMessage("process", list(

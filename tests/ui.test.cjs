@@ -91,7 +91,7 @@ handlers.process({
   chainColors: ["#116e70"]
 });
 assert.equal(rendered.node, plot, "The expected plot container must be used");
-assert.equal(rendered.traces.length, 5, "Four contours plus one chain trace");
+assert.equal(rendered.traces.length, 6, "Four contours, one chain and a selection overlay");
 assert.equal(rendered.traces[4].x.length, 1,
              "A missing torsion must not turn into a false (0,0) point");
 assert.equal(rendered.traces[4].x[0], 91.2);

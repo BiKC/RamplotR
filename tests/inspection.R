@@ -18,6 +18,21 @@ seq <- ram_sequence_data(a)
 assert(identical(seq$letter, c("A","T","G","P")),
        "Sequence must retain amino-acid identities")
 assert(seq$insertion_code[2L]=="A", "Insertion code must be preserved")
+groups <- ram_sequence_groups(a)
+assert(identical(names(groups), c("A", "B")),
+       "Navigator must retain every selected protein chain in source order")
+assert(identical(vapply(groups, nrow, integer(1)), c(A=3L, B=1L)),
+       "Navigator must preserve all residues of each chain")
+assert(length(ram_sequence_groups(a[0,,drop=FALSE]))==0L,
+       "Empty chain selection should show no groups")
+overview <- ram_sequence_overview_bins(
+  c(rep("Favoured", 70L), "Not allowed", rep("Favoured", 70L),
+    NA_character_), max_bins=12L)
+assert(length(overview)==12L,
+       "Large chains should use a bounded number of overview cells")
+assert("outlier" %in% overview && "missing" %in% overview,
+       "Compressed overviews must not lose isolated issues")
+
 assert(isTRUE(all.equal(ram_angular_difference(179,-179), 2)),
        "Angular difference must wrap across 180 degrees")
 assert(is.na(ram_angular_difference(NA,-20)), "Missing angles must stay missing")

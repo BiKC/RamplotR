@@ -34,6 +34,9 @@ The scientific classifications are tied to the bundled reference densities. Do n
 - [x] Preallocate and vectorize backbone extraction (PR #5).
 - [x] Cache immutable classification reference profiles (PR #6).
 - [x] Correct independent validation identifier matching and enforce coverage (PR #7).
+- [x] Run a same-runner 6VXX scaling pilot with 1x, 3x and 10x replicated
+  complexes and record peak RSS, warm/cold stage timings and software metadata.
+  See [measured results](scaling-results.md) and [run 36430181464](https://github.com/BiKC/RamplotR/actions/runs/36430181464).
 - [ ] Run paired same-host comparisons of legacy and current algorithms, including peak RSS.
 - [ ] Compare RamplotR region labels against independent MolProbity-style reports.
 - [ ] Prepare the methods, validation tables and figures for the arXiv preprint once validation is complete.

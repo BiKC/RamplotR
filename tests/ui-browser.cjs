@@ -460,10 +460,20 @@ const assert = require("node:assert/strict");
       selected: firstNglSelector, minZoom: previousZoomCount
     });
 
-    // A tab-independent inspector allows sequence selection and a one-click
-    // return to the 2D/3D plots.
-    await page.click('.nav-tabs a[data-value="sequence"]');
-    await page.waitForSelector(".ram-seq-res", {timeout:18000});
+    // Sequence navigation belongs to the plot tab. The short all-chain
+    // overview stays visible while the letter-level navigator is collapsed.
+    await page.waitForSelector("#ram-sequence-panel > summary");
+    const shortView = await page.evaluate(() => ({
+      overviewChains: document.querySelectorAll(".ram-sequence-overview-chain").length,
+      collapsed: !document.getElementById("ram-sequence-panel").open,
+      plotTab: document.querySelector('.nav-tabs li.active a').getAttribute("data-value")
+    }));
+    assert.equal(shortView.overviewChains, 1,
+                 "The small single-chain 1CRN fixture has one overview row.");
+    assert.ok(shortView.collapsed && shortView.plotTab === "plot",
+              "Sequence must be integrated into the plot tab and initially collapsed.");
+    await page.click("#ram-sequence-panel > summary");
+    await page.waitForSelector("#sequenceView .ram-seq-res", {timeout:18000});
     const sequencePick = await page.evaluate(first => {
       const buttons = Array.from(document.querySelectorAll(".ram-seq-res"));
       const other = buttons.find(b =>
@@ -479,11 +489,13 @@ const assert = require("node:assert/strict");
       const chosen = document.querySelector("#selectedResidueInfo strong");
       return chosen && chosen.textContent.includes(" " + resi);
     }, {timeout:15000}, sequencePick);
-    await page.click("#showInPlot");
-    await page.waitForFunction(() =>
-      !!document.querySelector('.nav-tabs li.active a[data-value="plot"]'),
-      {timeout:15000}
-    );
+    assert.equal(await page.$eval('.nav-tabs li.active a',
+      el => el.getAttribute("data-value")), "plot",
+      "Picking a residue must preserve the visible plot and NGL viewer.");
+    await page.screenshot({
+      path:"benchmarks/output/ui-preview/sequence-integrated.png", fullPage:true
+    });
+    await page.click("#ram-sequence-panel > summary");
 
     // Comparing 1CRN with itself tests sequence alignment without relying
     // on any additional external downloads inside the Shiny session.
@@ -507,6 +519,45 @@ const assert = require("node:assert/strict");
       path:"benchmarks/output/ui-preview/compare-self.png",fullPage:true
     });
     await page.click('.nav-tabs a[data-value="plot"]');
+
+    // Multi-chain experimental fixture: the compact overview and the
+    // expanded residue navigator must each show A, B, C and D together.
+    await (await page.$("#structfile")).uploadFile(
+      path.resolve("benchmarks/output/ui-preview/1BBB.pdb"));
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    await page.click("#submit");
+    await page.waitForFunction(() => {
+      const badge = document.getElementById("ram-current-structure");
+      const rows = document.querySelectorAll(".ram-sequence-overview-chain");
+      return badge && badge.textContent.includes("1BBB") && rows.length === 4;
+    }, {timeout:45000});
+    const overviewNames = await page.$eval(
+      ".ram-sequence-overview-chain .ram-sequence-chain-name",
+      nodes => nodes.map(n => n.textContent.trim()));
+    assert.deepEqual(overviewNames, ["Chain A", "Chain B", "Chain C", "Chain D"],
+                     "The collapsed navigator should show every protein chain.");
+    await page.click("#ram-sequence-panel > summary");
+    await page.waitForFunction(() =>
+      document.querySelectorAll("#sequenceView .ram-sequence-chain").length === 4,
+      {timeout:15000});
+    const allChains = await page.evaluate(() =>
+      Array.from(document.querySelectorAll(
+        "#sequenceView .ram-sequence-chain")).map(group => ({
+          title: group.querySelector("strong").textContent,
+          residues: group.querySelectorAll(".ram-seq-res").length
+        })));
+    assert.equal(allChains.length, 4);
+    assert.ok(allChains.every(group => group.residues > 0),
+              "Every chain should provide clickable residue navigation.");
+    await page.screenshot({
+      path:"benchmarks/output/ui-preview/all-chains-expanded.png", fullPage:true
+    });
+    await page.click("#sequenceView .ram-sequence-chain:last-child .ram-seq-res:nth-child(2)");
+    await page.waitForFunction(() => {
+      const selected = document.querySelector("#selectedResidueInfo strong");
+      return selected && selected.textContent.includes("Chain D");
+    }, {timeout:15000});
+    await page.click("#ram-sequence-panel > summary");
 
     // Check whether the browser delivered resize events and whether Plotly's
     // relayout handler actually received the new mobile dimensions.

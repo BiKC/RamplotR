@@ -187,11 +187,30 @@ const assert = require("node:assert/strict");
     }
     await page.click('.nav-tabs a[data-value="plot"]');
     await page.click("#clearResidue");
-    await page.waitForFunction(() => {
-      const p = document.getElementById("plotly");
-      return !document.querySelector("#selectedResidueInfo strong") &&
-        p.data[p.data.length - 1].x.length === 0;
-    }, { timeout: 18000 });
+    try {
+      await page.waitForFunction(() => {
+        const p = document.getElementById("plotly");
+        return !document.querySelector("#selectedResidueInfo strong") &&
+          p.data[p.data.length - 1].x.length === 0;
+      }, { timeout: 12000 });
+    } catch (e) {
+      const state = await page.evaluate(() => {
+        const p = document.getElementById("plotly");
+        return {
+          selectedInfo: document.querySelector("#selectedResidueInfo").innerText,
+          selectedOverlay: p.data[p.data.length - 1],
+          traceCount: p.data.length,
+          tableSelected: Array.from(document.querySelectorAll("#regions tbody tr.selected")).map(el => el.innerText),
+          tab: document.querySelector(".ram-main .nav-tabs li.active a").innerText,
+          button: document.querySelector("#clearResidue").outerHTML
+        };
+      });
+      console.error("Clear-selection diagnostics:", JSON.stringify(state));
+      await page.screenshot({
+        path: "benchmarks/output/ui-preview/selection-debug.png", fullPage: true
+      });
+      throw e;
+    }
     // The NGL stage has a pick signal and a named highlight representation.
     await page.waitForFunction(() => window.getNGLStage &&
       window.getNGLStage("NGL") &&

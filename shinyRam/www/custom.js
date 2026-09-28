@@ -11,6 +11,7 @@
   const plot = document.getElementById("plotly");
   const empty = document.getElementById("plot-empty");
   const currentStructure = document.getElementById("ram-current-structure");
+  const comparePlot = document.getElementById("comparePlot");
   let selectedResidue = null;
   let selectedCoordinates = new Map();
   let selectionTrace = -1;
@@ -188,6 +189,15 @@
     });
   }
 
+  function changeCompareSource() {
+    const selected = document.querySelector('input[name="compareInputSource"]:checked');
+    const upload = selected && selected.value === "upload";
+    const pdb = document.getElementById("ram-compare-pdb");
+    const file = document.getElementById("ram-compare-upload");
+    if (pdb) pdb.classList.toggle("is-hidden", upload);
+    if (file) file.classList.toggle("is-hidden", !upload);
+  }
+
   function changeSource() {
     const selected = document.querySelector('input[name="inputSource"]:checked');
     const upload = selected && selected.value === "upload";
@@ -199,8 +209,11 @@
 
   function initSourceControl() {
     changeSource();
+    changeCompareSource();
     document.addEventListener("change", function (event) {
       if (event.target && event.target.name === "inputSource") changeSource();
+      if (event.target && event.target.name === "compareInputSource")
+        changeCompareSource();
     });
   }
 
@@ -433,8 +446,42 @@
       });
   }
 
+  function drawComparison(obj) {
+    if (!comparePlot || !window.Plotly || !obj) return;
+    const aPhi = array(obj.phiA), aPsi = array(obj.psiA);
+    const bPhi = array(obj.phiB), bPsi = array(obj.psiB);
+    const asPoints = function (phi, psi) {
+      const x=[], y=[];
+      for (let i=0; i<phi.length; i++) {
+        if (Number.isFinite(phi[i]) && Number.isFinite(psi[i])) {
+          x.push(phi[i]); y.push(psi[i]);
+        }
+      }
+      return {x,y};
+    };
+    const a = asPoints(aPhi,aPsi), b = asPoints(bPhi,bPsi);
+    const traces = [
+      {type:"scattergl",mode:"markers",name:String(obj.nameA || "Primary"),
+       x:a.x,y:a.y,marker:{color:"#CE6A4D",size:7,opacity:.77}},
+      {type:"scattergl",mode:"markers",name:String(obj.nameB || "Comparison"),
+       x:b.x,y:b.y,marker:{color:"#317E9A",size:7,opacity:.77,symbol:"diamond"}}
+    ];
+    const axis = {range:[-180,180],tickvals:[-180,-90,0,90,180],
+      gridcolor:"#e3eeeb",zerolinecolor:"#a0bab9",constrain:"domain"};
+    comparePlot.style.minHeight = "420px";
+    window.Plotly.react(comparePlot,traces,{
+      autosize:true,paper_bgcolor:"#ffffff",plot_bgcolor:"#fbfdfc",
+      margin:{l:63,r:20,t:35,b:55},
+      xaxis:Object.assign({},axis,{title:"Phi (°)"}),
+      yaxis:Object.assign({},axis,{title:"Psi (°)",scaleanchor:"x",scaleratio:1}),
+      legend:{orientation:"h",y:1.12,x:0},
+      height:Math.min(660,Math.max(420,comparePlot.clientWidth+30))
+    },{responsive:true,displaylogo:false});
+  }
+
   if (window.Shiny) {
     window.Shiny.addCustomMessageHandler("process", drawPlot);
+    window.Shiny.addCustomMessageHandler("ram-comparison", drawComparison);
     window.Shiny.addCustomMessageHandler("ram-selection", function (choice) {
       selectedResidue = choice && !choice.clear ? choice : null;
       refreshSelection();
@@ -532,6 +579,11 @@
   // columns on visibility changes: do not enable DataTables scrollX, which
   // duplicates the header and creates cross-version alignment problems.
   function adjustVisibleTables() {
+    if (comparePlot && window.Plotly &&
+        comparePlot.classList.contains("js-plotly-plot") &&
+        comparePlot.clientWidth > 0) {
+      window.Plotly.Plots.resize(comparePlot);
+    }
     if (window.jQuery && window.jQuery.fn &&
         window.jQuery.fn.dataTable) {
       const api = window.jQuery.fn.dataTable.tables({

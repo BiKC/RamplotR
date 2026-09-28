@@ -6,6 +6,7 @@
   "use strict";
   let component = null, representation = null, owningStage = null;
   let generation = 0;
+  let selectedFile = null;
   const bytesLimit = 64 * 1024 * 1024;
   const find = id => document.getElementById(id);
   const status = text => {
@@ -15,6 +16,37 @@
   const currentStage = () =>
     typeof window.getNGLStage === "function" ?
       window.getNGLStage("NGL") : null;
+  // File inputs created inside the original Shiny UI are bound by Shiny
+  // and upload their contents to the R server before NGL can use them.
+  // Install this plain browser-only input after the Shiny connection has
+  // completed; never call Shiny.bindAll on this locally owned element.
+  function installLocalPicker() {
+    const slot = find("ram-density-file-slot");
+    if (!slot || find("ram-density-file")) return;
+    const input = document.createElement("input");
+    input.type = "file";
+    input.id = "ram-density-file";
+    input.accept = ".map,.mrc,.ccp4";
+    input.setAttribute("aria-label", "Choose local CCP4/MRC map");
+    input.addEventListener("change", function () {
+      selectedFile = input.files && input.files[0] || null;
+      status(selectedFile
+        ? "Selected " + selectedFile.name + ". Choose Show map to overlay."
+        : "No map selected.");
+    });
+    slot.appendChild(input);
+  }
+  if (window.jQuery && window.Shiny) {
+    window.jQuery(document).one("shiny:connected", installLocalPicker);
+    if (window.Shiny.shinyapp &&
+        typeof window.Shiny.shinyapp.isConnected === "function" &&
+        window.Shiny.shinyapp.isConnected()) installLocalPicker();
+  } else {
+    // In standalone browser previews there is no Shiny input binder.
+    if (document.readyState === "loading")
+      document.addEventListener("DOMContentLoaded", installLocalPicker);
+    else installLocalPicker();
+  }
   const level = () => {
     const input = find("ram-density-level");
     const n = Number(input ? input.value : 2);
@@ -31,7 +63,7 @@
   }
   async function loadMap() {
     const input = find("ram-density-file");
-    const file = input && input.files && input.files[0];
+    const file = selectedFile || input && input.files && input.files[0];
     if (!file) return status("Choose a local CCP4/MRC map first.");
     if (!/\.(map|mrc|ccp4)$/i.test(file.name))
       return status("Only .map, .mrc and .ccp4 files are supported.");
@@ -102,6 +134,9 @@
   if (window.Shiny && typeof window.Shiny.addCustomMessageHandler==="function")
     window.Shiny.addCustomMessageHandler("ram-clear-density",function (_message) {
       clearMap(false);
+      selectedFile = null;
+      const input = find("ram-density-file");
+      if (input) input.value = "";
       status("No map loaded.");
     });
 })();

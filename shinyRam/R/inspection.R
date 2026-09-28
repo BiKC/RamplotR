@@ -28,7 +28,7 @@ ram_amino_acid_letters <- c(
 ram_sequence_data <- function(data) {
   if (!nrow(data)) return(data.frame(
     chain=character(), resi=integer(), insertion_code=character(),
-    resn=character(), letter=character(), region=character(),
+    resn=character(), letter=character(), region=character(), plddt=numeric(),
     stringsAsFactors=FALSE))
   key <- paste(data$chain, data$resi, data$insertion_code, sep="\r")
   data <- data[!duplicated(key), , drop=FALSE]
@@ -39,6 +39,8 @@ ram_sequence_data <- function(data) {
     resn=as.character(data$resn),
     letter=unname(ram_amino_acid_letters[data$resn]),
     region=as.character(data$region),
+    plddt=if ("plddt" %in% names(data)) as.numeric(data$plddt) else
+      rep(NA_real_, nrow(data)),
     stringsAsFactors=FALSE
   )
   out$letter[is.na(out$letter)] <- "X"
@@ -171,4 +173,18 @@ ram_sequence_overview_bins <- function(region, max_bins = 180L) {
     candidates <- status[bucket == i]
     priority[match(TRUE, priority %in% candidates)]
   }, character(1))
+}
+
+
+# Per-chain pLDDT strip uses the lowest known confidence in each consecutive
+# sequence bin; low-confidence linkers remain visible on long chains.
+ram_plddt_overview_bins <- function(plddt, max_bins = 180L) {
+  if (!length(plddt)) return(numeric())
+  bins <- min(length(plddt), as.integer(max_bins))
+  bucket <- pmin(bins, floor((seq_along(plddt) - 1) * bins /
+                              length(plddt)) + 1L)
+  vapply(seq_len(bins), function(i) {
+    values <- plddt[bucket == i]
+    if (!any(is.finite(values))) NA_real_ else min(values[is.finite(values)])
+  }, numeric(1))
 }

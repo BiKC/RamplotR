@@ -57,6 +57,43 @@ const assert = require("node:assert/strict");
       document.getElementById("plotly").classList.contains("js-plotly-plot"),
       { timeout: 90000 }
     );
+    // The loaded-state CSS is applied in Plotly.react's completion
+    // callback. Wait for its scheduled responsive relayout before measuring.
+    try {
+      await page.waitForFunction(() => {
+        const p = document.getElementById("plotly");
+        return p && p._fullLayout && p.clientWidth > 0 &&
+          p._fullLayout.xaxis._length >= 0.48 * p.clientWidth &&
+          p._fullLayout.yaxis._length >= 0.48 * p.clientWidth;
+      }, {timeout: 7000});
+    } catch (error) {
+      const diagnostic = await page.evaluate(() => {
+        const p = document.getElementById("plotly");
+        const card = p.closest(".ram-chart-card");
+        const workspace = document.querySelector(".ram-workspace");
+        return {
+          viewport:[window.innerWidth, window.innerHeight],
+          appClasses:document.querySelector(".ram-app").className,
+          plot:{clientWidth:p.clientWidth,clientHeight:p.clientHeight,
+            rect:p.getBoundingClientRect().toJSON(),inlineStyle:p.style.cssText,
+            layout:p._fullLayout && {
+              width:p._fullLayout.width,height:p._fullLayout.height,
+              xLen:p._fullLayout.xaxis._length,yLen:p._fullLayout.yaxis._length,
+              xRange:p._fullLayout.xaxis.range,yRange:p._fullLayout.yaxis.range
+            }},
+          card:card.getBoundingClientRect().toJSON(),
+          workspace:workspace.getBoundingClientRect().toJSON(),
+          content:document.querySelector(".ram-main").getBoundingClientRect().toJSON(),
+          status:document.getElementById("ram-current-structure").textContent
+        };
+      });
+      console.error("INITIAL PLOT SIZE DIAGNOSTICS",JSON.stringify(diagnostic));
+      await page.screenshot({
+        path:"benchmarks/output/ui-preview/plot-size-debug.png",fullPage:true
+      });
+      console.error("PAGE ERRORS",errors);
+      throw error;
+    }
     const plot = await page.evaluate(() => {
       const p = document.getElementById("plotly");
       return {
@@ -151,6 +188,7 @@ const assert = require("node:assert/strict");
         viewportHeight: window.innerHeight
       };
     });
+    console.log("LAPTOP COMPACT DIAGNOSTICS",JSON.stringify(laptop));
     assert.ok(laptop.introHidden,
               "Loaded analysis should reclaim the introductory hero area.");
     assert.ok(laptop.sourceHeight < 100,

@@ -862,3 +862,119 @@ body > .container-fluid { max-width: none; padding: 0; }
   }
   .ram-has-data .ram-viewer-layers { margin-top:6px; padding-top:7px; }
 }
+
+
+/* Phase B is progressive disclosure: confidence controls only appear for
+   predicted structures, keeping the default experimental workflow compact. */
+.ram-prediction-upload.is-hidden { display: none; }
+.ram-prediction-upload { grid-column: 1 / -1; border-top: 1px solid #dce9e5;
+  padding: 4px 3px 2px; margin-top: 0; }
+.ram-prediction-upload > summary { cursor:pointer; display: list-item;
+  color:#1b6268; font-size:11px; font-weight:750; padding:7px 2px; }
+.ram-prediction-upload > summary:focus-visible { outline:2px solid #317e95; }
+.ram-prediction-upload[open] .ram-prediction-upload-fields {
+  padding-top:8px; }
+.ram-has-data .ram-prediction-upload:not([open]) {
+  border-top:0; padding:0; margin:0; }
+.ram-has-data .ram-prediction-upload:not([open]) > summary {
+  padding:4px 2px; color:#4a7175; }
+.ram-prediction-upload-fields { display:grid;
+  grid-template-columns:minmax(215px,1fr) minmax(0,2fr);
+  align-items: start; gap: 10px 15px; }
+.ram-prediction-upload-fields .shiny-input-container { width:100% !important;
+  margin-bottom: 6px !important; }
+.ram-prediction-upload-fields .control-label { display:block;
+  font-size: 11px; margin-bottom: 7px; }
+.ram-has-data .ram-prediction-upload .control-label { position:static;
+  width:auto; height:auto; padding:0; margin:0 0 7px; overflow:visible;
+  clip:auto; white-space:normal; }
+.ram-prediction-upload .ram-field-hint { margin:3px 0 0; max-width:900px; }
+.ram-has-data .ram-source:has(.ram-prediction-upload[open]:not(.is-hidden)) {
+  align-items:start;
+}
+.ram-source-choice .radio-inline { font-size: 11px !important; }
+.ram-source-controls { grid-template-columns:minmax(265px,300px) minmax(0,1fr) auto; }
+.ram-has-data .ram-source-controls {
+  grid-template-columns:minmax(265px,300px) minmax(145px,1fr) auto; }
+.ram-confidence-panel { margin-top:12px; border:1px solid #c8dfd9;
+  border-radius:11px; background:#fff; min-width:0; overflow:hidden; }
+.ram-confidence-panel > summary { cursor:pointer; list-style:none;
+  display:flex; align-items:center; flex-wrap:wrap; gap:6px 14px;
+  padding:14px 17px; position:relative; padding-right:40px;
+  background:#f1f8f5; }
+.ram-confidence-panel > summary::-webkit-details-marker { display:none; }
+.ram-confidence-panel > summary::after { content:""; position:absolute;
+  right:18px; top:19px; width:8px; height:8px; border-right:2px solid #426d71;
+  border-bottom:2px solid #426d71; transform:rotate(45deg); }
+.ram-confidence-panel[open] > summary::after { transform:rotate(225deg); top:23px; }
+.ram-confidence-panel > summary:focus-visible { outline:2px solid #247d82; }
+.ram-confidence-title { font-weight:750; font-size:13px; color:#154e55; }
+.ram-confidence-subtitle { font-size:11px; color:#55757d; }
+.ram-confidence-available { font-size:10px; font-weight:750; color:#185c5c;
+  background:#d8ece5; border-radius:99px; padding:5px 8px; }
+.ram-confidence-body { padding:16px 18px 13px; }
+.ram-confidence-explainer { font-size:11px; line-height:1.6;
+  color:#567179; max-width:700px; margin:0 0 12px; }
+.ram-confidence-metrics { display:flex; flex-wrap:wrap; gap:9px; }
+.ram-confidence-metric { font-size:11px; font-weight:750;
+  padding:7px 10px; color:#255b60; background:#eaf3ef; border-radius:6px; }
+.ram-confidence-map-title { display:flex; flex-wrap:wrap; gap:8px;
+  align-items:baseline; font-size:12px; color:#234d58; margin:17px 0 8px; }
+.ram-confidence-map-title span { font-size:10px; color:#6a7f86; }
+#ram-pae-plot { width:min(100%,620px); max-width:100%;
+  min-height:340px; overflow:hidden; }
+.ram-pae-note { font-size:11px; color:#5f777f; margin:8px 0 0; }
+.ram-confidence-warning { font-size:11px; padding:10px;
+  border-left:3px solid #c18a43; background:#fbf5e9; color:#715435; }
+.ram-confidence-mini { display:flex; height:5px; grid-column:2;
+  grid-row:2; min-width:0; overflow:hidden; border-radius:3px; }
+.ram-confidence-mini-cell { display:block; flex:1 1 0; min-width:0; }
+.ram-sequence-overview-chain:has(.ram-confidence-mini) .ram-sequence-chain-name {
+  grid-column:1; grid-row:1 / 3; }
+.ram-sequence-overview-chain:has(.ram-confidence-mini) .ram-sequence-mini {
+  grid-column:2; grid-row:1; }
+.ram-sequence-overview-chain:has(.ram-confidence-mini) .ram-sequence-chain-count {
+  grid-column:3; grid-row:1 / 3; }
+.ram-sequence-overview-chain:has(.ram-confidence-mini) { row-gap:2px; }
+.ram-inspector-plddt { font-weight:750; color:#126e74; }
+.ram-inspector-warning { display:inline-flex; font-size:11px;
+  color:#955039; background:#fdefe5; padding:3px 7px; border-radius:6px; }
+@media(max-width:880px) {
+  .ram-source-controls,.ram-has-data .ram-source-controls {
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+  .ram-source-choice { grid-column:1/-1; }
+  .ram-prediction-upload-fields { grid-template-columns:minmax(0,1fr); }
+  .ram-submit { grid-column:1/-1; }
+}
+@media(max-width:580px) {
+  .ram-source-controls,.ram-has-data .ram-source-controls {
+    grid-template-columns:minmax(0,1fr); }
+  #ram-pae-plot { min-height:285px; }
+}
+
+.ram-prediction-sidecars.is-hidden { display:none; }
+.ram-prediction-sidecars { display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 15px; }
+@media(max-width:880px) {
+  .ram-prediction-sidecars,.ram-prediction-upload-fields {
+    grid-template-columns:minmax(0,1fr);
+  }
+}
+
+.ram-confidence-metric.ram-review-high { background:#fceae2; color:#8f4c32; }
+
+/* After analysis, the collapsed provenance disclosure sits under the compact
+   Structure heading instead of consuming a full second toolbar row. Reopen
+   it to edit prediction settings without losing the loaded structure. */
+@media (min-width: 881px) {
+  .ram-has-data .ram-source:has(.ram-prediction-upload:not(.is-hidden):not([open])) {
+    position:relative; grid-template-columns:145px minmax(0,1fr);
+  }
+  .ram-has-data .ram-prediction-upload:not(.is-hidden):not([open]) {
+    position:absolute; top:29px; left:15px; width:135px;
+    border:0; padding:0; margin:0;
+  }
+  .ram-has-data .ram-prediction-upload:not(.is-hidden):not([open]) > summary {
+    padding:2px 0; font-size:10px; line-height:1.2;
+  }
+}

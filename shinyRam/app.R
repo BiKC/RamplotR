@@ -17,6 +17,10 @@ library(colourpicker)
 library(bio3d)
 library(NGLVieweR)
 
+# Confidence JSON files can be substantially larger than Shiny's 5 MB
+# default upload limit. The parser separately rejects JSON above 32 MB.
+options(shiny.maxRequestSize = 40 * 1024^2)
+
 # Used for processing data
 
 source(file.path("R", "ramachandran.R"), local = TRUE)
@@ -24,6 +28,7 @@ source(file.path("R", "backbone.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
 source(file.path("R", "inspection.R"), local = TRUE)
 source(file.path("R", "reports.R"), local = TRUE)
+source(file.path("R", "predictions.R"), local = TRUE)
 
 # Chain colours and contour colours are designed together for a recognisable
 # RamplotR publication identity. Region meaning is encoded by ordered contrast,
@@ -131,7 +136,8 @@ ui <- fluidPage(
             class = "ram-source-choice",
             radioButtons(
               "inputSource", "Structure source",
-              choices = c("PDB ID" = "pdb", "Upload file" = "upload"),
+              choices = c("PDB ID" = "pdb", "Upload file" = "upload",
+                           "AlphaFold DB" = "afdb"),
               selected = "pdb", inline = TRUE
             )
           ),
@@ -148,10 +154,36 @@ ui <- fluidPage(
             )
           ),
           tags$div(
+            id = "ram-afdb-wrap", class = "ram-source-picker is-hidden",
+            textInput("afdbAccession", "AlphaFold DB UniProt accession",
+                      placeholder = "e.g. P69905")
+          ),
+          tags$div(
             class = "ram-submit",
             actionButton("submit", "Analyze structure", class = "btn-primary")
           )
         ),
+        tags$details(id = "ram-prediction-upload", class = "ram-prediction-upload is-hidden",
+          tags$summary(class = "ram-prediction-summary", "Prediction settings (optional)"),
+          tags$div(class = "ram-prediction-upload-fields",
+            selectInput("predictionSource", "Uploaded structure type",
+              choices = c("Experimental or unknown (no confidence)" = "experimental",
+                          "AlphaFold 2 / ColabFold" = "alphafold2",
+                          "AlphaFold 3" = "alphafold3",
+                          "ESMFold" = "esmfold",
+                          "Other predicted model (B-factor pLDDT)" = "other_prediction"),
+              selected = "experimental", selectize = FALSE),
+            tags$div(id = "ram-confidence-sidecars",
+              class = "ram-prediction-sidecars is-hidden",
+              fileInput("predictionJson", "PAE / full confidence JSON",
+                accept = c(".json")),
+              fileInput("predictionSummaryJson", "Summary JSON (AF3, optional)",
+                accept = c(".json"))
+            )
+          ),
+          tags$p(class = "ram-field-hint",
+            "For declared predictions, pLDDT is read from B-factors or verified AF3 atom confidence. AlphaFold supports optional PAE; ESMFold provides local pLDDT but not native PAE.")
+        )
       ),
       tags$section(
         class = "ram-global-inspector is-empty", "aria-label" = "Residue inspection",
@@ -364,7 +396,7 @@ ui <- fluidPage(
                   )
                 )
               ),
-
+              uiOutput("predictionPanel")
             ),
             tabPanel(
               title = "Residue list", value = "residues",
@@ -476,7 +508,8 @@ ui <- fluidPage(
       )
     )
   ),
-  tags$script(src = "custom.js")
+  tags$script(src = "custom.js"),
+  tags$script(src = "prediction.js")
 )
 # Structure parsing is deliberately triggered by the Analyse button. Every
 # downstream result is a reactive expression, so adjusting settings never
@@ -560,28 +593,56 @@ server <- function(input, output, session) {
       updatePickerInput(session, "AA", selected = input$background)
   }, ignoreInit = TRUE)
 
+  prediction_downloads <- character()
+  session$onSessionEnded(function() unlink(prediction_downloads))
   observeEvent(input$submit, {
-    type <- if (identical(input$inputSource, "upload")) "file" else "code"
-    if (type == "file" && (is.null(input$structfile) ||
-                           is.null(input$structfile$datapath))) {
+    source_type <- input$inputSource
+    if (!source_type %in% c("pdb", "upload", "afdb")) return()
+    is_upload <- identical(source_type, "upload")
+    is_afdb <- identical(source_type, "afdb")
+    if (is_upload && (is.null(input$structfile) ||
+                      is.null(input$structfile$datapath))) {
       showNotification("Choose a PDB or mmCIF file first.", type = "error")
       return()
     }
-    source_id <- if (type == "file") input$structfile$datapath else
-      toupper(trimws(input$PDB))
-    key <- paste(type, source_id, sep = ":")
+    source_label <- if (is_upload) input$structfile$datapath else if (is_afdb)
+      toupper(trimws(input$afdbAccession)) else toupper(trimws(input$PDB))
+    declared_source <- if (is_afdb) "alphafold_db" else if (is_upload)
+      input$predictionSource else "experimental"
+    if (is.null(declared_source) || !nzchar(declared_source))
+      declared_source <- "experimental"
+    sidecar <- if (is_upload && !is.null(input$predictionJson))
+      input$predictionJson$datapath else ""
+    summary_file <- if (is_upload && !is.null(input$predictionSummaryJson))
+      input$predictionSummaryJson$datapath else ""
+    key <- paste(source_type, source_label, declared_source,
+                 sidecar, summary_file, sep = ":")
     previous <- isolate(loaded())
-    if (!is.null(previous) && identical(previous$key, key)) {
-      # The user may click Analyse again, but no expensive reloading is needed.
-      return()
-    }
+    if (!is.null(previous) && identical(previous$key, key)) return()
     withProgress(message = "Analysing structure", value = 0, {
-      incProgress(0.25, detail = "Loading coordinates")
+      incProgress(0.15, detail = "Loading coordinates")
+      afdb_files <- NULL
+      if (is_afdb) {
+        afdb_files <- tryCatch({
+          if (!requireNamespace("jsonlite", quietly = TRUE))
+            stop("Install jsonlite to retrieve AlphaFold DB structures.")
+          ram_download_afdb(ram_afdb_entry(source_label))
+        }, error = function(e) {
+          showNotification(conditionMessage(e), type = "error", duration = 12)
+          NULL
+        })
+        if (is.null(afdb_files)) return()
+        prediction_downloads <<- c(prediction_downloads,
+                                     afdb_files$structure, afdb_files$pae)
+      }
+      source_id <- if (is_afdb) afdb_files$structure else source_label
+      original_name <- if (is_afdb) afdb_files$original_name else if (is_upload)
+        input$structfile$name else NULL
       pdb <- tryCatch(
         ram_load_structure(
-          path = if (type == "file") source_id else NULL,
-          original_name = if (type == "file") input$structfile$name else NULL,
-          pdb_id = if (type == "code") source_id else NULL
+          path = if (is_upload || is_afdb) source_id else NULL,
+          original_name = original_name,
+          pdb_id = if (identical(source_type, "pdb")) source_id else NULL
         ),
         error = function(e) {
           showNotification(conditionMessage(e), type = "error", duration = 12)
@@ -598,15 +659,43 @@ server <- function(input, output, session) {
       )
       if (is.null(torsions)) return()
       chains <- unique(torsions$chain)
-      name <- if (type == "file")
+      name <- if (is_afdb) paste0("AF-", source_label) else if (is_upload)
         tools::file_path_sans_ext(basename(input$structfile$name)) else source_id
+      prediction <- NULL
+      if (!identical(declared_source, "experimental")) {
+        incProgress(0.15, detail = "Reading prediction confidence")
+        confidence_file <- if (is_afdb) afdb_files$pae else sidecar
+        prediction <- tryCatch(
+          ram_prepare_prediction(
+            ram_model_at(pdb, 1L), torsions, declared_source,
+            sidecar = confidence_file, summary_file = summary_file,
+            notes = if (is_afdb) afdb_files$notes else character(),
+            model_id = name
+          ), error = function(e) {
+            showNotification(paste("Prediction confidence:",
+              conditionMessage(e)), type = "warning", duration = 15)
+            NULL
+          }
+        )
+        if (!is.null(prediction) && is_afdb)
+          prediction$confidence_file <- afdb_files$pae_source
+        if (!is.null(prediction) && is_upload && !is.null(input$predictionJson))
+          prediction$confidence_file <- input$predictionJson$name
+        if (!is.null(prediction) && !is.null(confidence_file) &&
+            nzchar(confidence_file) && file.exists(confidence_file)) {
+          prediction$confidence_md5 <- unname(tools::md5sum(confidence_file))
+        }
+        if (!is.null(prediction) && length(prediction$notes))
+          showNotification(paste(prediction$notes, collapse = " "),
+                           type = "warning", duration = 14)
+      }
 
       # Invalidate selections before changing the 3D stage, even if a prior
       # structure used the same chain and residue numbering.
       selected_residue(NULL)
       viewer_ready(FALSE)
-      viewer_format <- if (type == "file")
-        ram_detect_format(input$structfile$name) else NULL
+      viewer_format <- if (is_upload || is_afdb)
+        ram_detect_format(original_name) else NULL
       widget <- NGLVieweR(data = source_id, format = viewer_format) %>%
         NGLVieweR::stageParameters(backgroundColor = "#f7fafb") %>%
         setRock()
@@ -646,7 +735,7 @@ server <- function(input, output, session) {
       })
       loaded(list(key = key, name = name, torsions = torsions, chains = chains,
                   pdb = pdb, nmodels = ram_model_count(pdb), source_id = source_id,
-                  viewer_format = viewer_format))
+                  viewer_format = viewer_format, prediction = prediction))
       incProgress(0.25, detail = "Preparing interactive views")
     })
   }, ignoreInit = TRUE)
@@ -717,14 +806,17 @@ server <- function(input, output, session) {
     ram_extract_torsions(ram_model_at(data$pdb, model))
   })
   classified <- reactive({
-    req(loaded(), input$validationMode, input$bgtype)
-    ram_classify_torsions(
+    structure <- req(loaded(), input$validationMode, input$bgtype)
+    result <- ram_classify_torsions(
       model_torsions(),
       reference_dir = file.path("static", input$bgtype),
       selected_reference = plot_reference(),
       mode = input$validationMode,
       threshold_fn = ram_density_thresholds
     )
+    if (current_model() == 1L)
+      result <- ram_apply_prediction(result, structure$prediction)
+    result
   })
   displayed <- reactive({
     data <- classified()
@@ -766,14 +858,18 @@ server <- function(input, output, session) {
     )
     columns <- c("chain", "resi", "insertion_code", "resn",
                  "phi", "psi", "region", "density")
+    if ("plddt" %in% names(data))
+      columns <- c(columns, "plddt", "confidence_category")
     shown <- data[, columns, drop = FALSE]
+    if ("plddt" %in% names(shown)) shown$plddt <- round(shown$plddt, 1L)
     shown$phi <- round(shown$phi, 1L)
     shown$psi <- round(shown$psi, 1L)
     shown$density <- round(shown$density, 1L)
     widget <- DT::datatable(
       shown, rownames = FALSE,
       colnames = c("Chain", "Residue", "Ins.", "AA", "Phi (°)", "Psi (°)",
-                   "Region", "Percentile"),
+                   "Region", "Percentile",
+                   if ("plddt" %in% names(shown)) c("pLDDT", "Confidence")),
       selection = list(mode = "single",
                        selected = if (length(marked)) marked[[1L]] else integer(0)),
       options = list(
@@ -840,6 +936,20 @@ server <- function(input, output, session) {
         structure$name, input$bgtype, input$background,
         input$validationMode, current_model(), reference_file
       )
+      if (!is.null(structure$prediction)) {
+        provenance$prediction_source <- structure$prediction$source
+        provenance$prediction_model <- structure$prediction$model_id
+        provenance$confidence_file <- structure$prediction$confidence_file
+        if (!is.null(structure$prediction$confidence_md5))
+          provenance$confidence_file_md5 <- structure$prediction$confidence_md5
+        if (is.finite(structure$prediction$ptm))
+          provenance$prediction_pTM <- structure$prediction$ptm
+        if (is.finite(structure$prediction$iptm))
+          provenance$prediction_ipTM <- structure$prediction$iptm
+        provenance$PAE_available <- !is.null(structure$prediction$pae)
+        provenance$confidence_limitations <- paste(
+          structure$prediction$notes, collapse = "; ")
+      }
       ram_save_html_report(file, data, provenance, image)
     }
   )
@@ -875,6 +985,19 @@ server <- function(input, output, session) {
             lapply(bins, function(value) {
               tags$span(class=paste("ram-sequence-mini-cell",
                  paste0("ram-seq-",value)), "aria-hidden"="true")
+            })
+          ),
+          if (any(is.finite(chain$plddt))) tags$div(
+            class = "ram-confidence-mini", role = "img",
+            "aria-label" = sprintf("%s prediction confidence; teal is high, amber/red is low.", title),
+            lapply(ram_plddt_overview_bins(chain$plddt), function(value) {
+              color <- if (!is.finite(value)) "#cbd7db" else if (value < 50)
+                "#d75e56" else if (value < 70) "#d6ac52" else if (value < 90)
+                "#7bbcb1" else "#126e74"
+              tags$span(class = "ram-confidence-mini-cell",
+                style = paste0("background:", color),
+                title = if (is.finite(value)) sprintf("Minimum pLDDT %.1f", value)
+                        else "Confidence unavailable")
             })
           ),
           tags$span(class="ram-sequence-chain-count",
@@ -931,6 +1054,91 @@ server <- function(input, output, session) {
         )
       })
     )
+  })
+
+  output$predictionPanel <- renderUI({
+    structure <- req(loaded())
+    prediction <- structure$prediction
+    if (is.null(prediction)) return(NULL)
+    if (current_model() > 1L)
+      return(tags$section(class = "ram-confidence-panel",
+        tags$p("Confidence applies to model 1 only. Switch back to model 1 to view its predictions.")))
+    known <- prediction$residues$plddt
+    available <- known[is.finite(known)]
+    title <- switch(prediction$source,
+      alphafold_db = "AlphaFold DB", alphafold2 = "AlphaFold / ColabFold",
+      alphafold3 = "AlphaFold 3", esmfold = "ESMFold",
+      other_prediction = "Predicted structure", "Predicted structure")
+    label <- if (length(available))
+      sprintf("Mean pLDDT %.1f · %d / %d residues",
+              mean(available), length(available), length(known))
+      else "No usable pLDDT values"
+    metric <- function(title, value) {
+      if (is.finite(value)) tags$span(class = "ram-confidence-metric",
+        paste0(title, " ", sprintf("%.2f", value))) else NULL
+    }
+    tags$details(id = "ram-confidence-panel",
+      class = "ram-confidence-panel",
+      tags$summary(
+        tags$span(class = "ram-confidence-title",
+          paste(title, "confidence")),
+        tags$span(class = "ram-confidence-subtitle", label),
+        if (!is.null(prediction$pae))
+          tags$span(class = "ram-confidence-available", "PAE available")
+      ),
+      tags$div(class = "ram-confidence-body",
+        tags$p(class = "ram-confidence-explainer",
+          "pLDDT estimates local prediction confidence. PAE estimates uncertainty in relative residue placement. Neither replaces experimental or stereochemical validation."),
+        tags$div(class = "ram-confidence-metrics",
+          metric("pTM", prediction$ptm),
+          metric("ipTM", prediction$iptm),
+          uiOutput("predictionReviewMetrics")),
+        if (!is.null(prediction$pae)) tagList(
+          tags$div(class = "ram-confidence-map-title",
+            tags$strong("Predicted aligned error (PAE)"),
+            tags$span("Click an axis residue to inspect it in 2D and 3D.")),
+          tags$div(id = "ram-pae-plot", role = "img",
+            "aria-label" = "Interactive predicted aligned error heatmap"),
+          tags$p(class = "ram-pae-note", id = "ram-pae-note")
+        ) else tags$p(class = "ram-confidence-explainer",
+          "No matching PAE matrix was provided for this model."),
+        if (length(prediction$notes)) tags$p(
+          class = "ram-confidence-warning",
+          paste(prediction$notes, collapse = " "))
+      )
+    )
+  })
+  output$predictionReviewMetrics <- renderUI({
+    if (is.null(req(loaded())$prediction) || current_model() != 1L)
+      return(NULL)
+    data <- classified()
+    if (!"plddt" %in% names(data)) return(NULL)
+    high_outliers <- sum(is.finite(data$plddt) & data$plddt >= 90 &
+      !is.na(data$region) & data$region == "Not allowed")
+    lower_inrange <- sum(is.finite(data$plddt) & data$plddt < 70 &
+      !is.na(data$region) & data$region != "Not allowed")
+    tagList(
+      tags$span(class = if (high_outliers > 0L)
+        "ram-confidence-metric ram-review-high" else "ram-confidence-metric",
+        paste(high_outliers, "high-confidence Ramachandran outliers")),
+      tags$span(class = "ram-confidence-metric",
+        paste(lower_inrange, "lower-confidence residues with in-range geometry"))
+    )
+  })
+  observe({
+    structure <- req(loaded())
+    prediction <- structure$prediction
+    if (is.null(prediction) || current_model() != 1L) {
+      session$sendCustomMessage("ram-confidence", list(clear = TRUE))
+    } else {
+      plot_data <- tryCatch(
+        ram_pae_plot_data(prediction, structure$torsions),
+        error = function(e) NULL
+      )
+      session$sendCustomMessage("ram-confidence",
+        if (is.null(plot_data)) list(clear = TRUE)
+        else plot_data)
+    }
   })
 
   comparison_torsions <- reactive({
@@ -1161,6 +1369,7 @@ server <- function(input, output, session) {
                      insertion_code = row$insertion_code[[1L]]))
   })
   observeEvent(input$ramSeqPick, select_from(input$ramSeqPick))
+  observeEvent(input$ramPaePick, select_from(input$ramPaePick))
   observeEvent(input$showInPlot, {
     updateTabsetPanel(session, "analysisTabs", selected = "plot")
   })
@@ -1224,7 +1433,16 @@ server <- function(input, output, session) {
         tags$span(paste("φ", angle(row$phi[[1L]]))),
         tags$span(paste("ψ", angle(row$psi[[1L]]))),
         tags$span(if (is.finite(row$density[[1L]]))
-          sprintf("Density percentile %.1f", row$density[[1L]]) else "")
+          sprintf("Density percentile %.1f", row$density[[1L]]) else ""),
+        if ("plddt" %in% names(row) && is.finite(row$plddt[[1L]]))
+          tags$span(class = "ram-inspector-plddt",
+            sprintf("pLDDT %.1f · %s", row$plddt[[1L]],
+                    row$confidence_category[[1L]])),
+        if ("plddt" %in% names(row) && is.finite(row$plddt[[1L]]) &&
+            row$plddt[[1L]] >= 90 &&
+            identical(as.character(row$region[[1L]]), "Not allowed"))
+          tags$span(class = "ram-inspector-warning",
+            "High model confidence, unusual backbone geometry; inspect locally.")
       )
     )
   })
@@ -1233,6 +1451,11 @@ server <- function(input, output, session) {
   outputOptions(output, "selectedResidueInfo", suspendWhenHidden = FALSE)
   observe({
     row <- selected_row()
+    session$sendCustomMessage("ram-confidence-selected",
+      if (is.null(row)) list(clear = TRUE) else list(
+        chain = as.character(row$chain[[1L]]),
+        resi = as.integer(row$resi[[1L]]),
+        insertion_code = as.character(row$insertion_code[[1L]])))
     session$sendCustomMessage("ram-selection", if (is.null(row)) list(clear = TRUE) else list(
       chain = as.character(row$chain[[1L]]),
       resi = as.integer(row$resi[[1L]]),

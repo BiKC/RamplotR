@@ -13,7 +13,7 @@ The original app has been hosted at https://bioit.shinyapps.io/RamplotR/. The ho
 To run this repository locally, install a current R 4.x and the following CRAN packages:
 
 ```r
-install.packages(c("shiny", "shinyWidgets", "colourpicker", "bio3d", "NGLVieweR", "DT"))
+install.packages(c("shiny", "shinyWidgets", "colourpicker", "bio3d", "NGLVieweR", "DT", "jsonlite"))
 shiny::runApp("shinyRam")
 ```
 
@@ -32,6 +32,10 @@ The primary plot and 3D viewer share a selected-residue inspector, which remains
 The residue table has readable angles, combined scientific/review filters and CSV export. The 3D viewer supports cartoon, ribbon, sticks, ball-and-stick and surface representations; ligand, DNA, RNA, spin and rock controls remain visible beneath the viewer as modern switches. RamplotR's own ordered publication palette is selected by default, with legacy colour schemes and custom colours still available.
 
 The optional comparison tab aligns a chain from each of two structures by sequence and displays angular and classification differences, including insertions and deletions. Multi-model structures can be inspected model by model. The Summary tab exports vector SVG and 300-dpi PNG plots plus a self-contained report with reproducibility settings.
+
+### AlphaFold and ESMFold confidence (Phase B)
+
+AlphaFold DB accession lookup and explicit AlphaFold 2/3, ColabFold and ESMFold upload provenance can add pLDDT tracks beneath every chain. AlphaFold PAE and AF3 confidence JSON are optional, strictly matched to the selected coordinates, and shown as a linked, collapsible heatmap. ESMFold local PDBs expose pLDDT from their B-factor fields; standard ESMFold does not provide PAE. Experimental B-factors are never interpreted as prediction confidence. See the [prediction guide](docs/phase-b-guide.md).
 
 For screenshots, limitations and the complete workflow see the [inspection and publication guide](docs/inspection-user-guide.md). The interface layout and browser verification history are documented in [interface-refresh.md](docs/interface-refresh.md).
 
@@ -52,8 +56,9 @@ are available for independent review. In particular, the outlier-rich 2DQ4
 case exposes important differences between RamplotR and wwPDB outlier calls.
 
 AlphaFold and ESMFold predicted-structure ingestion and linked confidence
-assessment are planned for Phase B; they are deliberately kept out of the
-independent experimental-validation benchmark.
+assessment are implemented separately from Phase A's independent experimental
+validation benchmark. Confidence is additional model evidence, not an official
+wwPDB/MolProbity quality score.
 
 ## Regression tests
 

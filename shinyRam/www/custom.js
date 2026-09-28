@@ -226,17 +226,39 @@
   function changeSource() {
     const selected = document.querySelector('input[name="inputSource"]:checked');
     const upload = selected && selected.value === "upload";
+    const afdb = selected && selected.value === "afdb";
     const pdbWrap = document.getElementById("ram-pdb-wrap");
     const uploadWrap = document.getElementById("ram-upload-wrap");
-    if (pdbWrap) pdbWrap.classList.toggle("is-hidden", upload);
+    const afdbWrap = document.getElementById("ram-afdb-wrap");
+    const predictionFields = document.getElementById("ram-prediction-upload");
+    if (pdbWrap) pdbWrap.classList.toggle("is-hidden", !!(upload || afdb));
     if (uploadWrap) uploadWrap.classList.toggle("is-hidden", !upload);
+    if (afdbWrap) afdbWrap.classList.toggle("is-hidden", !afdb);
+    if (predictionFields) {
+      predictionFields.classList.toggle("is-hidden", !upload);
+      const app = document.querySelector(".ram-app");
+      if (upload && (!app || !app.classList.contains("ram-has-data"))) {
+        predictionFields.open = true;
+      }
+    }
+  }
+
+  function changePredictionSource() {
+    const source = document.getElementById("predictionSource");
+    const sidecars = document.getElementById("ram-confidence-sidecars");
+    if (!source || !sidecars) return;
+    sidecars.classList.toggle("is-hidden",
+      source.value !== "alphafold2" && source.value !== "alphafold3");
   }
 
   function initSourceControl() {
     changeSource();
+    changePredictionSource();
     changeCompareSource();
     document.addEventListener("change", function (event) {
       if (event.target && event.target.name === "inputSource") changeSource();
+      if (event.target && event.target.id === "predictionSource")
+        changePredictionSource();
       if (event.target && event.target.name === "compareInputSource")
         changeCompareSource();
     });
@@ -252,7 +274,11 @@
     // Square angular axes remain enforced in Plotly. On short laptops, use
     // the available vertical space rather than blindly matching card width.
     const width = plot.clientWidth;
-    const minimum = width < 540 ? 285 : 385;
+    // Reserve enough physical pixels for equal 360° axes and their labels.
+    // The previous fixed 385px minimum shrank the angular area to <48%
+    // of its width on compact laptop screens with prediction controls.
+    const minimum = width < 540 ? 285 :
+      Math.max(385, Math.min(690, Math.ceil(width * 0.52 + 124)));
     let height = Math.max(minimum, Math.min(690,
       Math.round(width + (width < 540 ? 35 : 75))));
     const app = document.querySelector && document.querySelector(".ram-app");
@@ -476,6 +502,8 @@
         const app = document.querySelector && document.querySelector(".ram-app");
         if (app && !app.classList.contains("ram-has-data")) {
           app.classList.add("ram-has-data");
+          const details = document.getElementById("ram-prediction-upload");
+          if (details) details.open = false;
           scheduleResize();
         }
       })

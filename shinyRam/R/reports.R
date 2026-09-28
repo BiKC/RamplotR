@@ -94,7 +94,7 @@ ram_save_html_report <- function(path, data, metadata, svg_path,
   meta <- lapply(names(metadata), function(k)
     h(gsub("_", " ", k), metadata[[k]]))
   shown <- utils::head(data[, intersect(
-    c("chain", "resi", "insertion_code", "resn", "phi", "psi", "region", "density"),
+    c("chain", "resi", "insertion_code", "resn", "phi", "psi", "region", "density", "plddt", "confidence_category"),
     colnames(data)), drop = FALSE], max_report_rows)
   if ("phi" %in% names(shown)) shown$phi <- round(shown$phi, 2)
   if ("psi" %in% names(shown)) shown$psi <- round(shown$psi, 2)

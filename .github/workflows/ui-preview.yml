@@ -26,7 +26,7 @@ jobs:
           use-public-rspm: true
       - name: Install the application's R dependencies
         run: |
-          Rscript -e 'install.packages(c("shiny", "shinyWidgets", "colourpicker", "bio3d", "NGLVieweR", "DT"))'
+          Rscript -e 'install.packages(c("shiny", "shinyWidgets", "colourpicker", "bio3d", "NGLVieweR", "DT", "jsonlite"))'
       - name: Validate publication figure and report exports
         run: Rscript tests/reports.R
       - name: Install headless-browser controller
@@ -69,6 +69,8 @@ jobs:
           exit 1
       - name: Exercise real browser and capture screenshots
         run: node tests/ui-browser.cjs
+      - name: Verify AlphaFold and ESMFold uploads in the live browser
+        run: node tests/prediction-browser.cjs
       - name: Archive desktop/mobile screenshot previews and logs
         if: always()
         uses: actions/upload-artifact@v4

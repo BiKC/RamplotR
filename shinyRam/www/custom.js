@@ -55,7 +55,9 @@
   function plotHeight() {
     // The height follows the available panel width. The figure itself retains
     // equal scaling on phi and psi so the geometry is never distorted.
-    return Math.max(385, Math.min(690, Math.round(plot.clientWidth + 75)));
+    return Math.max(plot.clientWidth < 540 ? 285 : 385,
+                    Math.min(690, Math.round(plot.clientWidth +
+                      (plot.clientWidth < 540 ? 35 : 75))));
   }
 
   function contourTrace(matrix, operation, cutoff, color) {

@@ -121,4 +121,22 @@ assert(identical(entry$accession, "P12345") &&
 bad <- try(ram_afdb_entry("p12345", fetch = function(url)
   list(list(pdbUrl = "https://evil.example/pdb"))), silent = TRUE)
 assert(inherits(bad, "try-error"), "Never fetch arbitrary model URLs")
+# Even when visualising a large AF multimer at reduced resolution, show
+# the residues immediately before and after each protein-chain boundary.
+large_torsions <- data.frame(chain = c(rep("A", 250), rep("B", 260)),
+  resi = c(seq_len(250), seq_len(260)), insertion_code = "",
+  stringsAsFactors = FALSE)
+large_prediction <- list(
+  pae = matrix(2.5, 510, 510), pae_rows = seq_len(510)
+)
+overview <- ram_pae_plot_data(large_prediction, large_torsions,
+                              max_display = 400L)
+indices <- vapply(overview$residues, function(x) {
+  if (x$chain == "A") x$resi else 250L + x$resi
+}, integer(1))
+assert(length(overview$labels) == 400L &&
+         all(c(1L, 250L, 251L, 510L) %in% indices) &&
+         overview$downsampled,
+       "Downsampled PAE must retain all chain boundaries and termini")
+
 message("AlphaFold and ESMFold prediction-format tests passed")

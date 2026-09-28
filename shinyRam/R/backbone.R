@@ -69,7 +69,7 @@ ram_extract_torsions <- function(pdb, amino_acids = c(
     chosen <- if (any(options$alt == "")) {
       options[which(options$alt == "")[1L], , drop = FALSE]
     } else options[1L, , drop = FALSE]
-    unname(as.numeric(chosen[1L, c("x", "y", "z")]))
+    as.numeric(unlist(chosen[1L, c("x", "y", "z")], use.names = FALSE))
   }
   records <- lapply(indices, function(idx) {
     rec <- atoms[idx, , drop = FALSE]

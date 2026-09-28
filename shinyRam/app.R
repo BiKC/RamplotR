@@ -220,23 +220,11 @@ server <- function(input, output, session) {
   session$userData$previousPDB <- ""
   # reactive(bio3d::write.pdb(pdb = pdb(), file = paste0(accPDB(), '.pdb')))
 
+  # Reference cutoffs are deterministic and calculated once per density grid.
   searchlimit <- function(matrix, percentage, x = 1) {
-    totalGen <- 100 * sum(matrix$z[matrix$z > x]) / sum(matrix$z)
-    error <- abs(totalGen - percentage)
-    if (error < 0.1) {
-      return(x)
-    } else {
-      if (totalGen > percentage) {
-        searchlimit(matrix, percentage, x = x + x / 2)
-      } else {
-        searchlimit(matrix, percentage, x = x - x / 2)
-      }
-    }
+    ram_density_thresholds(matrix, percentage)[[1L]]
   }
-  densityToPercent <- function(matrix, x) {
-    100 * sum(matrix$z[matrix$z > x]) / sum(matrix$z)
-  }
-  
+
   observeEvent(input$ligands,{
     if(input$ligands){
       NGLVieweR_proxy("NGL")%>%addSelection(type = "ball+stick", param=list(name="ligand",sele= "ligand"))
@@ -453,7 +441,7 @@ server <- function(input, output, session) {
           incProgress(3 / 4, detail = paste("Filter data"))
         }
         if (input$background == "preProline"){
-          matrix <- readRDS(paste0("static/",input$bgtype,"/preProline"))
+          matrix <- ram_read_reference(file.path("static", input$bgtype, "preProline"))
           # get a subset of only those amino acids that precede a proline
           torsionsubset <- data.frame()
           for (i in 1:length(session$userData$torsion$resn) - 1) {
@@ -470,7 +458,7 @@ server <- function(input, output, session) {
           
         }
         else if (!input$background %in% allAA) {
-          matrix <- readRDS(paste0("static/",input$bgtype,"/General"))
+          matrix <- ram_read_reference(file.path("static", input$bgtype, "General"))
           torsionsubset <- session$userData$torsion
           torsionsubset <- subset(torsionsubset, resn %in% input$AA)
           # also subset for chains
@@ -478,7 +466,7 @@ server <- function(input, output, session) {
             torsionsubset <- subset(torsionsubset, chain %in% input$chainselection)
           }
         } else {
-          matrix <- readRDS(paste0("static/",input$bgtype,"/",input$background))
+          matrix <- ram_read_reference(file.path("static", input$bgtype, input$background))
           #updatePickerInput(session, "AA", selected = input$background)
           torsionsubset <- subset(session$userData$torsion, resn %in% input$AA)
           # also subset for chains
@@ -620,11 +608,7 @@ server <- function(input, output, session) {
             chainColors = unlist(lapply(unique(torsionsubset$chain), function(x) {
               input[[paste0("chain", x)]]
             })),
-            limits = c(
-              searchlimit(matrix, 85),
-              searchlimit(matrix, 98),
-              searchlimit(matrix, 99.95)
-            )
+            limits = ram_density_thresholds(matrix)
           )
         )
       })

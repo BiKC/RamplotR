@@ -40,12 +40,16 @@ For screenshots, limitations and the complete workflow see the [inspection and p
 The [independent validation protocol](docs/wwpdb-validation.md) uses official
 wwPDB residue-level validation reports to compare RamplotR's angles and
 reference-dependent classifications. A [versioned public corpus manifest](validation/manifest.csv)
-covers 1CRN, 1UBQ and 6VXX. The companion
+covers five experimental structures: 1CRN, 1UBQ, 6VXX, 2DQ4 and 1D3Z. The companion
 [GitHub Actions workflow](.github/workflows/wwpdb-validation.yml) archives
 source XML/mmCIF files, SHA256 hashes, exact software versions, per-residue
 results and reference-group contingency matrices. Differences in categories
 are explicitly reported instead of falsely claiming the four-group RamplotR
-method and six-group MolProbity are identical.
+method and six-group MolProbity are identical. The [first five-structure
+results](docs/phase-a-results.md), [pinned numerical results](validation/baseline-2026-09-28.csv)
+and [pinned official source SHA256 hashes](validation/baseline-source-hashes-2026-09-28.csv)
+are available for independent review. In particular, the outlier-rich 2DQ4
+case exposes important differences between RamplotR and wwPDB outlier calls.
 
 AlphaFold and ESMFold predicted-structure ingestion and linked confidence
 assessment are planned for Phase B; they are deliberately kept out of the

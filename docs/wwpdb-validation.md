@@ -67,9 +67,18 @@ Rscript benchmarks/compare_wwpdb.R 1CRN original benchmarks/output/wwpdb/1CRN
 
 For exact replay, supply the downloaded compressed XML and mmCIF as fourth
 and fifth CLI arguments. The independent wwPDB GitHub Actions workflow
-runs all three samples. It stores full source and output artifacts for
-90 days; freeze the hashes and outputs in a versioned release or DOI-backed
-archive for publications.
+runs all five samples. It stores full source and output artifacts for
+90 days. [Versioned baseline outputs](../validation/baseline-2026-09-28.csv),
+[exact source SHA256 hashes](../validation/baseline-source-hashes-2026-09-28.csv),
+and [independent outlier examples](../validation/2dq4-wwpdb-outlier-examples.csv)
+are pinned in the repository. Run `tests/phase-a-baseline.R` against the
+reproduced results; it fails if source hashes, finite angles or class counts
+change without explicit review. Preserve exact source files and results in
+a versioned release or DOI-backed archive for publication.
+
+See the [initial independently measured five-structure results](phase-a-results.md),
+including the seven 2DQ4 wwPDB outliers not identified by the existing
+RamplotR original reference distributions.
 
 ## Scope
 

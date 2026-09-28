@@ -838,3 +838,17 @@ body > .container-fluid { max-width: none; padding: 0; }
 @media(prefers-reduced-motion:reduce) {
   .ram-sequence-panel > summary::after { transition:none; }
 }
+
+
+/* Override Bootstrap/Shiny's permissive option wrapping so loading stays a
+   single slim toolbar instead of stacking choices on laptop screens. */
+.ram-source .ram-source-choice .shiny-options-group {
+  display:flex; flex-wrap:nowrap !important; gap:3px !important;
+}
+.ram-source .ram-source-choice .radio-inline {
+  min-width:0; flex:1 1 0; padding:7px 7px !important;
+  font-size:11px; white-space:nowrap;
+}
+.ram-has-data .ram-source .ram-source-choice .shiny-input-container {
+  width:100% !important; margin-bottom:0;
+}

@@ -4,7 +4,8 @@
 # until writing a human-readable table.
 
 ram_draw_figure <- function(data, reference, colors, chain_colors,
-                            title = "RamplotR | Ramachandran analysis") {
+                            title = "RamplotR | Ramachandran analysis",
+                            use_raster = FALSE) {
   stopifnot(length(colors) == 4L, is.matrix(reference$z))
   limits <- ram_density_thresholds(reference)
   z <- reference$z
@@ -18,7 +19,7 @@ ram_draw_figure <- function(data, reference, colors, chain_colors,
     col = as.character(colors), breaks = seq(0.5, 4.5, by = 1),
     xlim = c(-180, 180), ylim = c(-180, 180), asp = 1,
     xlab = expression(phi~"(degrees)"), ylab = expression(psi~"(degrees)"),
-    main = title, axes = FALSE, useRaster = TRUE
+    main = title, axes = FALSE, useRaster = use_raster
   )
   graphics::axis(1, at = c(-180, -90, 0, 90, 180))
   graphics::axis(2, at = c(-180, -90, 0, 90, 180), las = 1)
@@ -54,7 +55,8 @@ ram_save_figure <- function(path, data, reference, colors, chain_colors,
                    type = if (capabilities("cairo")) "cairo" else "Xlib")
   }
   on.exit(grDevices::dev.off(), add = TRUE)
-  ram_draw_figure(data, reference, colors, chain_colors, title)
+  ram_draw_figure(data, reference, colors, chain_colors, title,
+                  use_raster = identical(format, "png"))
   invisible(path)
 }
 

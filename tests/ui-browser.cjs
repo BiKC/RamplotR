@@ -529,7 +529,7 @@ const assert = require("node:assert/strict");
       const rows = document.querySelectorAll(".ram-sequence-overview-chain");
       return badge && badge.textContent.includes("1BBB") && rows.length === 4;
     }, {timeout:45000});
-    const overviewNames = await page.$eval(
+    const overviewNames = await page.$$eval(
       ".ram-sequence-overview-chain .ram-sequence-chain-name",
       nodes => nodes.map(n => n.textContent.trim()));
     assert.deepEqual(overviewNames, ["Chain A", "Chain B", "Chain C", "Chain D"],

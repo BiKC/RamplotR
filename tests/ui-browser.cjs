@@ -87,7 +87,25 @@ const assert = require("node:assert/strict");
     // Settings must repaint the existing plot without another Analyze click.
     const firstContour = await page.evaluate(() =>
       document.getElementById("plotly").data[0].fillcolor);
+    await page.evaluate(() => {
+      window.__plotUpdates = [];
+      const prior = window.Plotly.react;
+      window.Plotly.react = function(node, traces, layout, config) {
+        window.__plotUpdates.push({
+          contour: traces[0].fillcolor,
+          traces: traces.length
+        });
+        return prior.call(window.Plotly, node, traces, layout, config);
+      };
+    });
     await page.select("#colorscheme", "PDBSum");
+    await new Promise(resolve => setTimeout(resolve, 1600));
+    console.log("Palette diagnostic:", JSON.stringify(await page.evaluate(() => ({
+      selected: document.querySelector("#colorscheme").value,
+      colors: ["bg1","bg2","bg3","bg4"].map(id => document.getElementById(id)?.value),
+      contour: document.getElementById("plotly").data[0].fillcolor,
+      updateCalls: window.__plotUpdates
+    }))));
     await page.waitForFunction(oldColor =>
       document.getElementById("plotly").data[0].fillcolor !== oldColor,
       { timeout: 15000 }, firstContour);

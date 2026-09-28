@@ -62,12 +62,19 @@ const assert = require("node:assert/strict");
       return {
         traces: p.data.length,
         yAnchor: p._fullLayout.yaxis.scaleanchor,
+        xRange: p._fullLayout.xaxis.range,
+        yRange: p._fullLayout.yaxis.range,
         status: document.getElementById("ram-current-structure").textContent,
         width: p.getBoundingClientRect().width
       };
     });
     assert.ok(plot.traces >= 5, "Expected contours and at least one chain.");
     assert.equal(plot.yAnchor, "x", "Axes must be equally scaled.");
+    assert.ok(Math.abs(plot.xRange[0] + 180) < 1 &&
+              Math.abs(plot.xRange[1] - 180) < 1 &&
+              Math.abs(plot.yRange[0] + 180) < 1 &&
+              Math.abs(plot.yRange[1] - 180) < 1,
+              "The plot must keep both -180° to 180° angular ranges.");
     assert.ok(plot.status.includes("plotted residues"), "No plotted residues");
     await page.screenshot({
       path: "benchmarks/output/ui-preview/desktop-loaded.png", fullPage: true

@@ -6,6 +6,7 @@ on:
       - "shinyRam/app.R"
       - "shinyRam/www/**"
       - "tests/ui-browser.cjs"
+      - "tests/structure-verification-browser.cjs"
       - "tests/reports.R"
       - "tests/model-integration.R"
       - "shinyRam/R/**"
@@ -74,7 +75,7 @@ jobs:
       - name: Verify AlphaFold and ESMFold uploads in the live browser
         run: node tests/prediction-browser.cjs
       - name: Verify official wwPDB evidence, density UI and NMR ensemble
-        run: node tests/phase-c-browser.cjs
+        run: node tests/structure-verification-browser.cjs
       - name: Archive desktop/mobile screenshot previews and logs
         if: always()
         uses: actions/upload-artifact@v4

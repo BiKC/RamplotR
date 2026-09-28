@@ -40,7 +40,7 @@ The independent source XML and coordinate CIF are archived with every
 CI artifact, along with all joined residues, reference-group confusion
 matrices, source checksums and R session metadata. All input hashes and
 quantitative snapshots are additionally pinned in the repository;
-[tests/phase-a-baseline.R](../tests/phase-a-baseline.R) fails if an
+[tests/wwpdb-baseline.R](../tests/wwpdb-baseline.R) fails if an
 official source changes without review or if the same pinned sources
 produce different numbers.
 

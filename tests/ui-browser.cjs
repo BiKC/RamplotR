@@ -44,11 +44,14 @@ const assert = require("node:assert/strict");
       !document.getElementById("ram-upload-wrap").classList.contains("is-hidden"));
     const input = await page.$("#structfile");
     await input.uploadFile(path.resolve("benchmarks/output/ui-preview/1CRN.pdb"));
+    // Shiny's upload widget does not expose a stable progress-complete
+    // attribute across versions. Confirm the file was selected, then give the
+    // small local upload a moment to finish before submitting.
     await page.waitForFunction(() => {
-      const progress = document.querySelector("#structfile_progress");
-      return !progress || progress.style.display === "none" ||
-        progress.getAttribute("aria-valuenow") === "100";
-    }, { timeout: 30000 });
+      const field = document.querySelector("#structfile");
+      return field && field.files && field.files.length === 1;
+    }, { timeout: 15000 });
+    await new Promise(resolve => setTimeout(resolve, 1500));
     await page.click("#submit");
     await page.waitForFunction(() =>
       document.getElementById("plotly").classList.contains("js-plotly-plot"),

@@ -555,7 +555,7 @@ const assert = require("node:assert/strict");
     }, {timeout:30000});
     // Let NGL's WebGL renderer complete a frame before archiving screenshots.
     await new Promise(resolve => setTimeout(resolve, 900));
-    const overviewNames = await page.$eval(
+    const overviewNames = await page.$$eval(
       ".ram-sequence-overview-chain .ram-sequence-chain-name",
       nodes => nodes.map(n => n.textContent.trim()));
     assert.deepEqual(overviewNames, ["Chain A", "Chain B", "Chain C", "Chain D"],

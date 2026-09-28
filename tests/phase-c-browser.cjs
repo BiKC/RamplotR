@@ -50,6 +50,12 @@ const puppeteer=require("puppeteer-core");
     await page.waitForSelector("#validationXml");
     await (await page.$("#validationXml")).uploadFile(xml);
     await new Promise(resolve=>setTimeout(resolve,1400));
+    await page.click("#confirmValidationSource");
+    await page.waitForFunction(() =>
+      window.Shiny && window.Shiny.shinyapp &&
+      window.Shiny.shinyapp.$inputValues &&
+      window.Shiny.shinyapp.$inputValues.confirmValidationSource === true,
+      {timeout:15000});
     await page.click("#attachValidation");
     await page.waitForFunction(()=>
       document.querySelector(".ram-official-summary")&&

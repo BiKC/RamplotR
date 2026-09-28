@@ -75,8 +75,23 @@ const puppeteer=require("puppeteer-core");
     await page.click(".ram-density-panel summary");
     await (await page.$("#ram-density-file")).uploadFile(map);
     await page.click("#ram-density-load");
-    await page.waitForFunction(()=>document.getElementById("ram-density-status")
-      .textContent.includes("displayed at"),{timeout:20000});
+    try {
+      await page.waitForFunction(()=>document.getElementById("ram-density-status")
+        .textContent.includes("displayed at"),{timeout:12000});
+    } catch(error) {
+      const diagnostics=await page.evaluate(()=>({
+        status:document.getElementById("ram-density-status").textContent,
+        filename:document.getElementById("ram-density-file").files[0]&&
+                 document.getElementById("ram-density-file").files[0].name,
+        counters:window.__ramDensityChecks,
+        stageAvailable:typeof window.getNGLStage==="function" &&
+                       !!window.getNGLStage("NGL")
+      }));
+      console.error("Phase C map controls:",JSON.stringify(diagnostics));
+      await page.screenshot({path:path.join(output,"phase-c-map-failure.png"),
+                             fullPage:true});
+      throw error;
+    }
     await page.$eval("#ram-density-level",field=>{
       field.value="3.25";field.dispatchEvent(new Event("change",{bubbles:true}));
     });

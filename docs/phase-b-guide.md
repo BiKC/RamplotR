@@ -21,9 +21,13 @@ has a 2D "predicted_aligned_error" array.
 **AlphaFold 3**: upload the corresponding mmCIF model and select AlphaFold 3.
 The optional full confidence JSON supplies per-atom "atom_plddts" and
 per-token "pae". The optional summary confidence JSON supplies pTM/ipTM.
-RamplotR only applies per-atom confidence when atom count and order can be
-verified; it only displays PAE when the provided token chain/residue IDs
-can be uniquely mapped to protein residues. Ligand and nucleic-acid tokens
+RamplotR checks per-atom confidence against the coordinate model's atom
+count and chain order. Because AlphaFold 3's full JSON does not independently
+identify every atom by name and residue, **always upload the matching mmCIF and
+confidence JSON from the same seed and sample**. The program cannot establish
+the identity of a separately reordered or substituted model using the JSON
+alone. It displays PAE only when token chain/residue IDs uniquely map to
+protein residues. Ligand and nucleic-acid tokens
 are not silently assigned to protein residue numbers.
 
 **ESMFold**: upload the PDB returned by ESMFold and explicitly select

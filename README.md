@@ -56,8 +56,9 @@ are available for independent review. In particular, the outlier-rich 2DQ4
 case exposes important differences between RamplotR and wwPDB outlier calls.
 
 AlphaFold and ESMFold predicted-structure ingestion and linked confidence
-assessment are planned for Phase B; they are deliberately kept out of the
-independent experimental-validation benchmark.
+assessment are implemented separately from Phase A's independent experimental
+validation benchmark. Confidence is additional model evidence, not an official
+wwPDB/MolProbity quality score.
 
 ## Regression tests
 

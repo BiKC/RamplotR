@@ -184,6 +184,9 @@
         r: 14, t: uniqueChains.length ? 72 : 24, b: 52
       },
       xaxis: Object.assign({}, axis, {
+        // Keep the scientific -180°..180° domain instead of allowing Plotly
+        // to extend the x-range when it enforces equal pixel scales.
+        constrain: "domain",
         title: { text: "Phi (φ), degrees", standoff: 9,
                  font: { size: narrow ? 11 : 12 } }
       }),

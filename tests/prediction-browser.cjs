@@ -51,7 +51,20 @@ const puppeteer = require("puppeteer-core");
       .classList.contains("is-hidden"));
     const upload=await page.$("#structfile");
     await upload.uploadFile(fixture);
-    await page.select("#predictionSource","esmfold");
+    // Select prediction provenance through the same visible native dropdown a
+    // researcher uses. A Selectize-backed hidden input may silently revert
+    // scripted changes and analyse an AF/ESM prediction as experimental.
+    async function chooseSource(value) {
+      const settings=await page.$("#ram-prediction-upload");
+      const opened=await page.evaluate(el=>el.open,settings);
+      if (!opened) await page.click("#ram-prediction-upload > summary");
+      await page.select("#predictionSource",value);
+      await page.waitForFunction(expected =>
+        window.Shiny && window.Shiny.shinyapp &&
+        window.Shiny.shinyapp.$inputValues.predictionSource === expected,
+        {timeout:10000},value);
+    }
+    await chooseSource("esmfold");
     await page.waitForFunction(()=>document.getElementById("ram-confidence-sidecars")
       .classList.contains("is-hidden"));
     await new Promise(done=>setTimeout(done,1300));
@@ -86,7 +99,7 @@ const puppeteer = require("puppeteer-core");
       fullPage:true});
 
     // Independently verify AF2 monomer PAE and UI linkage.
-    await page.select("#predictionSource","alphafold2");
+    await chooseSource("alphafold2");
     await page.waitForFunction(()=>!document.getElementById("ram-confidence-sidecars")
       .classList.contains("is-hidden"));
     await (await page.$("#predictionJson")).uploadFile(af2);
@@ -113,7 +126,7 @@ const puppeteer = require("puppeteer-core");
 
     // Explicit AF3 upload uses per-atom confidence and per-token PAE. Both
     // must map to the same matching chain/residue, without reusing an AF2 label.
-    await page.select("#predictionSource","alphafold3");
+    await chooseSource("alphafold3");
     await (await page.$("#predictionJson")).uploadFile(af3);
     await (await page.$("#predictionSummaryJson")).uploadFile(af3Summary);
     await new Promise(done=>setTimeout(done,1300));

@@ -17,7 +17,7 @@ install.packages(c("shiny", "shinyWidgets", "colourpicker", "bio3d", "NGLVieweR"
 shiny::runApp("shinyRam")
 ```
 
-The input panel lets you select a four-character PDB identifier or upload a local PDB or mmCIF structure (.pdb, .ent, .cif, .mcif, .mmcif). Uploads retain insertion codes and atom alternate locations for backbone processing. For now the app reads the first structural model.
+The input panel lets you select a four-character PDB identifier or upload a local PDB or mmCIF structure (.pdb, .ent, .cif, .mcif, .mmcif). Uploads retain insertion codes and atom alternate locations for backbone processing. Structures with consistent multiple models offer a model selector. Both PDB and mmCIF uploads are supported; see the [inspection guide](docs/inspection-user-guide.md) for the current model and comparison limitations.
 
 ## Scientific interpretation
 
@@ -27,15 +27,13 @@ Reference distributions and density-percentile thresholds in RamplotR must not b
 
 ## Interface
 
-Once a structure is loaded, changing filters, the reference dataset, the
-classification mode or plot/chain colours updates the plot and statistics
-automatically. Click any residue on the Ramachandran plot, in the 3D structure,
-or in the searchable residue list to highlight it across all three views.
-Use **Clear selection** to dismiss the highlight. Press **Analyze structure**
-only when loading another PDB accession or uploaded structure.
+The primary plot and 3D viewer share a selected-residue inspector, which remains visible when you switch tabs. A compact sequence overview directly beneath these views shows **every selected chain at once**; expand it to browse individual residues without leaving the plot. The loaded interface also offers a condensed laptop layout and a reversible focus mode for hiding analysis settings. Click a point, row, sequence letter or residue in the molecular structure to show the corresponding residue across all views. The inspector includes **Show in plot**, **Clear**, and outlier-review navigation. Changing residue filters, density reference, classification mode or palette updates the result without refetching the structure.
 
+The residue table has readable angles, combined scientific/review filters and CSV export. The 3D viewer supports cartoon, ribbon, sticks, ball-and-stick and surface representations; ligand, DNA, RNA, spin and rock controls remain visible beneath the viewer as modern switches. RamplotR's own ordered publication palette is selected by default, with legacy colour schemes and custom colours still available.
 
-The current version has a responsive scientific workspace with the Ramachandran plot and 3D viewer alongside one another on wide screens. Reference controls and residue filters are grouped in the sidebar. The full UI changes and manual browser checks are documented in [interface-refresh.md](docs/interface-refresh.md).
+The optional comparison tab aligns a chain from each of two structures by sequence and displays angular and classification differences, including insertions and deletions. Multi-model structures can be inspected model by model. The Summary tab exports vector SVG and 300-dpi PNG plots plus a self-contained report with reproducibility settings.
+
+For screenshots, limitations and the complete workflow see the [inspection and publication guide](docs/inspection-user-guide.md). The interface layout and browser verification history are documented in [interface-refresh.md](docs/interface-refresh.md).
 
 ## Regression tests
 
@@ -46,9 +44,10 @@ Rscript tests/scientific.R
 Rscript tests/peptide.R
 Rscript tests/input.R
 Rscript tests/classification.R
+Rscript tests/inspection.R
 ```
 
-GitHub Actions runs these tests and checks R source syntax on Linux and Windows. Integration checks using actual PDB/mmCIF structures and an independent structural validator are still planned.
+GitHub Actions runs source parsing, scientific regression tests and inspection/alignment tests on Ubuntu and Windows. Its full-browser job runs the Shiny app with real PDB input, checks table alignment and linked views, and exercises figure/report export and an actual multi-model NMR fixture. The separate structure validation workflow checks real structures and reference classifications.
 
 ## Project files
 
@@ -57,6 +56,8 @@ GitHub Actions runs these tests and checks R source syntax on Linux and Windows.
 - `shinyRam/static/`: reference-density matrices
 - `shinyRam/www/`: plotting JavaScript and bundled viewer assets
 - `tests/`: isolated scientific and input tests
-- `docs/upgrade-worklog.md`: upgrade plan and verification status
+- `docs/upgrade-worklog.md`: original scientific upgrade plan and verification status
+- `docs/upgrade-inspection-worklog.md`: current inspection-upgrade checklist
+- `docs/inspection-user-guide.md`: user workflow, colour scheme, export and comparison guidance
 
 MIT license; see LICENSE.

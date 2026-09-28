@@ -74,6 +74,34 @@ const assert = require("node:assert/strict");
       };
     });
     assert.ok(plot.traces >= 5, "Expected contours and at least one chain.");
+    // Use DOM collections directly; Shiny may replace individual controls
+    // while a reactive update is being applied to the page.
+    const cleanControls = await page.evaluate(() => {
+      const styles = document.querySelectorAll('input[name="nglRepresentation"]');
+      const layers = document.querySelectorAll(
+        '.ram-viewer-options input[type="checkbox"]');
+      return {
+        compactInspector: document.querySelector(".ram-global-inspector")
+          .classList.contains("is-empty"),
+        previousHidden: getComputedStyle(document.getElementById("prevReview")).display
+          === "none",
+        reviewLabel: document.getElementById("nextReview").textContent.trim(),
+        molecularStyles: Array.prototype.map.call(styles || [], item => item.value),
+        selectedStyle: document.querySelector(
+          'input[name="nglRepresentation"]:checked')?.value,
+        visibleLayers: Array.prototype.every.call(layers || [], item =>
+          item.closest(".ram-toggles")?.getBoundingClientRect().height > 0)
+      };
+    });
+    assert.ok(cleanControls.compactInspector && cleanControls.previousHidden,
+      "The empty residue inspector must not display unnecessary buttons.");
+    assert.equal(cleanControls.reviewLabel,"Review issues");
+    assert.deepEqual(cleanControls.molecularStyles,
+      ["cartoon","ribbon","licorice","ball+stick","surface"]);
+    assert.equal(cleanControls.selectedStyle, "cartoon",
+      "Cartoon must be the default molecular representation.");
+    assert.equal(cleanControls.visibleLayers, true,
+      "All five molecular layer and motion switches must remain visible.");
     assert.equal(plot.yAnchor, "x", "Axes must be equally scaled.");
     assert.ok(Math.abs(plot.xRange[0] + 180) < 1 &&
               Math.abs(plot.xRange[1] - 180) < 1 &&
@@ -84,13 +112,76 @@ const assert = require("node:assert/strict");
     assert.ok(plot.axisPixels.x >= 0.48 * plot.width &&
               plot.axisPixels.y >= 0.48 * plot.width,
               "Angular axes must use at least half of the plot panel width.");
+    assert.equal(await page.$eval("#colorscheme", el => el.value),
+                 "RamplotR", "RamplotR must be the publication-default palette.");
+    assert.equal(await page.evaluate(() =>
+      document.getElementById("plotly").data[0].fillcolor),
+      "#D4ECE7", "The default contour must use the RamplotR identity palette.");
     // NGL loads and paints asynchronously after the Plotly response.
     // Give the viewer a moment to render before taking the desktop preview.
     await new Promise(resolve => setTimeout(resolve, 1600));
     await page.screenshot({
       path: "benchmarks/output/ui-preview/desktop-loaded.png", fullPage: true
     });
+    // Display choices and secondary options are discoverable without
+    // opening another disclosure or leaving the molecular view.
+    assert.equal(await page.evaluate(() =>
+      document.querySelectorAll('.ram-viewer-layers input[type="checkbox"]').length), 5,
+      "The 3D viewer must expose all five layer and motion controls.");
 
+    // A standard laptop should show the analysis, not a full-height landing
+    // page. Focus mode is reversible and must preserve the live plot.
+    await page.setViewport({ width: 1366, height: 768, deviceScaleFactor: 1 });
+    await page.waitForFunction(() => {
+      const app = document.querySelector(".ram-app");
+      const p = document.querySelector("#plotly");
+      return app && app.classList.contains("ram-has-data") &&
+        p && p._fullLayout && Math.abs(p._fullLayout.width-p.clientWidth)<3;
+    }, {timeout:15000});
+    const laptop = await page.evaluate(() => {
+      const intro = document.querySelector(".ram-intro");
+      const source = document.querySelector(".ram-source");
+      const p = document.querySelector("#plotly");
+      return {
+        introHidden: getComputedStyle(intro).display === "none",
+        sourceHeight: source.getBoundingClientRect().height,
+        plotBottom: p.getBoundingClientRect().bottom,
+        viewerHeight: document.querySelector(".ram-ngl")
+          .getBoundingClientRect().height,
+        viewportHeight: window.innerHeight
+      };
+    });
+    assert.ok(laptop.introHidden,
+              "Loaded analysis should reclaim the introductory hero area.");
+    assert.ok(laptop.sourceHeight < 100,
+              "The loaded structure toolbar should remain compact.");
+    assert.ok(laptop.plotBottom <= laptop.viewportHeight+95,
+              "The laptop plot should fit mostly inside the first screen.");
+    assert.ok(laptop.viewerHeight >= 290 && laptop.viewerHeight < 380,
+              "The molecular viewer should fit a short laptop viewport.");
+    await page.screenshot({
+      path:"benchmarks/output/ui-preview/laptop-compact.png",fullPage:true
+    });
+    await page.click("#ram-toggle-settings");
+    await page.waitForFunction(() => {
+      const app = document.querySelector(".ram-app");
+      const sidebar = document.querySelector(".ram-sidebar");
+      return app.classList.contains("ram-focus-mode") &&
+        getComputedStyle(sidebar).display === "none" &&
+        document.querySelector("#ram-toggle-settings")
+          .getAttribute("aria-expanded") === "false";
+    });
+    await page.screenshot({
+      path:"benchmarks/output/ui-preview/laptop-focus.png",fullPage:true
+    });
+    await page.click("#ram-toggle-settings");
+    await page.waitForFunction(() =>
+      !document.querySelector(".ram-app").classList.contains("ram-focus-mode"));
+    await page.setViewport({width:1440,height:940,deviceScaleFactor:1});
+    await page.waitForFunction(() => {
+      const p = document.querySelector("#plotly");
+      return p._fullLayout && Math.abs(p._fullLayout.width-p.clientWidth)<3;
+    }, {timeout:15000});
 
     // Changing presentation controls must update the displayed plot without
     // another click on Analyze, and without loading another structure.
@@ -141,6 +232,20 @@ const assert = require("node:assert/strict");
         .reduce((n, t) => n + t.x.length, 0);
       return count > 0 && count < expected;
     }, { timeout: 18000 }, fullCount);
+    // Sequence maps keep their true protein length when the plot shows only
+    // one amino acid. Filtered-out positions become disabled, not deleted.
+    await page.waitForFunction(() => {
+      const count = document.querySelector(".ram-sequence-chain-count");
+      return count && count.textContent.includes("46 aa");
+    }, {timeout:12000});
+    await page.click("#ram-sequence-panel > summary");
+    await page.waitForFunction(() => {
+      const buttons = document.querySelectorAll("#sequenceView .ram-seq-res");
+      return buttons.length === 46 &&
+        document.querySelectorAll("#sequenceView .ram-seq-res:disabled").length > 0 &&
+        document.querySelectorAll("#sequenceView .ram-seq-res:not(:disabled)").length > 0;
+    }, {timeout:12000});
+    await page.click("#ram-sequence-panel > summary");
     await page.evaluate(() => {
       const values = Array.from(document.querySelector("#AA").options)
         .map(option => option.value);
@@ -210,6 +315,10 @@ const assert = require("node:assert/strict");
         window.__ramZoomCalls.some(call =>
           call.sele === expected && call.duration === 650);
     }, { timeout: 20000 }, firstNglSelector);
+    await page.waitForFunction(() =>
+      !document.querySelector(".ram-global-inspector").classList.contains("is-empty")
+      && getComputedStyle(document.getElementById("prevReview")).display !== "none",
+      {timeout:10000});
     await page.screenshot({
       path: "benchmarks/output/ui-preview/desktop-residue-zoom.png",
       fullPage: true
@@ -217,10 +326,45 @@ const assert = require("node:assert/strict");
 
     // The residue table should also select the same entry, and clicking
     // another row should move the plot highlight back to that residue.
+    // Change the protein representation while retaining the orange residue
+    // overlay; then restore cartoon before continuing linked-view tests.
+    await page.evaluate(() =>
+      document.querySelector('input[name="nglRepresentation"][value="licorice"]').click());
+    await page.waitForFunction(() => {
+      const group = window.getNGLStage("NGL")?.getRepresentationsByName("ram-chain-A");
+      return group && group.list && group.list.some(item =>
+        (item.repr?.type || "").toLowerCase() === "licorice");
+    }, {timeout:20000});
+    await page.evaluate(() =>
+      document.querySelector('input[name="nglRepresentation"][value="cartoon"]').click());
+    await page.waitForFunction(() => {
+      const group = window.getNGLStage("NGL")?.getRepresentationsByName("ram-chain-A");
+      const highlight = window.getNGLStage("NGL")?.getRepresentationsByName("ram-highlight");
+      return group && group.list && group.list.some(item =>
+        (item.repr?.type || "").toLowerCase() === "cartoon") &&
+        highlight && highlight.list.length > 0;
+    }, {timeout:20000});
+
     await page.click('.nav-tabs a[data-value="residues"]');
     await page.waitForSelector("#regions table tbody tr", { timeout: 18000 });
     await page.waitForFunction(() =>
       document.querySelector("#regions tbody tr.selected"), { timeout: 18000 });
+    // One physical table (no DataTables scroll-head clone) must align the
+    // column headings with the corresponding residue values.
+    const geometry = await page.evaluate(() => {
+      const table = document.querySelector("#regions table");
+      const head = table.querySelectorAll("thead th");
+      const cells = table.querySelectorAll("tbody tr:first-child td");
+      return [0,1,2,3,4,5,6,7].map(i => ({
+        heading: head[i].getBoundingClientRect().left,
+        value: cells[i].getBoundingClientRect().left
+      }));
+    });
+    assert.ok(geometry.every(col => Math.abs(col.heading - col.value) <= 4),
+              "Residue table header and body columns must align.");
+    await page.screenshot({
+      path:"benchmarks/output/ui-preview/residue-table.png",fullPage:true
+    });
     const before = await page.$eval("#selectedResidueInfo strong",
                                    e => e.textContent);
     // A single page.$ returns only the first row; find and actually click a
@@ -336,6 +480,122 @@ const assert = require("node:assert/strict");
     }, { timeout: 20000 }, {
       selected: firstNglSelector, minZoom: previousZoomCount
     });
+
+    // Sequence navigation belongs to the plot tab. The short all-chain
+    // overview stays visible while the letter-level navigator is collapsed.
+    await page.waitForSelector("#ram-sequence-panel > summary");
+    const shortView = await page.evaluate(() => ({
+      overviewChains: document.querySelectorAll(".ram-sequence-overview-chain").length,
+      collapsed: !document.getElementById("ram-sequence-panel").open,
+      plotTab: document.querySelector('.nav-tabs li.active a').getAttribute("data-value")
+    }));
+    assert.equal(shortView.overviewChains, 1,
+                 "The small single-chain 1CRN fixture has one overview row.");
+    assert.ok(shortView.collapsed && shortView.plotTab === "plot",
+              "Sequence must be integrated into the plot tab and initially collapsed.");
+    await page.click("#ram-sequence-panel > summary");
+    await page.waitForSelector("#sequenceView .ram-seq-res", {timeout:18000});
+    const sequencePick = await page.evaluate(first => {
+      const buttons = Array.from(document.querySelectorAll(".ram-seq-res"));
+      const other = buttons.find(b =>
+        b.dataset.chain !== String(first[0]) ||
+        Number(b.dataset.resi) !== Number(first[1]) ||
+        b.dataset.insertion !== String(first[2] || ""));
+      if (!other) return null;
+      other.click();
+      return other.dataset.resi;
+    }, firstPoint);
+    assert.ok(sequencePick, "Sequence navigator needs multiple residues.");
+    await page.waitForFunction(resi => {
+      const chosen = document.querySelector("#selectedResidueInfo strong");
+      return chosen && chosen.textContent.includes(" " + resi);
+    }, {timeout:15000}, sequencePick);
+    assert.equal(await page.$eval('.nav-tabs li.active a',
+      el => el.getAttribute("data-value")), "plot",
+      "Picking a residue must preserve the visible plot and NGL viewer.");
+    await page.screenshot({
+      path:"benchmarks/output/ui-preview/sequence-integrated.png", fullPage:true
+    });
+    await page.click("#ram-sequence-panel > summary");
+
+    // Comparing 1CRN with itself tests sequence alignment without relying
+    // on any additional external downloads inside the Shiny session.
+    await page.click('.nav-tabs a[data-value="compare"]');
+    await page.evaluate(() =>
+      document.querySelector('input[name="compareInputSource"][value="upload"]').click());
+    await page.waitForFunction(() => {
+      const element = document.getElementById("ram-compare-upload");
+      return element && !element.classList.contains("is-hidden");
+    }, {timeout:15000});
+    await (await page.$("#compareFile")).uploadFile(
+      path.resolve("benchmarks/output/ui-preview/1CRN.pdb"));
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    await page.click("#compareSubmit");
+    await page.waitForSelector("#comparison tbody tr", {timeout:25000});
+    await page.waitForFunction(() => {
+      const p = document.getElementById("comparePlot");
+      return p && p.data && p.data.length >= 2;
+    }, {timeout:18000});
+    await page.screenshot({
+      path:"benchmarks/output/ui-preview/compare-self.png",fullPage:true
+    });
+    await page.click('.nav-tabs a[data-value="plot"]');
+
+    // Multi-chain experimental fixture: the compact overview and the
+    // expanded residue navigator must each show A, B, C and D together.
+    await (await page.$("#structfile")).uploadFile(
+      path.resolve("benchmarks/output/ui-preview/1BBB.pdb"));
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    await page.click("#submit");
+    await page.waitForFunction(() => {
+      const badge = document.getElementById("ram-current-structure");
+      const rows = document.querySelectorAll(".ram-sequence-overview-chain");
+      return badge && badge.textContent.includes("1BBB") && rows.length === 4;
+    }, {timeout:45000});
+    // Chain selection is updated asynchronously after replacing a
+    // single-chain structure. Do not mistake a transient Chain-A-only plot
+    // for a completed four-chain analysis.
+    await page.waitForFunction(() => {
+      const plot = document.getElementById("plotly");
+      const badge = document.getElementById("ram-current-structure");
+      const chainTraces = (plot?.data || [])
+        .filter(trace => /^Chain [A-D]$/.test(trace.name || ""));
+      const stage = typeof window.getNGLStage === "function"
+        ? window.getNGLStage("NGL") : null;
+      const chainD = stage && stage.getRepresentationsByName("ram-chain-D");
+      return badge && badge.textContent.includes("1BBB") &&
+        chainTraces.length === 4 &&
+        chainD && chainD.list && chainD.list.length > 0;
+    }, {timeout:30000});
+    // Let NGL's WebGL renderer complete a frame before archiving screenshots.
+    await new Promise(resolve => setTimeout(resolve, 900));
+    const overviewNames = await page.$$eval(
+      ".ram-sequence-overview-chain .ram-sequence-chain-name",
+      nodes => nodes.map(n => n.textContent.trim()));
+    assert.deepEqual(overviewNames, ["Chain A", "Chain B", "Chain C", "Chain D"],
+                     "The collapsed navigator should show every protein chain.");
+    await page.click("#ram-sequence-panel > summary");
+    await page.waitForFunction(() =>
+      document.querySelectorAll("#sequenceView .ram-sequence-chain").length === 4,
+      {timeout:15000});
+    const allChains = await page.evaluate(() =>
+      Array.from(document.querySelectorAll(
+        "#sequenceView .ram-sequence-chain")).map(group => ({
+          title: group.querySelector("strong").textContent,
+          residues: group.querySelectorAll(".ram-seq-res").length
+        })));
+    assert.equal(allChains.length, 4);
+    assert.ok(allChains.every(group => group.residues > 0),
+              "Every chain should provide clickable residue navigation.");
+    await page.screenshot({
+      path:"benchmarks/output/ui-preview/all-chains-expanded.png", fullPage:true
+    });
+    await page.click("#sequenceView .ram-sequence-chain:last-child .ram-seq-res:nth-child(2)");
+    await page.waitForFunction(() => {
+      const selected = document.querySelector("#selectedResidueInfo strong");
+      return selected && selected.textContent.includes("Chain D");
+    }, {timeout:15000});
+    await page.click("#ram-sequence-panel > summary");
 
     // Check whether the browser delivered resize events and whether Plotly's
     // relayout handler actually received the new mobile dimensions.

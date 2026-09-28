@@ -5,12 +5,13 @@
   "use strict";
 
   const defaultChainColors = [
-    "#1c7777", "#9366aa", "#cf823a", "#5a8eb8",
-    "#65915f", "#c25b76", "#a77e45", "#737d94"
+    "#CE6A4D", "#317E9A", "#8065A3", "#B68A3E",
+    "#498777", "#B65B7A", "#5070A0", "#826B4B"
   ];
   const plot = document.getElementById("plotly");
   const empty = document.getElementById("plot-empty");
   const currentStructure = document.getElementById("ram-current-structure");
+  const comparePlot = document.getElementById("comparePlot");
   let selectedResidue = null;
   let selectedCoordinates = new Map();
   let selectionTrace = -1;
@@ -28,8 +29,11 @@
     const resi = Number(item.resi);
     if (!Number.isInteger(resi) || !/^[A-Za-z0-9_-]*$/.test(chain) ||
         !/^[A-Za-z0-9]*$/.test(ins)) return null;
-    return String(resi) + (ins ? "^" + ins : "") +
+    const residue = String(resi) + (ins ? "^" + ins : "") +
       (chain ? ":" + chain : "");
+    const model = Number(item.modelIndex);
+    return item.multipleModels && Number.isInteger(model) && model > 0
+      ? residue + " and /" + (model - 1) : residue;
   }
 
   function syncNglSelection(zoom) {
@@ -50,7 +54,8 @@
     // than adding a new representation for every residue click.
     highlight.setSelection(sele || "none");
 
-    const key = sele ? selectionKey(selectedResidue) : "";
+    const key = sele ? selectionKey(selectedResidue) + "::" +
+      String(selectedResidue.modelIndex || 1) : "";
     if (sele && zoom && key !== focusedKey) {
       const component = structures.find(function (item) {
         return item && item.structure && typeof item.autoView === "function";
@@ -156,6 +161,68 @@
     return Array.isArray(value) ? value : value == null ? [] : [value];
   }
 
+  // A delegated sequence click survives Shiny's HTML re-rendering, including
+  // when the user switches chains or changes scientific reference datasets.
+  document.addEventListener("click", function (event) {
+    const button = event.target && event.target.closest &&
+      event.target.closest(".ram-seq-res");
+    if (!button) return;
+    const pick = {
+      chain: button.dataset.chain,
+      resi: Number(button.dataset.resi),
+      insertion_code: button.dataset.insertion || ""
+    };
+    if (!Number.isInteger(pick.resi)) return;
+    if (window.Shiny && window.Shiny.setInputValue)
+      window.Shiny.setInputValue("ramSeqPick", pick, { priority: "event" });
+  });
+
+  let lastSequenceScrollKey = "";
+  function markSequenceSelection() {
+    if (typeof document.querySelectorAll !== "function") return;
+    const selected = selectionKey(selectedResidue);
+    let activeButton = null;
+    document.querySelectorAll(".ram-seq-res").forEach(function (button) {
+      const key = selectionKey({
+        chain: button.dataset.chain, resi: Number(button.dataset.resi),
+        insertion_code: button.dataset.insertion || ""
+      });
+      const active = !!selected && selected === key;
+      button.setAttribute("aria-pressed", String(active));
+      if (active) activeButton = button;
+    });
+    // With all chains present, keep the selected letter in view only within
+    // its own horizontal sequence row. Do not scroll the entire page.
+    if (activeButton && selected !== lastSequenceScrollKey &&
+        typeof activeButton.closest === "function") {
+      const strip = activeButton.closest(".ram-sequence-grid");
+      if (strip && strip.clientWidth && Number.isFinite(activeButton.offsetLeft)) {
+        strip.scrollLeft = Math.max(0, activeButton.offsetLeft -
+          strip.offsetLeft - strip.clientWidth / 2);
+        lastSequenceScrollKey = selected;
+      }
+    }
+    if (!selected) lastSequenceScrollKey = "";
+  }
+
+  function changeCompareSource() {
+    const selected = document.querySelector('input[name="compareInputSource"]:checked');
+    const upload = selected && selected.value === "upload";
+    const pdb = document.getElementById("ram-compare-pdb");
+    const file = document.getElementById("ram-compare-upload");
+    if (pdb) pdb.classList.toggle("is-hidden", upload);
+    if (file) file.classList.toggle("is-hidden", !upload);
+  }
+
+  // The expanded all-chain navigator may render after the selection message.
+  // Re-apply selection markers whenever Shiny inserts its residue buttons.
+  document.addEventListener("shiny:value", function (event) {
+    if (event.target && event.target.id === "sequenceView" &&
+        typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(markSequenceSelection);
+    }
+  });
+
   function changeSource() {
     const selected = document.querySelector('input[name="inputSource"]:checked');
     const upload = selected && selected.value === "upload";
@@ -167,8 +234,11 @@
 
   function initSourceControl() {
     changeSource();
+    changeCompareSource();
     document.addEventListener("change", function (event) {
       if (event.target && event.target.name === "inputSource") changeSource();
+      if (event.target && event.target.name === "compareInputSource")
+        changeCompareSource();
     });
   }
 
@@ -179,11 +249,23 @@
   }
 
   function plotHeight() {
-    // The height follows the available panel width. The figure itself retains
-    // equal scaling on phi and psi so the geometry is never distorted.
-    return Math.max(plot.clientWidth < 540 ? 285 : 385,
-                    Math.min(690, Math.round(plot.clientWidth +
-                      (plot.clientWidth < 540 ? 35 : 75))));
+    // Square angular axes remain enforced in Plotly. On short laptops, use
+    // the available vertical space rather than blindly matching card width.
+    const width = plot.clientWidth;
+    const minimum = width < 540 ? 285 : 385;
+    let height = Math.max(minimum, Math.min(690,
+      Math.round(width + (width < 540 ? 35 : 75))));
+    const app = document.querySelector && document.querySelector(".ram-app");
+    if (app && app.classList.contains("ram-has-data") &&
+        (window.innerWidth || 0) >= 900 && (window.innerHeight || 0) < 1000 &&
+        typeof plot.getBoundingClientRect === "function") {
+      const top = plot.getBoundingClientRect().top;
+      if (top > 0 && top < window.innerHeight) {
+        height = Math.min(height,
+          Math.max(minimum, Math.floor(window.innerHeight - top - 30)));
+      }
+    }
+    return height;
   }
 
   function contourTrace(matrix, operation, cutoff, color) {
@@ -222,10 +304,10 @@
     plot.style.height = plotHeight() + "px";
 
     const background = [
-      safeColor(shades[0], "#F1EEF6"),
-      safeColor(shades[1], "#BDC9E1"),
-      safeColor(shades[2], "#74A9CF"),
-      safeColor(shades[3], "#0570B0")
+      safeColor(shades[0], "#FFF8ED"),
+      safeColor(shades[1], "#D4ECE7"),
+      safeColor(shades[2], "#7DB9B5"),
+      safeColor(shades[3], "#126E74")
     ];
     // Preserve the original scientific contour cutoffs and layer order.
     const traces = [
@@ -389,6 +471,13 @@
           plot.on("plotly_click", onPlotClick);
           plot.__ramPickBound = true;
         }
+        // Keep the full introductory form for first-time visitors. Once a
+        // structure has rendered, the compact toolbar makes room for science.
+        const app = document.querySelector && document.querySelector(".ram-app");
+        if (app && !app.classList.contains("ram-has-data")) {
+          app.classList.add("ram-has-data");
+          scheduleResize();
+        }
       })
       .catch(function () {
         plot.style.display = "none";
@@ -401,17 +490,69 @@
       });
   }
 
+  function drawComparison(obj) {
+    if (!comparePlot || !window.Plotly || !obj) return;
+    const aPhi = array(obj.phiA), aPsi = array(obj.psiA);
+    const bPhi = array(obj.phiB), bPsi = array(obj.psiB);
+    const asPoints = function (phi, psi) {
+      const x=[], y=[];
+      for (let i=0; i<phi.length; i++) {
+        if (Number.isFinite(phi[i]) && Number.isFinite(psi[i])) {
+          x.push(phi[i]); y.push(psi[i]);
+        }
+      }
+      return {x,y};
+    };
+    const a = asPoints(aPhi,aPsi), b = asPoints(bPhi,bPsi);
+    const traces = [
+      {type:"scattergl",mode:"markers",name:String(obj.nameA || "Primary"),
+       x:a.x,y:a.y,marker:{color:"#CE6A4D",size:7,opacity:.77}},
+      {type:"scattergl",mode:"markers",name:String(obj.nameB || "Comparison"),
+       x:b.x,y:b.y,marker:{color:"#317E9A",size:7,opacity:.77,symbol:"diamond"}}
+    ];
+    const axis = {range:[-180,180],tickvals:[-180,-90,0,90,180],
+      gridcolor:"#e3eeeb",zerolinecolor:"#a0bab9",constrain:"domain"};
+    comparePlot.style.minHeight = "420px";
+    window.Plotly.react(comparePlot,traces,{
+      autosize:true,paper_bgcolor:"#ffffff",plot_bgcolor:"#fbfdfc",
+      margin:{l:63,r:20,t:35,b:55},
+      xaxis:Object.assign({},axis,{title:"Phi (°)"}),
+      yaxis:Object.assign({},axis,{title:"Psi (°)",scaleanchor:"x",scaleratio:1}),
+      legend:{orientation:"h",y:1.12,x:0},
+      height:Math.min(660,Math.max(420,comparePlot.clientWidth+30))
+    },{responsive:true,displaylogo:false});
+  }
+
   if (window.Shiny) {
     window.Shiny.addCustomMessageHandler("process", drawPlot);
+    window.Shiny.addCustomMessageHandler("ram-comparison", drawComparison);
     window.Shiny.addCustomMessageHandler("ram-selection", function (choice) {
       selectedResidue = choice && !choice.clear ? choice : null;
+      const inspector = document.querySelector(".ram-global-inspector");
+      if (inspector) inspector.classList.toggle("is-empty", !selectedResidue);
+      const reviewButton = document.getElementById("nextReview");
+      if (reviewButton) reviewButton.textContent =
+        selectedResidue ? "Next issue" : "Review issues";
       refreshSelection();
+      markSequenceSelection();
       syncNglSelection(true);
     });
     // Shiny requires every custom message handler to declare one argument.
-    window.Shiny.addCustomMessageHandler("ram-bind-ngl", function (_message) {
+    window.Shiny.addCustomMessageHandler("ram-bind-ngl", function (message) {
       bindNglPick();
       syncNglSelection(true);
+      // NGLVieweR reuses the camera between renderValue calls. An old
+      // residue-focused camera can clip a newly loaded multi-chain protein
+      // even after its representations finish loading. Only reframe after
+      // an actual structure load, not after every representation change.
+      if (message && message.resetView === true && !selectedResidue &&
+          typeof window.getNGLStage === "function") {
+        const stage = window.getNGLStage("NGL");
+        if (stage && typeof stage.autoView === "function") {
+          if (typeof stage.handleResize === "function") stage.handleResize();
+          stage.autoView(450);
+        }
+      }
     });
   }
 
@@ -495,9 +636,52 @@
     }
   }
 
-  // Support both Bootstrap's jQuery event and native tab events.
-  document.addEventListener("shown.bs.tab", scheduleResize);
-  if (window.jQuery)
-    window.jQuery(document).on("shown.bs.tab", scheduleResize);
+  // Bootstrap hides the DT at initialisation. Recalculate *the same table's*
+  // columns on visibility changes: do not enable DataTables scrollX, which
+  // duplicates the header and creates cross-version alignment problems.
+  function adjustVisibleTables() {
+    if (comparePlot && window.Plotly &&
+        comparePlot.classList.contains("js-plotly-plot") &&
+        comparePlot.clientWidth > 0) {
+      window.Plotly.Plots.resize(comparePlot);
+    }
+    if (window.jQuery && window.jQuery.fn &&
+        window.jQuery.fn.dataTable) {
+      const api = window.jQuery.fn.dataTable.tables({
+        visible: true, api: true
+      });
+      if (api && typeof api.columns === "function") api.columns.adjust();
+    }
+  }
+  // Show or hide analysis settings without duplicating the plots, breaking
+  // Shiny inputs, or forcing users to scroll through the sidebar.
+  const settingsToggle = document.getElementById("ram-toggle-settings");
+  const ramApp = document.querySelector && document.querySelector(".ram-app");
+  if (settingsToggle && ramApp) {
+    settingsToggle.addEventListener("click", function () {
+      const collapsed = ramApp.classList.toggle("ram-focus-mode");
+      settingsToggle.textContent = collapsed ? "Show settings" : "Hide settings";
+      settingsToggle.setAttribute("aria-expanded", String(!collapsed));
+      settingsToggle.title = collapsed
+        ? "Show structure input and analysis settings"
+        : "Expand the plots by hiding analysis settings";
+      scheduleResize();
+      adjustVisibleTables();
+    });
+  }
+
+  document.addEventListener("shown.bs.tab", function () {
+    scheduleResize(); adjustVisibleTables(); markSequenceSelection();
+  });
+  if (window.jQuery) {
+    window.jQuery(document).on("shown.bs.tab", function () {
+      scheduleResize();
+      markSequenceSelection();
+      // Wait for the Bootstrap pane to finish its layout before measuring DT.
+      if (window.requestAnimationFrame)
+        window.requestAnimationFrame(adjustVisibleTables);
+      else adjustVisibleTables();
+    });
+  }
 
 })();

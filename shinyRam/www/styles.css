@@ -733,3 +733,84 @@ body > .container-fluid { max-width: none; padding: 0; }
   .ram-source-choice .radio-inline,
   .ram-viewer-details > summary::after { transition: none; }
 }
+
+
+/* Unified multi-chain navigator: visible position maps, optional interaction.
+   A single collapsed strip leaves room for the 2D/3D analysis on laptops. */
+.ram-sequence-panel {
+  display:none; min-width:0; margin-top:12px; border:1px solid #d7e7e3;
+  border-radius:11px; background:#fbfdfc; overflow:hidden;
+}
+.ram-has-data .ram-sequence-panel { display:block; }
+.ram-sequence-panel > summary {
+  position:relative; display:block; list-style:none; cursor:pointer;
+  padding:12px 40px 12px 15px; outline-offset:-3px;
+}
+.ram-sequence-panel > summary::-webkit-details-marker { display:none; }
+.ram-sequence-panel > summary:focus-visible { outline:2px solid #167b80; }
+.ram-sequence-panel > summary::after {
+  content:""; position:absolute; top:19px; right:19px; height:9px; width:9px;
+  border-right:2px solid #47787b; border-bottom:2px solid #47787b;
+  transform:rotate(45deg); transition:transform .15s;
+}
+.ram-sequence-panel[open] > summary::after {
+  transform:rotate(225deg); top:23px;
+}
+.ram-sequence-summary-title { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+.ram-sequence-summary-title strong { color:#173f48; font-size:12px; letter-spacing:.005em; }
+.ram-sequence-summary-hint { color:#617d82; font-size:11px; }
+.ram-sequence-overview { display:grid; gap:5px; margin-top:9px; }
+.ram-sequence-overview-chain {
+  display:grid; grid-template-columns:75px minmax(0,1fr) 58px;
+  gap:10px; align-items:center; min-width:0;
+}
+.ram-sequence-chain-name { font-size:10px; font-weight:750; color:#315b61;
+  overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.ram-sequence-chain-count { text-align:right; font-size:10px; color:#687e83;
+  font-variant-numeric:tabular-nums; }
+.ram-sequence-mini { display:flex; width:100%; min-width:0; height:8px;
+  overflow:hidden; border-radius:4px; background:#e6efeb; }
+.ram-sequence-mini-cell { display:block; flex:1 1 0; min-width:0; height:100%; }
+.ram-sequence-mini-cell.ram-seq-outlier { background:#df866c; }
+.ram-sequence-mini-cell.ram-seq-missing { background:#9ba7b3; }
+.ram-sequence-mini-cell.ram-seq-generously-allowed { background:#dfc27a; }
+.ram-sequence-mini-cell.ram-seq-allowed { background:#91c9b8; }
+.ram-sequence-mini-cell.ram-seq-favoured { background:#276c73; }
+.ram-sequence-empty { display:block; margin-top:6px; color:#698189; font-size:11px; }
+.ram-sequence-detail { border-top:1px solid #dae9e5; padding:13px 15px 16px; }
+.ram-sequence-instruction { margin:0 0 10px; font-size:11px; color:#607983; }
+.ram-sequence-detail .ram-sequence-legend {
+  display:flex; flex-wrap:wrap; gap:6px; margin:0 0 13px;
+}
+.ram-sequence-detail .ram-swatch { font-size:10px; padding:4px 8px; }
+.ram-sequence-chains { display:grid; gap:13px; }
+.ram-sequence-chain {
+  min-width:0; background:#fff; border:1px solid #e1ebe8;
+  border-radius:8px; padding:9px 11px 10px;
+}
+.ram-sequence-chain-heading { display:flex; align-items:baseline; gap:10px; margin-bottom:7px;
+  font-size:11px; color:#5d777e; }
+.ram-sequence-chain-heading strong { color:#154b53; font-size:12px; }
+.ram-sequence-scroll-hint { margin-left:auto; font-size:10px; color:#7a9399; }
+.ram-sequence-chain .ram-sequence-grid {
+  display:flex; flex-wrap:nowrap; gap:3px; align-items:center;
+  max-height:none; min-height:43px; padding:3px 0 5px; margin:0;
+  overflow-x:auto; overflow-y:hidden; scrollbar-width:thin;
+  background:none; border:0;
+}
+.ram-sequence-chain .ram-seq-res { width:27px; height:30px; flex:0 0 27px;
+  border-radius:5px; font-size:11px; }
+.ram-sequence-chain .ram-seq-res[aria-pressed="true"] {
+  border:2px solid #134f55; outline:2px solid #8fcfc4;
+  outline-offset:1px; box-shadow:none;
+}
+@media(max-width:580px) {
+  .ram-sequence-panel > summary { padding:12px 30px 12px 10px; }
+  .ram-sequence-overview-chain { grid-template-columns:55px minmax(0,1fr) 42px; gap:6px; }
+  .ram-sequence-detail { padding:12px 9px; }
+  .ram-sequence-chain { padding:8px; }
+  .ram-sequence-scroll-hint { display:none; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .ram-sequence-panel > summary::after { transition:none; }
+}

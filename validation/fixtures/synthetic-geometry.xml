@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic: schema-shaped wwPDB annotations, not experimental evidence. -->
+<wwPDB-validation-information>
+  <ModelledSubgroup model="1" chain="A" resnum="1" resname="SER"
+     phi="-70" psi="-20" rama="Favored" rota="OUTLIER" rscc="0.91" rsrz="0.8">
+    <clash atom="CA" overlap="0.5"/>
+    <clash atom="CB" overlap="0.45"/>
+    <bond-outlier atom1="CA" atom2="CB"/>
+    <angle-outlier atom1="CA" atom2="CB" atom3="OG"/>
+  </ModelledSubgroup>
+  <ModelledSubgroup model="1" chain="A" resnum="2" resname="THR"
+    icode="A" altcode="A" rama="OUTLIER" rota="Rotameric"/>
+  <ModelledSubgroup model="1" chain="A" resnum="2" resname="THR"
+    icode="A" altcode="" rama="Allowed" rota="OUTLIER">
+    <symm-clash overlap="0.4"/>
+  </ModelledSubgroup>
+  <ModelledSubgroup model="2" chain="A" resnum="1" resname="SER"
+    rama="OUTLIER" rota="OUTLIER"/>
+</wwPDB-validation-information>

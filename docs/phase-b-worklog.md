@@ -11,6 +11,6 @@ Base: main `99fd7f38c17e88dce28b043560ecd5a147d647ea`. Scientific Phase A and hi
 - [x] All-chain and multi-model scientific regression tests pass on Ubuntu and Windows; independent wwPDB and structure-validation workflows remain green.
 - [x] Real Chromium/Shiny smoke tests pass for ESMFold, AF2 PAE and AF3 full/summary confidence upload, in addition to desktop/mobile interactions.
 - [x] Downsampled PAE plots preserve both sides of protein-chain boundaries, and missing phi/psi are never labelled as acceptable geometry.
-- [ ] Merge reviewed PR #14 and check post-merge workflows on main.
+- [x] Merged PR #14 into main as `dad437d132c58452caa46950d644172e19b2eaa6`. Post-merge scientific regression tests passed on Ubuntu and Windows and all five independent wwPDB checks passed. The final PR-head browser and structure-validation workflows also passed.
 
 ESMFold PDB stores pLDDT in B-factor fields. AlphaFold3's full confidence JSON has per-atom `atom_plddts` and per-token `pae`; the token indices are **not** atom indices. AF2/DB PAE JSON may use `predicted_aligned_error` and `residue1`/`residue2`. Disallow unsupported formats rather than fabricating confidence values.

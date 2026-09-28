@@ -188,6 +188,7 @@ const assert = require("node:assert/strict");
         viewportHeight: window.innerHeight
       };
     });
+    console.log("LAPTOP COMPACT DIAGNOSTICS",JSON.stringify(laptop));
     assert.ok(laptop.introHidden,
               "Loaded analysis should reclaim the introductory hero area.");
     assert.ok(laptop.sourceHeight < 100,

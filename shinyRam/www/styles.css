@@ -962,3 +962,19 @@ body > .container-fluid { max-width: none; padding: 0; }
 }
 
 .ram-confidence-metric.ram-review-high { background:#fceae2; color:#8f4c32; }
+
+/* After analysis, the collapsed provenance disclosure sits under the compact
+   Structure heading instead of consuming a full second toolbar row. Reopen
+   it to edit prediction settings without losing the loaded structure. */
+@media (min-width: 881px) {
+  .ram-has-data .ram-source:has(.ram-prediction-upload:not(.is-hidden):not([open])) {
+    position:relative; grid-template-columns:145px minmax(0,1fr);
+  }
+  .ram-has-data .ram-prediction-upload:not(.is-hidden):not([open]) {
+    position:absolute; top:29px; left:15px; width:135px;
+    border:0; padding:0; margin:0;
+  }
+  .ram-has-data .ram-prediction-upload:not(.is-hidden):not([open]) > summary {
+    padding:2px 0; font-size:10px; line-height:1.2;
+  }
+}

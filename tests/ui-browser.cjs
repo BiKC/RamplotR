@@ -91,19 +91,118 @@ const assert = require("node:assert/strict");
       path: "benchmarks/output/ui-preview/desktop-loaded.png", fullPage: true
     });
 
-    await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+
+    // Changing presentation controls must update the displayed plot without
+    // another click on Analyze, and without loading another structure.
+    await page.select("#colorscheme", "PDBSum");
     await page.waitForFunction(() => {
       const p = document.getElementById("plotly");
-      if (!p || !p._fullLayout) return false;
-      const width = p.clientWidth;
-      const cardWidth = p.closest(".ram-chart-card").clientWidth;
-      const targetHeight = Math.max(285, Math.min(690, Math.round(width + 35)));
-      return width > 0 && width <= cardWidth + 2 &&
-             Math.abs(p._fullLayout.width - width) <= 3 &&
-             Math.abs(p._fullLayout.height - targetHeight) <= 3 &&
-             p._fullLayout.xaxis._length >= 0.45 * width &&
-             p._fullLayout.yaxis._length >= 0.45 * width;
-    }, { timeout: 15000 });
+      return p && p.data && p.data[0].fillcolor === "#F3F300";
+    }, { timeout: 18000 });
+    const fullCount = await page.evaluate(() => {
+      const p = document.getElementById("plotly");
+      return p.data.filter(trace => trace.customdata)
+        .reduce((sum, trace) => sum + trace.x.length, 0);
+    });
+    assert.ok(fullCount > 5, "The initial test structure should contain many points.");
+    await page.evaluate(() => window.Shiny.setInputValue("AA", ["GLY"], {
+      priority: "event"
+    }));
+    await page.waitForFunction(expected => {
+      const p = document.getElementById("plotly");
+      const count = p && p.data && p.data.filter(t => t.customdata)
+        .reduce((n, t) => n + t.x.length, 0);
+      return count > 0 && count < expected;
+    }, { timeout: 18000 }, fullCount);
+    await page.evaluate(() => {
+      const values = Array.from(document.querySelector("#AA").options)
+        .map(option => option.value);
+      window.Shiny.setInputValue("AA", values, { priority: "event" });
+    });
+    await page.waitForFunction(expected => {
+      const p = document.getElementById("plotly");
+      const count = p && p.data && p.data.filter(t => t.customdata)
+        .reduce((n, t) => n + t.x.length, 0);
+      return count === expected;
+    }, { timeout: 18000 }, fullCount);
+
+    const firstPoint = await page.evaluate(() => {
+      const trace = document.getElementById("plotly").data.find(t =>
+        t.customdata && t.customdata.length);
+      return trace.customdata[0];
+    });
+    await page.evaluate(detail => {
+      document.getElementById("plotly").emit("plotly_click", {
+        points: [{ customdata: detail }]
+      });
+    }, firstPoint);
+    await page.waitForFunction(() => {
+      const p = document.getElementById("plotly");
+      return document.querySelector("#selectedResidueInfo strong") &&
+        p.data[p.data.length - 1].x.length === 1;
+    }, { timeout: 18000 });
+
+    // The residue table should also select the same entry, and clicking
+    // another row should move the plot highlight back to that residue.
+    await page.click('.nav-tabs a[data-value="residues"]');
+    await page.waitForSelector("#regions table tbody tr", { timeout: 18000 });
+    await page.waitForFunction(() =>
+      document.querySelector("#regions tbody tr.selected"), { timeout: 18000 });
+    const before = await page.$eval("#selectedResidueInfo strong",
+                                   e => e.textContent);
+    const rows = await page.$("#regions table tbody tr");
+    if (rows.length > 1) {
+      await rows[1].click();
+      await page.waitForFunction(old =>
+        document.querySelector("#selectedResidueInfo strong") &&
+        document.querySelector("#selectedResidueInfo strong").textContent !== old,
+        { timeout: 18000 }, before);
+    }
+    await page.click('.nav-tabs a[data-value="plot"]');
+    await page.click("#clearResidue");
+    await page.waitForFunction(() => {
+      const p = document.getElementById("plotly");
+      return !document.querySelector("#selectedResidueInfo strong") &&
+        p.data[p.data.length - 1].x.length === 0;
+    }, { timeout: 18000 });
+    // The NGL stage has a pick signal and a named highlight representation.
+    await page.waitForFunction(() => window.getNGLStage &&
+      window.getNGLStage("NGL") &&
+      window.getNGLStage("NGL").getRepresentationsByName("ram-highlight")
+        .list.length > 0, { timeout: 18000 });
+
+    await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+    try {
+      await page.waitForFunction(() => {
+        const p = document.getElementById("plotly");
+        if (!p || !p._fullLayout) return false;
+        const width = p.clientWidth;
+        const cardWidth = p.closest(".ram-chart-card").clientWidth;
+        const targetHeight = Math.max(285, Math.min(690, Math.round(width + 35)));
+        return width > 0 && width <= cardWidth + 2 &&
+               Math.abs(p._fullLayout.width - width) <= 3 &&
+               Math.abs(p._fullLayout.height - targetHeight) <= 3 &&
+               p._fullLayout.xaxis._length >= 0.45 * width &&
+               p._fullLayout.yaxis._length >= 0.45 * width;
+      }, { timeout: 15000 });
+    } catch (e) {
+      const details = await page.evaluate(() => {
+        const p = document.getElementById("plotly");
+        return {
+          clientWidth: p.clientWidth,
+          layoutWidth: p._fullLayout && p._fullLayout.width,
+          layoutHeight: p._fullLayout && p._fullLayout.height,
+          axisWidth: p._fullLayout && p._fullLayout.xaxis._length,
+          axisHeight: p._fullLayout && p._fullLayout.yaxis._length,
+          cardWidth: p.closest(".ram-chart-card").clientWidth
+        };
+      });
+      console.error("Responsive layout diagnostics:", JSON.stringify(details));
+      await page.screenshot({
+        path: "benchmarks/output/ui-preview/mobile-debug.png", fullPage: true
+      });
+      throw e;
+    }
     const dimensions = await page.evaluate(() => ({
       viewport: document.documentElement.clientWidth,
       body: document.body.scrollWidth,

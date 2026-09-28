@@ -295,22 +295,27 @@ ui <- fluidPage(
                     tags$div(class = "ram-viewer-heading",
                       tags$h3(class = "ram-chart-label", "Molecular structure"),
                       tags$p(class = "ram-chart-help",
-                        "Select a residue in the structure, or drag to rotate.")
-                    ),
-                    tags$div(class = "ram-viewer-style",
-                      selectInput("nglRepresentation", "View",
-                        choices = c("Cartoon" = "cartoon", "Ribbon" = "ribbon",
-                          "Sticks" = "licorice", "Ball & stick" = "ball+stick",
-                          "Surface" = "surface"), selected = "cartoon")
+                        "Click a residue to inspect it. Drag to rotate, scroll to zoom.")
                     )
                   ),
                   tags$div(class = "ram-ngl",
                     NGLVieweR::NGLVieweROutput("NGL")),
-                  tags$div(class = "ram-viewer-note",
-                    "Selected residues appear as orange sticks."),
-                  tags$details(
-                    class = "ram-viewer-options ram-viewer-details",
-                    tags$summary("Layers & motion"),
+                  tags$div(class = "ram-viewer-options", "aria-label" = "3D view controls",
+                    tags$div(class = "ram-viewer-control-heading",
+                      tags$span("Representation"),
+                      tags$span(class = "ram-viewer-control-note",
+                        "Selected residues stay highlighted in orange")
+                    ),
+                    tags$div(class = "ram-representation",
+                      radioButtons("nglRepresentation", label = NULL,
+                        choices = c("Cartoon" = "cartoon", "Ribbon" = "ribbon",
+                          "Sticks" = "licorice", "Ball & stick" = "ball+stick",
+                          "Surface" = "surface"),
+                        selected = "cartoon", inline = TRUE)
+                    ),
+                    tags$div(class = "ram-viewer-control-heading ram-layer-heading",
+                      tags$span("Layers & motion")
+                    ),
                     tags$div(class = "ram-toggles",
                       checkboxInput("ligands", "Ligands"),
                       checkboxInput("dna", "DNA"),
@@ -319,7 +324,7 @@ ui <- fluidPage(
                       checkboxInput("rocking", "Rock", value = TRUE)
                     ),
                     tags$p(class = "ram-viewer-hint",
-                      "Surface rendering may take longer for large structures.")
+                      "Surface rendering can take longer for large structures.")
                   )
                 )
               )

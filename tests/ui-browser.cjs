@@ -84,6 +84,37 @@ const assert = require("node:assert/strict");
     assert.ok(plot.axisPixels.x >= 0.48 * plot.width &&
               plot.axisPixels.y >= 0.48 * plot.width,
               "Angular axes must use at least half of the plot panel width.");
+    // Settings must repaint the existing plot without another Analyze click.
+    const firstContour = await page.evaluate(() =>
+      document.getElementById("plotly").data[0].fillcolor);
+    await page.select("#colorscheme", "PDBSum");
+    await page.waitForFunction(oldColor =>
+      document.getElementById("plotly").data[0].fillcolor !== oldColor,
+      { timeout: 15000 }, firstContour);
+    assert.equal(await page.evaluate(() =>
+      document.getElementById("plotly").data[0].fillcolor.toLowerCase()),
+      "#f3f300", "Changing the contour palette must repaint immediately");
+
+    // The selected residue must appear in the plot overlay without any
+    // further structure loading. Use a real plotted point's metadata.
+    await page.evaluate(() => {
+      const p = document.getElementById("plotly");
+      const trace = p.data.find(t => t.customdata && t.customdata.length);
+      if (!trace) throw Error("No residue points to select");
+      p.emit("plotly_click", { points: [{ customdata: trace.customdata[0] }] });
+    });
+    await page.waitForFunction(() => {
+      const p = document.getElementById("plotly");
+      const marker = p.data[p.data.length - 1];
+      return marker && marker.x && marker.x.length === 1 &&
+        document.getElementById("ram-selected-residue").textContent.includes("Selected:");
+    }, { timeout: 15000 });
+    await page.click("#clearSelection");
+    await page.waitForFunction(() => {
+      const p = document.getElementById("plotly");
+      return p.data[p.data.length - 1].x.length === 0;
+    }, { timeout: 10000 });
+
     // NGL loads and paints asynchronously after the Plotly response.
     // Give the viewer a moment to render before taking the desktop preview.
     await new Promise(resolve => setTimeout(resolve, 1600));

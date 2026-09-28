@@ -287,7 +287,33 @@ ui <- fluidPage(
                     tags$p("Enter an accession and select Analyze structure.")
                   ),
                   tags$div(id = "plotly", class = "ram-plot",
-                           role = "img", "aria-label" = "Interactive Ramachandran plot")
+                           role = "img", "aria-label" = "Interactive Ramachandran plot"),
+                  # Available in the main analysis view for every chain. The
+                  # collapsed position map is compact; expand it for residue
+                  # letters and synchronized 2D / 3D selection.
+                  tags$details(
+                    id = "ram-sequence-panel", class = "ram-sequence-panel",
+                    tags$summary(
+                      tags$div(class = "ram-sequence-summary-title",
+                        tags$strong("Sequence navigator"),
+                        tags$span(class = "ram-sequence-summary-hint",
+                          "Every selected chain · expand to inspect residues")
+                      ),
+                      uiOutput("sequenceOverview")
+                    ),
+                    tags$div(class = "ram-sequence-detail",
+                      tags$p(class = "ram-sequence-instruction",
+                        "Select a letter to highlight its Ramachandran point and zoom to it in the 3D structure. Scroll individual chains sideways to reach more residues."),
+                      tags$div(class = "ram-sequence-legend",
+                        tags$span(class="ram-swatch ram-sw-favoured", "Favoured"),
+                        tags$span(class="ram-swatch ram-sw-allowed", "Allowed"),
+                        tags$span(class="ram-swatch ram-sw-generously-allowed", "Generously allowed"),
+                        tags$span(class="ram-swatch ram-sw-outlier", "Outlier"),
+                        tags$span(class="ram-swatch ram-sw-missing", "Missing angles")
+                      ),
+                      uiOutput("sequenceView")
+                    )
+                  )
                 ),
                 tags$section(
                   class = "ram-chart-card", "aria-label" = "3D molecular viewer",
@@ -328,32 +354,7 @@ ui <- fluidPage(
                   )
                 )
               ),
-              # Available in the main analysis view for every chain. The
-              # collapsed position map is compact; expand it for residue
-              # letters and synchronized 2D / 3D selection.
-              tags$details(
-                id = "ram-sequence-panel", class = "ram-sequence-panel",
-                tags$summary(
-                  tags$div(class = "ram-sequence-summary-title",
-                    tags$strong("Sequence navigator"),
-                    tags$span(class = "ram-sequence-summary-hint",
-                      "Every selected chain · expand to inspect residues")
-                  ),
-                  uiOutput("sequenceOverview")
-                ),
-                tags$div(class = "ram-sequence-detail",
-                  tags$p(class = "ram-sequence-instruction",
-                    "Select a letter to highlight its Ramachandran point and zoom to it in the 3D structure. Scroll individual chains sideways to reach more residues."),
-                  tags$div(class = "ram-sequence-legend",
-                    tags$span(class="ram-swatch ram-sw-favoured", "Favoured"),
-                    tags$span(class="ram-swatch ram-sw-allowed", "Allowed"),
-                    tags$span(class="ram-swatch ram-sw-generously-allowed", "Generously allowed"),
-                    tags$span(class="ram-swatch ram-sw-outlier", "Outlier"),
-                    tags$span(class="ram-swatch ram-sw-missing", "Missing angles")
-                  ),
-                  uiOutput("sequenceView")
-                )
-              )
+
             ),
             tabPanel(
               title = "Residue list", value = "residues",

@@ -1,0 +1,80 @@
+name: Refresh README screenshots
+
+# Commit curated browser-test images only for documentation updates.
+on:
+  push:
+    branches:
+      - docs/project-readme
+    paths:
+      - README.md
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Interface browser preview run ID (optional)
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  curate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install image tools
+        run: python -m pip install --quiet pillow
+      - name: Retrieve real browser captures
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GIVEN_RUN: ${{ inputs.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id="$GIVEN_RUN"
+          if [[ -z "$run_id" ]]; then
+            run_id="$(gh run list --workflow ui-preview.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId')"
+          fi
+          [[ "$run_id" =~ ^[0-9]+$ ]] || { echo "No successful browser run found"; exit 1; }
+          echo "Source run: $run_id"
+          mkdir -p benchmarks/output/ui-preview
+          gh run download "$run_id" --name ramplotr-interface-preview --dir benchmarks/output/ui-preview
+          echo "RUN_ID=$run_id" >> "$GITHUB_ENV"
+      - name: Create image crops
+        run: python scripts/curate-readme-screenshots.py
+      - name: Record screenshot provenance
+        shell: bash
+        run: |
+          cat > docs/screenshots/README.md <<EOF
+          # Example screenshots
+
+          The screenshots are cropped from real Shiny browser tests, not mock-up renders.
+          Source: https://github.com/BiKC/RamplotR/actions/runs/$RUN_ID
+
+          - Overview and linked inspection: uploaded experimental 1CRN structure.
+          - Multi-chain sequence: 1BBB multimer.
+          - Prediction PAE: synthetic AlphaFold 2/ColabFold-style confidence test data (illustrative only).
+          - Ensemble: 1D3Z NMR multi-model structure.
+
+          To regenerate, extract a recent successful interface browser-test artifact
+          to benchmarks/output/ui-preview, then run
+          python scripts/curate-readme-screenshots.py.
+          Review the crops after layout changes.
+          EOF
+      - name: Commit screenshots to documentation branch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots/
+          if ! git diff --cached --quiet; then
+            git commit -m "docs: add current tested screenshots to the project README"
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi

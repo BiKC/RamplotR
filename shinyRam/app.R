@@ -767,7 +767,8 @@ server <- function(input, output, session) {
       session$sendCustomMessage("ram-clear-density",list())
       loaded(list(key = key, name = name, torsions = torsions, chains = chains,
                   pdb = pdb, nmodels = ram_model_count(pdb), source_id = source_id,
-                  viewer_format = viewer_format, prediction = prediction))
+                  viewer_format = viewer_format, prediction = prediction,
+                  declared_source = declared_source, input_source = source_type))
       incProgress(0.25, detail = "Preparing interactive views")
     })
   }, ignoreInit = TRUE)
@@ -846,6 +847,19 @@ server <- function(input, output, session) {
   observeEvent(loaded(), external_validation(NULL), ignoreInit=TRUE)
   observeEvent(input$attachValidation, {
     structure <- req(loaded())
+    if (!identical(structure$declared_source, "experimental") ||
+        identical(structure$input_source, "afdb")) {
+      showNotification(
+        "Official wwPDB reports apply to their deposited experimental structure, not a predicted model.",
+        type = "error", duration = 14)
+      return()
+    }
+    if (!isTRUE(input$confirmValidationSource)) {
+      showNotification(
+        "Confirm that the official wwPDB report belongs to this exact deposited structure and model.",
+        type = "warning", duration = 12)
+      return()
+    }
     file <- req(input$validationXml)
     record <- tryCatch(ram_external_validation_read(file$datapath),
       error=function(e) {
@@ -855,6 +869,7 @@ server <- function(input, output, session) {
     if(is.null(record)) return()
     external_validation(list(key=structure$key,records=record,
       name=file$name,md5=unname(tools::md5sum(file$datapath))))
+    updateCheckboxInput(session, "confirmValidationSource", value = FALSE)
     showNotification("Official wwPDB annotations attached. Check model and residue coverage.",
                      type="message")
   },ignoreInit=TRUE)
@@ -1140,6 +1155,9 @@ server <- function(input, output, session) {
         tags$div(class="ram-phase-c-attach",
           fileInput("validationXml","Attach wwPDB validation XML (.xml or .xml.gz)",
                     accept=c(".xml",".gz")),
+          checkboxInput("confirmValidationSource",
+            "This official report belongs to the loaded deposited experimental structure.",
+            value = FALSE),
           actionButton("attachValidation","Attach report",class="btn-primary btn-sm"),
           actionButton("clearValidation","Clear",class="btn-default btn-sm")
         ),

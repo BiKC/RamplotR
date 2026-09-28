@@ -63,14 +63,29 @@ const puppeteer=require("puppeteer-core");
       const stage=window.getNGLStage&&window.getNGLStage("NGL");
       if(!stage)throw Error("NGL stage unavailable.");
       window.__ramDensityChecks={loaded:0,levels:[],removed:0};
+      const originalLoad=stage.loadFile.bind(stage);
+      const originalRemove=stage.removeComponent.bind(stage);
+      stage.__ramOriginalLoadFile=originalLoad;
+      stage.__ramOriginalRemoveComponent=originalRemove;
       stage.loadFile=async(file,opts)=>{
-        if(opts.ext!=="ccp4")throw Error("Wrong CCP4 parser.");
-        window.__ramDensityChecks.loaded++;
-        return {addRepresentation:(name,params)=>({
-          setParameters:values=>window.__ramDensityChecks.levels.push(values)
-        })};
+        // Only simulate volume parsing. NGLVieweR also uses loadFile for
+        // ordinary structure updates and must not be intercepted.
+        if(opts&&opts.ext==="ccp4") {
+          window.__ramDensityChecks.loaded++;
+          return {addRepresentation:(name,params)=>({
+            setParameters:values=>window.__ramDensityChecks.levels.push(values)
+          })};
+        }
+        return originalLoad(file,opts);
       };
-      stage.removeComponent=()=>window.__ramDensityChecks.removed++;
+      stage.removeComponent=comp=>{
+        if(comp && typeof comp.addRepresentation==="function" &&
+           !comp.structure && !comp.volume) {
+          window.__ramDensityChecks.removed++;
+          return;
+        }
+        return originalRemove(comp);
+      };
     });
     await page.click(".ram-density-panel summary");
     await page.waitForSelector("#ram-density-file",{timeout:15000});
@@ -112,6 +127,14 @@ const puppeteer=require("puppeteer-core");
     await page.click("#ram-density-clear");
     const removed=await page.evaluate(()=>window.__ramDensityChecks.removed);
     assert.equal(removed,1);
+    // Restore the original NGL Stage methods before changing structures.
+    await page.evaluate(()=>{
+      const stage=window.getNGLStage("NGL");
+      if(stage && stage.__ramOriginalLoadFile)
+        stage.loadFile=stage.__ramOriginalLoadFile;
+      if(stage && stage.__ramOriginalRemoveComponent)
+        stage.removeComponent=stage.__ramOriginalRemoveComponent;
+    });
 
     // Replace the structure with a real NMR ensemble and run model analysis.
     await (await page.$("#structfile")).uploadFile(nmr);
@@ -133,12 +156,28 @@ const puppeteer=require("puppeteer-core");
                                {timeout:30000});
     await page.click("#ram-ensemble-panel summary");
     await page.click("#calculateEnsemble");
-    await page.waitForFunction(()=>{
-      const table=document.querySelector("#ensembleRows table");
-      const summary=document.querySelector("#ensembleResultSummary");
-      return !!(table&&table.querySelectorAll("tbody tr").length>2&&
-        summary&&summary.textContent.includes("models analysed"));
-    },{timeout:90000});
+    try {
+      await page.waitForFunction(()=>{
+        const table=document.querySelector("#ensembleRows table");
+        const summary=document.querySelector("#ensembleResultSummary");
+        return !!(table&&table.querySelectorAll("tbody tr").length>2&&
+          summary&&summary.textContent.includes("models analysed"));
+      },{timeout:90000});
+    }catch(error){
+      const details=await page.evaluate(()=>({
+        currentStructure:document.querySelector("#ram-current-structure")?.textContent,
+        ensemblePanel:document.querySelector("#ram-ensemble-panel")?.textContent.slice(0,500),
+        summary:document.querySelector("#ensembleResultSummary")?.textContent,
+        tableRows:document.querySelectorAll("#ensembleRows table tbody tr").length,
+        currentTab:document.querySelector(".nav-tabs li.active a")?.textContent,
+        notifications:[...document.querySelectorAll(".shiny-notification")]
+          .map(node=>node.textContent)
+      }));
+      console.error("Phase C ensemble diagnostics:",JSON.stringify(details));
+      await page.screenshot({path:path.join(output,"phase-c-ensemble-failure.png"),
+                             fullPage:true});
+      throw error;
+    }
     await page.screenshot({path:path.join(output,"phase-c-ensemble.png"),
                            fullPage:true});
     console.log("Phase C wwPDB import, NGL overlay and NMR ensemble passed.");

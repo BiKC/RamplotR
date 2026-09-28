@@ -173,6 +173,7 @@
   });
 
   function markSequenceSelection() {
+    if (typeof document.querySelectorAll !== "function") return;
     const selected = selectionKey(selectedResidue);
     document.querySelectorAll(".ram-seq-res").forEach(function (button) {
       const key = selectionKey({

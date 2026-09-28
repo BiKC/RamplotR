@@ -31,6 +31,9 @@ jobs:
       - name: Verify peptide continuity and torsion calculations
         run: Rscript tests/peptide.R
         shell: bash
+      - name: Verify independent-reference identifier matching
+        run: Rscript tests/validation-alignment.R
+        shell: bash
       - name: Verify cached reference profiles
         run: Rscript tests/profile.R
         shell: bash

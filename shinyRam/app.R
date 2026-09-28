@@ -952,6 +952,19 @@ server <- function(input, output, session) {
                  paste0("ram-seq-",value)), "aria-hidden"="true")
             })
           ),
+          if (any(is.finite(chain$plddt))) tags$div(
+            class = "ram-confidence-mini", role = "img",
+            "aria-label" = sprintf("%s prediction confidence; teal is high, amber/red is low.", title),
+            lapply(ram_plddt_overview_bins(chain$plddt), function(value) {
+              color <- if (!is.finite(value)) "#cbd7db" else if (value < 50)
+                "#d75e56" else if (value < 70) "#d6ac52" else if (value < 90)
+                "#7bbcb1" else "#126e74"
+              tags$span(class = "ram-confidence-mini-cell",
+                style = paste0("background:", color),
+                title = if (is.finite(value)) sprintf("Minimum pLDDT %.1f", value)
+                        else "Confidence unavailable")
+            })
+          ),
           tags$span(class="ram-sequence-chain-count",
             sprintf("%s aa",format(nrow(chain),big.mark=",")))
         )

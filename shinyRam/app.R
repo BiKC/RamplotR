@@ -213,6 +213,8 @@ ui <- fluidPage(
             tags$details(
               class = "ram-details",
               tags$summary("Customize region colors"),
+              tags$p(class = "ram-field-hint",
+                     "Select Custom as your contour palette to use these colours."),
               tags$div(
                 class = "ram-details-body ram-appearance-controls",
                 colourpicker::colourInput("bg1", "Not allowed", value = "#F1EEF6"),
@@ -385,10 +387,9 @@ server <- function(input, output, session) {
     updateColourInput(session, "bg3", value = colors[[3L]])
     updateColourInput(session, "bg4", value = colors[[4L]])
   }
-  # Preset selection and four independent colourpicker updates are not
-  # atomic. Use the chosen preset immediately, and prevent partial picker
-  # updates from accidentally switching the dropdown back to Custom.
-  pending_palette <- reactiveVal(NULL)
+  # A preset is applied atomically in the plotted data; picker updates are
+  # presentation-only. Custom colours apply when Custom is selected, avoiding
+  # circular observers that used to undo a preset during asynchronous updates.
   active_palette <- reactive({
     if (identical(input$colorscheme, "Rampage")) return(unname(rampage))
     if (identical(input$colorscheme, "PDBSum")) return(unname(pdbsum))
@@ -399,23 +400,7 @@ server <- function(input, output, session) {
   observeEvent(input$colorscheme, {
     colors <- switch(input$colorscheme, Rampage = rampage,
                      PDBSum = pdbsum, NULL)
-    if (!is.null(colors)) {
-      pending_palette(unname(colors))
-      update_color_inputs(colors)
-    }
-  })
-  observeEvent(list(input$bg1, input$bg2, input$bg3, input$bg4), {
-    colors <- unname(c(input$bg1, input$bg2, input$bg3, input$bg4))
-    if (length(colors) != 4L || anyNA(colors)) return()
-    pending <- pending_palette()
-    if (!is.null(pending)) {
-      if (identical(colors, pending)) pending_palette(NULL)
-      return()
-    }
-    scheme <- if (identical(colors, unname(rampage))) "Rampage" else
-      if (identical(colors, unname(pdbsum))) "PDBSum" else "custom"
-    if (!identical(input$colorscheme, scheme))
-      updateSelectInput(session, "colorscheme", selected = scheme)
+    if (!is.null(colors)) update_color_inputs(colors)
   })
   observeEvent(input$background, {
     # Preserve the existing convenience behaviour for per-amino-acid plots.

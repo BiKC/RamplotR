@@ -125,8 +125,8 @@ const assert = require("node:assert/strict");
     });
     // Display choices and secondary options are discoverable without
     // opening another disclosure or leaving the molecular view.
-    assert.equal(await page.$$eval('.ram-viewer-layers input[type="checkbox"]',
-      nodes => nodes.length), 5,
+    assert.equal(await page.evaluate(() =>
+      document.querySelectorAll('.ram-viewer-layers input[type="checkbox"]').length), 5,
       "The 3D viewer must expose all five layer and motion controls.");
 
     // A standard laptop should show the analysis, not a full-height landing

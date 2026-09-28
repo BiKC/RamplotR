@@ -32,9 +32,11 @@ ram_classify_torsions <- function(torsions, reference_dir, selected_reference,
   if (n == 0L) return(result)
   for (group in unique(result$reference_used)) {
     rows <- which(result$reference_used == group)
-    ref <- if (mode == "legacy") selected_reference else
-      ram_read_reference(file.path(reference_dir, group))
-    limits <- ram_density_thresholds(ref)
+    profile <- if (mode == "residue") {
+      ram_reference_profile(file.path(reference_dir, group))
+    } else NULL
+    ref <- if (mode == "legacy") selected_reference else profile$reference
+    limits <- if (mode == "legacy") ram_density_thresholds(ref) else profile$thresholds
     px <- match(round(result$phi[rows]), ref$x)
     py <- match(round(result$psi[rows]), ref$y)
     valid <- which(!is.na(px) & !is.na(py))
@@ -46,7 +48,8 @@ ram_classify_torsions <- function(torsions, reference_dir, selected_reference,
     region[z > limits[2]] <- "Allowed"
     region[z > limits[1]] <- "Favoured"
     result$region[positions] <- region
-    result$density[positions] <- ram_density_ranks(ref, z)
+    result$density[positions] <- if (mode == "legacy") ram_density_ranks(ref, z) else
+      profile$percentiles[match(z, profile$levels)]
   }
   result
 }
@@ -78,6 +81,32 @@ ram_read_reference <- local({
     key <- normalizePath(path, mustWork = TRUE)
     if (!exists(key, envir = cache, inherits = FALSE)) {
       assign(key, readRDS(key), envir = cache)
+    }
+    get(key, envir = cache, inherits = FALSE)
+  }
+})
+
+# Precompute immutable density profile metadata once per reference grid.
+# Dataset and residue group are separated by the normalized absolute path.
+ram_reference_profile <- local({
+  cache <- new.env(parent = emptyenv())
+  function(path) {
+    key <- normalizePath(path, mustWork = TRUE)
+    if (!exists(key, envir = cache, inherits = FALSE)) {
+      reference <- ram_read_reference(key)
+      z <- as.numeric(reference$z)
+      if (!length(z) || any(!is.finite(z)) || any(z < 0) || sum(z) <= 0) {
+        stop("Invalid reference density grid")
+      }
+      levels <- sort(unique(z))
+      weights <- levels * tabulate(match(z, levels), nbins = length(levels))
+      higher_mass <- rev(cumsum(rev(weights))) - weights
+      assign(key, list(
+        reference = reference,
+        thresholds = ram_density_thresholds(reference),
+        levels = levels,
+        percentiles = higher_mass / sum(z) * 100
+      ), envir = cache)
     }
     get(key, envir = cache, inherits = FALSE)
   }

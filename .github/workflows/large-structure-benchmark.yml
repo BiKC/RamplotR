@@ -34,12 +34,12 @@ jobs:
           for factor in 1 3 10; do
             /usr/bin/time \
               -f 'peak_rss_kb=%M\nwall_seconds=%e' \
-              -o "benchmarks/output/scaling/scaling-\${factor}.metrics.txt" \
+              -o "benchmarks/output/scaling/scaling-${factor}.metrics.txt" \
               Rscript benchmarks/scale.R \
                 benchmarks/output/scaling/source-6vxx.rds \
                 "$factor" 3 original \
-                "benchmarks/output/scaling/scaling-\${factor}.csv"
-            cat "benchmarks/output/scaling/scaling-\${factor}.metrics.txt"
+                "benchmarks/output/scaling/scaling-${factor}.csv"
+            cat "benchmarks/output/scaling/scaling-${factor}.metrics.txt"
           done
           {
             echo '## Structural scaling benchmark'
@@ -47,8 +47,8 @@ jobs:
             echo 'Each multiplier is executed in a separate R process on this runner.'
             echo
             for factor in 1 3 10; do
-              echo "### \${factor}x copies"
-              cat "benchmarks/output/scaling/scaling-\${factor}.metrics.txt"
+              echo "### ${factor}x copies"
+              cat "benchmarks/output/scaling/scaling-${factor}.metrics.txt"
               echo
             done
           } >> "$GITHUB_STEP_SUMMARY"

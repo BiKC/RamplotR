@@ -219,6 +219,7 @@
     // The plot container starts hidden while empty. Measure its actual width
     // only after showing it, otherwise the first Plotly layout becomes tiny.
     plot.style.display = "block";
+    plot.style.height = plotHeight() + "px";
 
     const background = [
       safeColor(shades[0], "#F1EEF6"),
@@ -365,7 +366,9 @@
       uirevision: "ramplotr-geometry"
     };
     const config = {
-      responsive: true,
+      // The dedicated ResizeObserver sets both dimensions. Plotly's built-in
+      // responsive listener races with it and restores the old desktop SVG.
+      responsive: false,
       displaylogo: false,
       toImageButtonOptions: {
         format: "png",

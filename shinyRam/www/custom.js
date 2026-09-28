@@ -1,175 +1,256 @@
-colors = ["#7FC97F", "#BEAED4", "#FDC086", "#FFFF99", "#386CB0", "#F0027F", "#BF5B17", "#666666"];
-function mapHextoRGB(hex) {
-    //console.log(hex);
-    var bigint = parseInt(hex.replace("#", ""), 16);
-    var r = (bigint >> 16) & 255;
-    var g = (bigint >> 8) & 255;
-    var b = bigint & 255;
-    return "rgb(" + r + "," + g + "," + b + ")";
-}
-for (color in colors) {
-    colors[color] = mapHextoRGB(colors[color]);
-}
+/* RamplotR plot and small interface interactions.
+ * The server owns scientific calculations; this file only draws their results.
+ */
+(function () {
+  "use strict";
 
-//console.log('loaded!');
-Shiny.addCustomMessageHandler("process",
-    function (obj) {
-        TESTER = document.getElementById('plotly');
-        //clear the plot
-        Plotly.purge(TESTER);
+  const defaultChainColors = [
+    "#1c7777", "#9366aa", "#cf823a", "#5a8eb8",
+    "#65915f", "#c25b76", "#a77e45", "#737d94"
+  ];
+  const plot = document.getElementById("plotly");
+  const empty = document.getElementById("plot-empty");
+  const currentStructure = document.getElementById("ram-current-structure");
 
-        df = obj['df'];
-        matrix = obj['matrix'];
-        //transpose matrix.z
-        //matrix.z = matrix.z[0].map((_, colIndex) => matrix.z.map(row => row[colIndex]));
-        name = obj['name'];
-        pdb = obj['pdb'];
-        backgroundColors = obj['backgroundColors'];
-        chainColors = obj['chainColors'];
-        limits = obj['limits'];
-        // if chainColors is a single value, make it a list
-        if (typeof chainColors === 'string' || chainColors instanceof String) {
-            chainColors = [chainColors];
-        }
+  function safeColor(value, fallback) {
+    return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value)
+      ? value : fallback;
+  }
 
-        //console.log(chainColors);
-        //Transform df from format {chain:[],resi:[],resn[],phi:[],psi:[]} to format {[chain,resi,resn,phi,psi]}
-        df["processed"] = df.chain.map(function (d, i) { return [d, df.resi[i], df.resn[i], df.phi[i], df.psi[i]] });
-
-
-
-        //console.log("TESTER: " + TESTER);
-        //console.log("df: " + JSON.stringify(df));
-        //console.log("matrix: " + matrix["z"]);
-        //df is an object containing "chain", "phi", "psi","resi" and "resn"
-        // we want to plot the data in the plotly div
-        //get unique chains
-        var uniqueChains = df.chain.filter(function (elem, index, self) {
-            return index == self.indexOf(elem);
-        });
-        df["chainid"] = df.chain.map(function (x) {
-            return uniqueChains.indexOf(x);
-        });
-
-        // contour plot
-        // make contours like this:
-        //console.log(limits)
-        var data = [
-            // plot the matrix as contours
-            {
-                x: matrix['x'],
-                y: matrix['y'],
-                z: matrix['z'],
-                type: 'contour',
-                showscale: false,
-                showlegend: false,
-                //hoverinfo: 'none',
-                contours: {
-                    type: 'constraint',
-                    operation: '<',
-                    value: limits[2],
-                },
-                fillcolor: mapHextoRGB(backgroundColors[1])
-                // colorscale borders are [0.00000004293, 0.0000012354, 0.00001265]
-                //colors should be #f1eef6, #bdc9e1, #74a9cf, #0570b0
-            },
-            {
-                x: matrix['x'],
-                y: matrix['y'],
-                z: matrix['z'],
-                type: 'contour',
-                showlegend: false,
-                //hoverinfo: 'none',
-                contours: {
-                    type: 'constraint',
-                    operation: '<',
-                    value: limits[1],
-                },
-                fillcolor: mapHextoRGB(backgroundColors[2]),
-                opacity: 0.8
-
-            }
-            ,
-            {
-                x: matrix['x'],
-                y: matrix['y'],
-                z: matrix['z'],
-                type: 'contour',
-                showlegend: false,
-                hoverinfo: 'none',
-                contours: {
-                    type: 'constraint',
-                    operation: '<',
-                    value: limits[0],
-                },
-                fillcolor: mapHextoRGB(backgroundColors[3]),
-                opacity: 0.8
-            },
-            {
-                x: matrix['x'],
-                y: matrix['y'],
-                z: matrix['z'],
-                type: 'contour',
-                showlegend: false,
-                hoverinfo: 'none',
-                contours: {
-                    type: 'constraint',
-                    operation: '>',
-                    value: limits[2],
-                },
-                fillcolor: mapHextoRGB(backgroundColors[0]),
-                opacity: 0.8
-            }
-        ];
-
-
-        //markers per chain
-        for (var i = 0; i < uniqueChains.length; i++) {
-            var chain = uniqueChains[i];
-            var chainData = df.processed.filter(function (x) { return x[0] == chain; });
-
-            var chainData = {
-                x: chainData.map(function (x) { return x[3]; }),
-                y: chainData.map(function (x) { return x[4]; }),
-                mode: 'markers',
-                showlegend: true,
-                type: 'scatter',
-                name: chain,
-                marker: {
-                    // if chainColors is null or undefined, use the default colors, this is necessary for first loading as well as when another pdb is loaded, since UI only updates after everything is done.
-                    // This was a pain to figure out.
-                    color: chainColors != null && chainColors[i] ? mapHextoRGB(chainColors[i]) : colors[i % colors.length],
-                    size: 12
-                },
-                text: chainData.map(function (x) { return x[0] + ": " + x[1] + " " + x[2] + ": (" + x[3] + ", " + x[4] + ")"; })
-
-            };
-            data.push(chainData);
-        }
-
-
-
-        var layout = {
-            title: name,
-            xaxis: {
-                title: 'Phi Φ (degrees)',
-                range: [-180, 180]
-            },
-            yaxis: {
-                title: 'Psi ψ (degrees)',
-                range: [-180, 180]
-            },
-            annotations: [{
-                text: 'Made using shinyRam',
-                font: { size: 12 },
-                showarrow: false,
-                xref: 'paper',
-                x: 1,
-                yref: 'paper',
-                y: -0.065
-            }],
-            hovermode: 'closest'
-        };
-        Plotly.newPlot(TESTER, data, layout);
-
+  function escapeText(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (char) {
+      return {
+        "&": "&amp;", "<": "&lt;", ">": "&gt;",
+        '"': "&quot;", "'": "&#39;"
+      }[char];
     });
+  }
+
+  function array(value) {
+    return Array.isArray(value) ? value : value == null ? [] : [value];
+  }
+
+  function changeSource() {
+    const selected = document.querySelector('input[name="inputSource"]:checked');
+    const upload = selected && selected.value === "upload";
+    const pdbWrap = document.getElementById("ram-pdb-wrap");
+    const uploadWrap = document.getElementById("ram-upload-wrap");
+    if (pdbWrap) pdbWrap.classList.toggle("is-hidden", upload);
+    if (uploadWrap) uploadWrap.classList.toggle("is-hidden", !upload);
+  }
+
+  function initSourceControl() {
+    changeSource();
+    document.addEventListener("change", function (event) {
+      if (event.target && event.target.name === "inputSource") changeSource();
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initSourceControl);
+  } else {
+    initSourceControl();
+  }
+
+  function plotHeight() {
+    // The height follows the available panel width. The figure itself retains
+    // equal scaling on phi and psi so the geometry is never distorted.
+    return Math.max(385, Math.min(690, Math.round(plot.clientWidth + 75)));
+  }
+
+  function contourTrace(matrix, operation, cutoff, color) {
+    return {
+      type: "contour",
+      x: matrix.x, y: matrix.y, z: matrix.z,
+      contours: { type: "constraint", operation: operation, value: cutoff },
+      fillcolor: color,
+      hoverinfo: "skip",
+      showscale: false,
+      showlegend: false,
+      line: { width: 0 }
+    };
+  }
+
+  function drawPlot(obj) {
+    if (!plot) return;
+    if (!window.Plotly) {
+      if (empty) {
+        empty.hidden = false;
+        const message = empty.querySelector("p");
+        if (message) message.textContent =
+          "The plotting library could not load. Check your connection and reload.";
+      }
+      return;
+    }
+
+    const frame = obj && obj.matrix;
+    const limits = array(obj && obj.limits);
+    const shades = array(obj && obj.backgroundColors);
+    if (!frame || !frame.x || !frame.y || !frame.z || limits.length < 3) return;
+
+    const background = [
+      safeColor(shades[0], "#F1EEF6"),
+      safeColor(shades[1], "#BDC9E1"),
+      safeColor(shades[2], "#74A9CF"),
+      safeColor(shades[3], "#0570B0")
+    ];
+    // Preserve the original scientific contour cutoffs and layer order.
+    const traces = [
+      contourTrace(frame, "<", limits[2], background[1]),
+      contourTrace(frame, "<", limits[1], background[2]),
+      contourTrace(frame, "<", limits[0], background[3]),
+      contourTrace(frame, ">", limits[2], background[0])
+    ];
+
+    const df = obj.df || {};
+    const chains = array(df.chain);
+    const amino = array(df.resn);
+    const residueIds = array(df.resi);
+    const phis = array(df.phi);
+    const psis = array(df.psi);
+    const uniqueChains = [...new Set(chains.map(String))];
+    const chainColors = array(obj.chainColors);
+    let totalPoints = 0;
+
+    uniqueChains.forEach(function (chain, index) {
+      const x = [], y = [], label = [];
+      chains.forEach(function (name, row) {
+        if (String(name) !== chain) return;
+        const phi = phis[row];
+        const psi = psis[row];
+        // Missing angles are NA/null, not (0, 0).
+        if (typeof phi !== "number" || typeof psi !== "number" ||
+            !Number.isFinite(phi) || !Number.isFinite(psi)) return;
+        x.push(phi);
+        y.push(psi);
+        label.push(
+          "<b>Chain " + escapeText(chain || "unassigned") + "</b><br>" +
+          escapeText(amino[row]) + " " + escapeText(residueIds[row]) + "<br>" +
+          "φ " + phi.toFixed(1) + "° · ψ " + psi.toFixed(1) + "°"
+        );
+      });
+      if (!x.length) return;
+      totalPoints += x.length;
+      traces.push({
+        type: x.length > 2500 ? "scattergl" : "scatter",
+        mode: "markers",
+        x: x, y: y,
+        text: label,
+        hovertemplate: "%{text}<extra></extra>",
+        name: "Chain " + (chain || "unassigned"),
+        showlegend: true,
+        marker: {
+          color: safeColor(chainColors[index],
+                           defaultChainColors[index % defaultChainColors.length]),
+          size: x.length > 2500 ? 5 : 7,
+          opacity: 0.84,
+          line: { color: "#ffffff", width: 0.7 }
+        }
+      });
+    });
+
+    const narrow = plot.clientWidth < 540;
+    const axis = {
+      range: [-180, 180],
+      tickvals: [-180, -90, 0, 90, 180],
+      tickfont: { color: "#526875", size: narrow ? 10 : 11 },
+      gridcolor: "#e7edf0",
+      gridwidth: 1,
+      zeroline: true,
+      zerolinecolor: "#bdcbd0",
+      zerolinewidth: 1,
+      linecolor: "#b9c9ce",
+      ticks: "outside",
+      ticklen: 4,
+      tickcolor: "#a8b9be",
+      showline: true,
+      automargin: true
+    };
+    const layout = {
+      autosize: true,
+      height: plotHeight(),
+      paper_bgcolor: "#ffffff",
+      plot_bgcolor: "#fafcfc",
+      font: {
+        family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif',
+        color: "#263f4b", size: 12
+      },
+      margin: {
+        l: narrow ? 49 : 62,
+        r: 14, t: uniqueChains.length ? 72 : 24, b: 52
+      },
+      xaxis: Object.assign({}, axis, {
+        title: { text: "Phi (φ), degrees", standoff: 9,
+                 font: { size: narrow ? 11 : 12 } }
+      }),
+      yaxis: Object.assign({}, axis, {
+        title: { text: "Psi (ψ), degrees", standoff: 10,
+                 font: { size: narrow ? 11 : 12 } },
+        scaleanchor: "x", scaleratio: 1, constrain: "domain"
+      }),
+      legend: {
+        orientation: "h", x: 0, y: 1.04, yanchor: "bottom",
+        font: { size: 11, color: "#3c5461" },
+        bgcolor: "rgba(255,255,255,0)", itemsizing: "constant"
+      },
+      hovermode: "closest",
+      hoverlabel: {
+        bgcolor: "#19303b", bordercolor: "#19303b",
+        font: { color: "#ffffff", size: 12 }
+      },
+      uirevision: "ramplotr-geometry"
+    };
+    const config = {
+      responsive: true,
+      displaylogo: false,
+      toImageButtonOptions: {
+        format: "png",
+        filename: String(obj.name || "RamplotR").replace(/[^a-z0-9_-]/gi, "_"),
+        scale: 2
+      }
+    };
+
+    plot.style.display = "block";
+    if (empty) empty.hidden = true;
+    if (currentStructure) {
+      currentStructure.textContent =
+        (obj.name ? obj.name + " · " : "") +
+        totalPoints.toLocaleString() + " plotted residues";
+    }
+    Promise.resolve(window.Plotly.react(plot, traces, layout, config))
+      .catch(function () {
+        plot.style.display = "none";
+        if (empty) {
+          empty.hidden = false;
+          const message = empty.querySelector("p");
+          if (message) message.textContent =
+            "The plot could not be rendered. Choose a different structure or reload.";
+        }
+      });
+  }
+
+  if (window.Shiny) {
+    window.Shiny.addCustomMessageHandler("process", drawPlot);
+  }
+
+  // Resize Plotly if the sidebar or viewport changes size. Do not recreate
+  // the scientific traces or reset the current plot selection on resize.
+  if (plot && window.ResizeObserver) {
+    let previousWidth = 0;
+    const observer = new ResizeObserver(function () {
+      const width = plot.clientWidth;
+      if (!width || Math.abs(width - previousWidth) < 5 ||
+          !plot.classList.contains("js-plotly-plot")) return;
+      previousWidth = width;
+      if (window.Plotly) window.Plotly.Plots.resize(plot);
+    });
+    observer.observe(plot.parentElement || plot);
+  }
+
+  document.addEventListener("shown.bs.tab", function () {
+    if (plot && window.Plotly && plot.classList.contains("js-plotly-plot")) {
+      window.Plotly.Plots.resize(plot);
+    }
+    window.dispatchEvent(new Event("resize"));
+  });
+})();

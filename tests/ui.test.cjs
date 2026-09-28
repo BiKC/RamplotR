@@ -131,7 +131,8 @@ assert.ok(rendered.traces[4].text[0].includes("&lt;GLY&gt;"),
           "Hover labels must escape structure-supplied strings");
 assert.equal(rendered.layout.yaxis.scaleanchor, "x",
              "Angular axes must retain the same scale");
-assert.equal(rendered.config.responsive, true);
+assert.equal(rendered.config.responsive, false,
+             "ResizeObserver owns plot dimensions to prevent resize races.");
 assert.equal(empty.hidden, true);
 assert.ok(badge.textContent.includes("1 plotted residues"));
 // Plotly.react promises resolve on the next microtask; point-click handlers

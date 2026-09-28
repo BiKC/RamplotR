@@ -8,7 +8,7 @@ The inspector beneath the structure input is shared across tabs. Selecting a res
 
 **Show in plot** brings you to the plot and molecular viewer without clearing the selection. **Clear** restores the overview. **Previous issue** and **Next issue** navigate through residues prioritised as outliers, unavailable/terminal backbone angles, and positions within two percentile points of a density cutoff. “Near boundary” is a visual review hint; it is not an additional scientific quality classification.
 
-On a loaded screen with no selected residue, the inspector is reduced to a single review action. After selecting a residue, navigation controls become available. Additional NGL overlays and animation options live in a disclosure below the viewer.
+On a loaded screen with no selected residue, the inspector is reduced to a single review action. After selecting a residue, navigation controls become available. Representation buttons and the ligand, DNA, RNA, spin and rock switches remain visible beneath the viewer, so users can discover them without opening a settings menu.
 
 ## The residue table
 

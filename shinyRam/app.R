@@ -726,7 +726,7 @@ server <- function(input, output, session) {
   })
   observe({
     row <- selected_row()
-    session$sendCustomMessage("ram-selection", if (is.null(row)) NULL else list(
+    session$sendCustomMessage("ram-selection", if (is.null(row)) list(clear = TRUE) else list(
       chain = as.character(row$chain[[1L]]),
       resi = as.integer(row$resi[[1L]]),
       insertion_code = as.character(row$insertion_code[[1L]]),

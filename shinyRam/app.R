@@ -385,15 +385,35 @@ server <- function(input, output, session) {
     updateColourInput(session, "bg3", value = colors[[3L]])
     updateColourInput(session, "bg4", value = colors[[4L]])
   }
+  # Preset selection and four independent colourpicker updates are not
+  # atomic. Use the chosen preset immediately, and prevent partial picker
+  # updates from accidentally switching the dropdown back to Custom.
+  pending_palette <- reactiveVal(NULL)
+  active_palette <- reactive({
+    if (identical(input$colorscheme, "Rampage")) return(unname(rampage))
+    if (identical(input$colorscheme, "PDBSum")) return(unname(pdbsum))
+    values <- c(input$bg1, input$bg2, input$bg3, input$bg4)
+    if (length(values) != 4L || anyNA(values)) return(unname(rampage))
+    unname(values)
+  })
   observeEvent(input$colorscheme, {
-    if (identical(input$colorscheme, "Rampage")) update_color_inputs(rampage)
-    if (identical(input$colorscheme, "PDBSum")) update_color_inputs(pdbsum)
+    colors <- switch(input$colorscheme, Rampage = rampage,
+                     PDBSum = pdbsum, NULL)
+    if (!is.null(colors)) {
+      pending_palette(unname(colors))
+      update_color_inputs(colors)
+    }
   })
   observeEvent(list(input$bg1, input$bg2, input$bg3, input$bg4), {
-    colors <- c(input$bg1, input$bg2, input$bg3, input$bg4)
+    colors <- unname(c(input$bg1, input$bg2, input$bg3, input$bg4))
     if (length(colors) != 4L || anyNA(colors)) return()
-    scheme <- if (identical(unname(colors), unname(rampage))) "Rampage" else
-      if (identical(unname(colors), unname(pdbsum))) "PDBSum" else "custom"
+    pending <- pending_palette()
+    if (!is.null(pending)) {
+      if (identical(colors, pending)) pending_palette(NULL)
+      return()
+    }
+    scheme <- if (identical(colors, unname(rampage))) "Rampage" else
+      if (identical(colors, unname(pdbsum))) "PDBSum" else "custom"
     if (!identical(input$colorscheme, scheme))
       updateSelectInput(session, "colorscheme", selected = scheme)
   })
@@ -627,7 +647,7 @@ server <- function(input, output, session) {
       df = displayed(),
       matrix = plot_reference(),
       name = data$name,
-      backgroundColors = c(input$bg1, input$bg2, input$bg3, input$bg4),
+      backgroundColors = active_palette(),
       chainColors = {
         colors <- current_chain_colors()
         colors[match(unique(displayed()$chain), data$chains)]

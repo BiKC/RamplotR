@@ -288,6 +288,31 @@ const assert = require("node:assert/strict");
       window.getNGLStage("NGL").getRepresentationsByName("ram-highlight")
         .list.length > 0, { timeout: 18000 });
 
+    // Simulate an NGL hit on a known atom through its actual stage signal.
+    // NGLVieweR's own handler expects getLabel(); our linked selector also
+    // supports closestBondAtom for bond picking. No artificial Shiny input.
+    const previousZoomCount = await page.evaluate(() => window.__ramZoomCalls.length);
+    await page.evaluate(detail => {
+      const stage = window.getNGLStage("NGL");
+      stage.signals.clicked.dispatch({
+        getLabel() { return "Selected backbone atom"; },
+        closestBondAtom: {
+          chainname: String(detail[0]), resno: Number(detail[1]),
+          inscode: String(detail[2] || "")
+        }
+      });
+    }, firstPoint);
+    await page.waitForFunction(({ selected, minZoom }) => {
+      const p = document.getElementById("plotly");
+      return document.querySelector("#selectedResidueInfo strong") &&
+        p.data[p.data.length - 1].x.length === 1 &&
+        window.__ramStickSelections.includes(selected) &&
+        window.__ramZoomCalls.length > minZoom &&
+        window.__ramZoomCalls.some(call => call.sele === selected);
+    }, { timeout: 20000 }, {
+      selected: firstNglSelector, minZoom: previousZoomCount
+    });
+
     // Check whether the browser delivered resize events and whether Plotly's
     // relayout handler actually received the new mobile dimensions.
     await page.evaluate(() => {

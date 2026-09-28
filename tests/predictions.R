@@ -92,6 +92,19 @@ assert(identical(ram_confidence_review(joined),
                  c("High confidence · geometry in range", "Other",
                    "Lower-confidence prediction")),
        "Review status must remain independent from scientific class")
+missing_angle <- joined
+missing_angle$region[[1L]] <- NA_character_
+assert(identical(ram_confidence_review(missing_angle)[[1L]],
+                 "Confidence available · backbone geometry unassessed"),
+       "Missing phi/psi must never be described as acceptable geometry")
+
+# Exercise the same API used by the Shiny upload workflow, not only its
+# constituent parsers. The base ESMFold path requires no optional JSON package.
+uploaded <- ram_prepare_prediction(pdb, torsions, "esmfold")
+assert(identical(unname(uploaded$residues$plddt), c(93, 77, 21)) &&
+         is.null(uploaded$pae) && identical(uploaded$source, "esmfold"),
+       "Declared ESMFold structures must expose pLDDT without fabricating PAE")
+
 
 mock_api <- function(url) {
   assert(grepl("https://alphafold.ebi.ac.uk/api/prediction/P12345",

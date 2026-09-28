@@ -8,7 +8,7 @@ Base: main at a09d3eed4800bbe5c3aea37869fb181ea8fc8a6f. Historical version v0.1.
 - [x] Test XML parsing, stable residue matching, alt locations, insertion codes, missing angles and unequal classification vocabularies.
 - [x] Add a public manifest and an easy-to-run verification workflow; fail CI on coverage/angle regressions, not on genuine differences between reference models.
 - [x] Document why the four-region, four-reference-group RamplotR original method is not directly MolProbity-equivalent to its three regions and six groups.
-- [ ] Pass CI and merge the independent validation workflow into main. ESMFold and AlphaFold are explicitly Phase B.
+- [x] Pass Ubuntu/Windows scientific regression, independent five-structure wwPDB validation, structure-validation benchmark and full live-browser CI, and merge PR #13 into main. ESMFold and AlphaFold are explicitly Phase B.
 
 ## Independent findings
 
@@ -19,3 +19,6 @@ outliers are not classified as outliers by the original RamplotR references.
 The independent numerical geometry and group-specific class comparisons are
 tested separately. Do not claim MolProbity-equivalent categories. Phase B
 includes AlphaFold and ESMFold predicted-model confidence integration.
+
+Completed integration: https://github.com/BiKC/RamplotR/pull/13
+Reviewed independent validation workflow: https://github.com/BiKC/RamplotR/actions/runs/36476627652

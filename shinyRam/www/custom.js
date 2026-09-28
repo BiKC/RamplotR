@@ -233,11 +233,23 @@
   }
 
   function plotHeight() {
-    // The height follows the available panel width. The figure itself retains
-    // equal scaling on phi and psi so the geometry is never distorted.
-    return Math.max(plot.clientWidth < 540 ? 285 : 385,
-                    Math.min(690, Math.round(plot.clientWidth +
-                      (plot.clientWidth < 540 ? 35 : 75))));
+    // Square angular axes remain enforced in Plotly. On short laptops, use
+    // the available vertical space rather than blindly matching card width.
+    const width = plot.clientWidth;
+    const minimum = width < 540 ? 285 : 385;
+    let height = Math.max(minimum, Math.min(690,
+      Math.round(width + (width < 540 ? 35 : 75))));
+    const app = document.querySelector && document.querySelector(".ram-app");
+    if (app && app.classList.contains("ram-has-data") &&
+        (window.innerWidth || 0) >= 900 && (window.innerHeight || 0) < 1000 &&
+        typeof plot.getBoundingClientRect === "function") {
+      const top = plot.getBoundingClientRect().top;
+      if (top > 0 && top < window.innerHeight) {
+        height = Math.min(height,
+          Math.max(minimum, Math.floor(window.innerHeight - top - 30)));
+      }
+    }
+    return height;
   }
 
   function contourTrace(matrix, operation, cutoff, color) {
@@ -443,6 +455,13 @@
           plot.on("plotly_click", onPlotClick);
           plot.__ramPickBound = true;
         }
+        // Keep the full introductory form for first-time visitors. Once a
+        // structure has rendered, the compact toolbar makes room for science.
+        const app = document.querySelector && document.querySelector(".ram-app");
+        if (app && !app.classList.contains("ram-has-data")) {
+          app.classList.add("ram-has-data");
+          scheduleResize();
+        }
       })
       .catch(function () {
         plot.style.display = "none";
@@ -601,6 +620,23 @@
       if (api && typeof api.columns === "function") api.columns.adjust();
     }
   }
+  // Show or hide analysis settings without duplicating the plots, breaking
+  // Shiny inputs, or forcing users to scroll through the sidebar.
+  const settingsToggle = document.getElementById("ram-toggle-settings");
+  const ramApp = document.querySelector && document.querySelector(".ram-app");
+  if (settingsToggle && ramApp) {
+    settingsToggle.addEventListener("click", function () {
+      const collapsed = ramApp.classList.toggle("ram-focus-mode");
+      settingsToggle.textContent = collapsed ? "Show settings" : "Hide settings";
+      settingsToggle.setAttribute("aria-expanded", String(!collapsed));
+      settingsToggle.title = collapsed
+        ? "Show structure input and analysis settings"
+        : "Expand the plots by hiding analysis settings";
+      scheduleResize();
+      adjustVisibleTables();
+    });
+  }
+
   document.addEventListener("shown.bs.tab", function () {
     scheduleResize(); adjustVisibleTables(); markSequenceSelection();
   });

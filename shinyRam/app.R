@@ -303,7 +303,7 @@ ui <- fluidPage(
                     ),
                     tags$div(class = "ram-sequence-detail",
                       tags$p(class = "ram-sequence-instruction",
-                        "Select a letter to highlight its Ramachandran point and zoom to it in the 3D structure. Scroll individual chains sideways to reach more residues."),
+                        "Select a letter to highlight its Ramachandran point and zoom in 3D. Dimmed letters are hidden by the current filters; scroll each chain sideways for more residues."),
                       tags$div(class = "ram-sequence-legend",
                         tags$span(class="ram-swatch ram-sw-favoured", "Favoured"),
                         tags$span(class="ram-swatch ram-sw-allowed", "Allowed"),
@@ -838,7 +838,12 @@ server <- function(input, output, session) {
 
   sequence_groups <- reactive({
     req(loaded())
-    ram_sequence_groups(displayed())
+    # A sequence must retain its true residue positions even if an amino-acid
+    # or pre-proline filter limits the points currently drawn in the plot.
+    data <- classified()
+    if (!is.null(input$chainselection))
+      data <- data[data$chain %in% input$chainselection, , drop=FALSE]
+    ram_sequence_groups(data)
   })
   # Keep the condensed position maps reactive even while the full sequence
   # navigator is collapsed; all selected chains remain visible.
@@ -874,13 +879,18 @@ server <- function(input, output, session) {
 
   output$sequenceView <- renderUI({
     groups <- sequence_groups()
-    if (!length(groups)) return(tags$p("No residues match these filters."))
+    if (!length(groups)) return(tags$p("No chains match the current selection."))
+    shown <- displayed()
+    shown_keys <- paste(shown$chain, shown$resi,
+                        shown$insertion_code, sep="\r")
     tags$div(class="ram-sequence-chains", role="group",
       "aria-label"="Residue navigation for all selected protein chains",
       lapply(seq_along(groups), function(k) {
         chain <- groups[[k]]
         chain_name <- names(groups)[[k]]
         statuses <- ram_sequence_status(chain$region)
+        selectable <- paste(chain$chain, chain$resi,
+                            chain$insertion_code, sep="\r") %in% shown_keys
         tags$section(class="ram-sequence-chain",
           tags$div(class="ram-sequence-chain-heading",
             tags$strong(if (identical(chain_name, "Unassigned"))
@@ -896,14 +906,16 @@ server <- function(input, output, session) {
               tags$button(type="button",
                 class=paste("ram-seq-res",
                   paste0("ram-seq-",statuses[[i]])),
+                disabled=if (!selectable[[i]]) "disabled" else NULL,
                 "data-chain"=residue$chain[[1L]],
                 "data-resi"=residue$resi[[1L]],
                 "data-insertion"=residue$insertion_code[[1L]],
                 title=sprintf("%s %s%d%s · %s",
                   residue$resn[[1L]],residue$chain[[1L]],
                   residue$resi[[1L]],residue$insertion_code[[1L]],
-                  if (is.na(residue$region[[1L]])) "Missing angles"
-                  else residue$region[[1L]]),
+                  paste0(if (is.na(residue$region[[1L]])) "Missing angles"
+                    else residue$region[[1L]],
+                    if (!selectable[[i]]) " · Hidden by current filters" else "")),
                 "aria-pressed"="false",
                 residue$letter[[1L]])
             })

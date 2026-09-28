@@ -306,8 +306,27 @@ ram_pae_plot_data <- function(prediction, torsions, max_display = 400L) {
   if (nrow(pae) != ncol(pae) || nrow(pae) != length(prediction$pae_rows))
     stop("PAE values and residue indices are inconsistent.")
   n <- nrow(pae)
-  chosen <- if (n <= max_display) seq_len(n) else
-    unique(as.integer(round(seq(1, n, length.out = max_display))))
+  chosen <- seq_len(n)
+  if (n > max_display) {
+    # Protein interfaces are often precisely where uncertainty changes.
+    # Preserve both residues beside every observed chain boundary, even when
+    # sampling a large multimeric PAE matrix to fit a browser viewport.
+    chains <- as.character(torsions$chain[prediction$pae_rows])
+    transition <- which(chains[-1L] != chains[-n])
+    essential <- sort(unique(c(1L, n, transition, transition + 1L)))
+    if (length(essential) > max_display)
+      stop("Too many chain boundaries to display without concealing interfaces.")
+    uniform <- unique(as.integer(round(seq(1, n, length.out = max_display))))
+    other <- setdiff(uniform, essential)
+    selected <- sort(unique(c(essential,
+      head(other, max_display - length(essential)))))
+    if (length(selected) < max_display) {
+      remaining <- setdiff(seq_len(n), selected)
+      selected <- sort(c(selected, head(remaining,
+        max_display - length(selected))))
+    }
+    chosen <- selected
+  }
   rows <- prediction$pae_rows[chosen]
   if (anyNA(rows) || any(rows < 1L | rows > nrow(torsions)))
     stop("PAE residue mapping is invalid.")

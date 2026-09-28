@@ -1,10 +1,10 @@
 # Exact-source reproducibility gate for the independent experimental cohort.
-# Usage: Rscript tests/phase-a-baseline.R ACCESSION OUTPUT_DIR
+# Usage: Rscript tests/wwpdb-baseline.R ACCESSION OUTPUT_DIR
 # This is run after benchmarks/compare_wwpdb.R has saved its provenance,
 # per-residue comparison and scientific summary.
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) != 2L)
-  stop("Usage: Rscript tests/phase-a-baseline.R ACCESSION OUTPUT_DIR")
+  stop("Usage: Rscript tests/wwpdb-baseline.R ACCESSION OUTPUT_DIR")
 id <- toupper(args[[1L]])
 folder <- args[[2L]]
 expect <- read.csv("validation/baseline-2026-09-28.csv",

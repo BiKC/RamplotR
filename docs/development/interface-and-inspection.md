@@ -1,4 +1,4 @@
-# RamplotR inspection and publication upgrade
+# Interactive inspection and publication tools: implementation record
 
 Branch: `upgrade/inspection-visualization-reporting` (integration PR #12).
 Historical reference: `v0.1.0-legacy` is unchanged; all scientific reference grids are preserved.
@@ -22,7 +22,7 @@ Historical reference: `v0.1.0-legacy` is unchanged; all scientific reference gri
 - [Structure validation and benchmark](https://github.com/BiKC/RamplotR/actions/runs/36470803613)
 - [Live Shiny browser test and visual-preview artifact](https://github.com/BiKC/RamplotR/actions/runs/36470803548)
 
-These runs confirm the implemented regression and browser scenarios. Independent agreement of every RamplotR region classification against MolProbity is separate future validation, not a claim from these tests. Hosted deployments must be updated separately from merging the GitHub repository.
+These runs confirm the implemented regression and browser scenarios. Independent wwPDB comparisons have since been performed and are documented in the [validation results](../validation-results.md). These are method comparisons, not a claim of identical RamplotR and MolProbity classifications. Hosted deployments must be updated separately from merging the GitHub repository.
 
 ## Scientific boundaries
 

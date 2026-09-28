@@ -1,6 +1,6 @@
 # RamplotR upgrade worklog
 
-This log records the main changes and their verification status. Work happens in separately scoped commits. The published historical baseline is preserved as `v0.1.0-legacy` (commit `aa3eba2180d505f4dc01c9c2bf977cef00b3252a`).
+This historical log records early scientific changes and verification. For current usage, see [the documentation index](../README.md). Some unchecked historical proposals were subsequently implemented in other pull requests; refer to the current user guides for available features. Work happens in separately scoped commits. The published historical baseline is preserved as `v0.1.0-legacy` (commit `aa3eba2180d505f4dc01c9c2bf977cef00b3252a`).
 
 ## Completed in PR #2
 
@@ -8,7 +8,7 @@ This log records the main changes and their verification status. Work happens in
 2. Deterministic density thresholds and reusable reference grids.
 3. Atom-based backbone torsions that respect peptide connectivity, chain boundaries and insertion codes.
 
-## Phase 2: CI, inputs, reproducibility
+## Regression testing, input handling and reproducibility
 
 - [x] Keep scientific changes in their own commits, merged without squashing.
 - [x] Add a two-platform R regression workflow for existing scientific test scripts.
@@ -21,7 +21,7 @@ This log records the main changes and their verification status. Work happens in
 
 The scientific classifications are tied to the bundled reference densities. Do not claim MolProbity-equivalent outlier percentages without a separate benchmark. New methods and reference datasets will be versioned.
 
-## Phase 3: scientific comparisons and timing
+## Scientific comparisons and timing
 
 - [x] Provide a repeatable analysis/timing script recording the structure, reference dataset, software environment and per-stage elapsed time.
 - [x] Provide an independent torsion-angle comparison with Bio3D for PDB accessions without insertion codes.
@@ -29,14 +29,14 @@ The scientific classifications are tied to the bundled reference densities. Do n
 - [ ] Run scaling benchmarks on large PDB/mmCIF inputs and record benchmark output.
 - [ ] Compare region labels against independently generated structural-validation reports; numerical thresholds differ across implementations.
 
-## Phase 4: larger-structure performance and paper preparation
+## Larger-structure performance and manuscript planning
 
 - [x] Preallocate and vectorize backbone extraction (PR #5).
 - [x] Cache immutable classification reference profiles (PR #6).
 - [x] Correct independent validation identifier matching and enforce coverage (PR #7).
 - [x] Run a same-runner 6VXX scaling pilot with 1x, 3x and 10x replicated
   complexes and record peak RSS, warm/cold stage timings and software metadata.
-  See [measured results](scaling-results.md) and [run 36430181464](https://github.com/BiKC/RamplotR/actions/runs/36430181464).
+  See [measured results](../scaling-results.md) and [run 36430181464](https://github.com/BiKC/RamplotR/actions/runs/36430181464).
 - [ ] Run paired same-host comparisons of legacy and current algorithms, including peak RSS.
 - [ ] Compare RamplotR region labels against independent MolProbity-style reports.
 - [ ] Prepare the methods, validation tables and figures for the arXiv preprint once validation is complete.

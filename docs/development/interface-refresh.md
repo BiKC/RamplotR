@@ -1,6 +1,6 @@
-# Interface refresh
+# Interactive interface: design and verification record
 
-The interface refresh changes the layout and plotting presentation without
+This historical record describes the layout and plotting changes without
 changing backbone extraction, reference grids or scientific classifications.
 The historical application remains available as v0.1.0-legacy.
 
@@ -71,6 +71,6 @@ In a browser, check both a wide desktop window and a mobile-width window:
 5. Test a structure with many chains and a structure with missing angles,
    then download a PNG with the Plotly toolbar.
 
-The old README screenshot is historical; capture a new screenshot from a
-running app before replacing it. The shinyapps.io deployment is separate
+The [main README](../../README.md) now contains curated screenshots generated
+from the real browser tests. The shinyapps.io deployment is separate
 from merging changes into the GitHub repository.

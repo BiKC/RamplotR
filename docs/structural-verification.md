@@ -1,8 +1,8 @@
-# Phase C: structural verification, ensembles and batch analysis
+# Structural verification, ensembles and batch analysis
 
-Phase C extends the established RamplotR Ramachandran analysis without
-changing its reference densities, four-region labels, or the historical
-`v0.1.0-legacy` release.
+These workflows extend RamplotR's Ramachandran analysis without changing its
+reference densities or four-region labels. The historical
+`v0.1.0-legacy` release remains available for reproducibility.
 
 ## Extended native geometry
 
@@ -42,7 +42,7 @@ the source file's MD5 checksum in its HTML report.
 
 The original RamplotR contour interpretation and the wwPDB/MolProbity
 reference systems are **not equivalent**. The independent outlier-rich
-[Phase A results](phase-a-results.md) explicitly show genuine discrepancies.
+[independent validation results](validation-results.md) explicitly show genuine discrepancies.
 Importing a report does not rewrite the original region classification.
 Do not attach experimental wwPDB validation reports to an unrelated
 AlphaFold/ESMFold prediction, even if their sequences are similar.
@@ -118,7 +118,7 @@ For an ESMFold prediction, explicitly set
 `--prediction-source esmfold`; never request this for an experimental
 structure. For AlphaFold 2/3, the CLI can read declared pLDDT from compatible
 B-factor files; AF3 confidence sidecar parsing remains available in the
-interactive Phase B uploader.
+interactive prediction uploader.
 
 Use `--no-json` to avoid the optional jsonlite dependency; `--report`
 requires htmltools and an SVG-capable R graphics device, while wwPDB XML
@@ -132,7 +132,7 @@ The outputs record the current model, file MD5 checksum, reference file MD5,
 R/Bio3D versions, chosen scientific mode and prediction provenance where
 declared. The HTML report distinguishes computed geometry from imported
 independent evidence and prints model-ensemble statistics when available.
-Use the pinned Phase A corpus and reference-validation reports before
+Use the pinned independent wwPDB corpus and reference-validation reports before
 making formal validation-performance claims. Avoid presenting any visual
 density overlay or geometric heuristic as an official experimental
 fit or MolProbity-equivalent score.

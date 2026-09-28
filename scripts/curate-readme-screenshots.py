@@ -20,13 +20,19 @@ EXAMPLES = {
     "residue-inspection.png": ("desktop-residue-zoom.png", (5, 165, 1420, 1120)),
     "all-chains.png": ("all-chains-expanded.png", (380, 1030, 1040, 1690)),
     "prediction-pae.png": ("prediction-af2-pae.png", (355, 1390, 1300, 2180)),
-    "ensemble.png": ("phase-c-ensemble.png", (380, 812, 1340, 1570)),
+    "ensemble.png": ("verification-ensemble.png", (380, 812, 1340, 1570)),
 }
 
 def main():
     DEST.mkdir(parents=True, exist_ok=True)
     for name, (original, bounds) in EXAMPLES.items():
         path = SOURCE / original
+        # Accept older successful workflow artifacts when regenerating
+        # documentation for historic revisions.
+        if name == "ensemble.png" and not path.is_file():
+            legacy = SOURCE / "phase-c-ensemble.png"
+            if legacy.is_file():
+                path = legacy
         if not path.is_file():
             raise FileNotFoundError(f"Missing {path}; rerun the real browser tests.")
         with Image.open(path) as picture:

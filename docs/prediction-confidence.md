@@ -1,8 +1,8 @@
-# Phase B: analysing AlphaFold and ESMFold predictions
+# AlphaFold and ESMFold prediction confidence
 
-RamplotR preserves its existing structure-analysis workflow. Prediction
-confidence is **additional evidence**, not a replacement for the experimental
-or stereochemical validation completed in Phase A.
+RamplotR adds model-confidence evidence to its existing structure-inspection
+workflow. Confidence complements stereochemical analysis and experimental
+validation; it cannot replace either.
 
 ## Loading a prediction
 

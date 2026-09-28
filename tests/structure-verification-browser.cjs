@@ -1,4 +1,4 @@
-// Phase C live Shiny smoke test. Fixtures are synthetic, not claims about
+// Experimental verification live Shiny smoke test. Fixtures are synthetic, not claims about
 // experimental map fit or official wwPDB assessments.
 const fs=require("node:fs"),path=require("node:path");
 const assert=require("node:assert/strict");
@@ -61,7 +61,7 @@ const puppeteer=require("puppeteer-core");
       document.querySelector(".ram-official-summary")&&
       document.querySelector(".ram-official-summary").textContent
         .includes("Matched 1 of"),{timeout:30000});
-    await page.screenshot({path:path.join(output,"phase-c-wwpdb.png"),
+    await page.screenshot({path:path.join(output,"verification-wwpdb.png"),
                            fullPage:true});
     // Mock only volume parsing to test local map controls deterministically.
     // Physical map alignment still requires a genuine CCP4 map and review.
@@ -119,8 +119,8 @@ const puppeteer=require("puppeteer-core");
         stageAvailable:typeof window.getNGLStage==="function" &&
                        !!window.getNGLStage("NGL")
       }));
-      console.error("Phase C map controls:",JSON.stringify(diagnostics));
-      await page.screenshot({path:path.join(output,"phase-c-map-failure.png"),
+      console.error("Experimental verification map controls:",JSON.stringify(diagnostics));
+      await page.screenshot({path:path.join(output,"verification-map-failure.png"),
                              fullPage:true});
       throw error;
     }
@@ -181,13 +181,13 @@ const puppeteer=require("puppeteer-core");
         notifications:[...document.querySelectorAll(".shiny-notification")]
           .map(node=>node.textContent)
       }));
-      console.error("Phase C ensemble diagnostics:",JSON.stringify(details));
-      await page.screenshot({path:path.join(output,"phase-c-ensemble-failure.png"),
+      console.error("Experimental verification ensemble diagnostics:",JSON.stringify(details));
+      await page.screenshot({path:path.join(output,"verification-ensemble-failure.png"),
                              fullPage:true});
       throw error;
     }
-    await page.screenshot({path:path.join(output,"phase-c-ensemble.png"),
+    await page.screenshot({path:path.join(output,"verification-ensemble.png"),
                            fullPage:true});
-    console.log("Phase C wwPDB import, NGL overlay and NMR ensemble passed.");
+    console.log("Experimental verification wwPDB import, NGL overlay and NMR ensemble passed.");
   }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

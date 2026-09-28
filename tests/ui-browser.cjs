@@ -529,7 +529,24 @@ const assert = require("node:assert/strict");
       const rows = document.querySelectorAll(".ram-sequence-overview-chain");
       return badge && badge.textContent.includes("1BBB") && rows.length === 4;
     }, {timeout:45000});
-    const overviewNames = await page.$$eval(
+    // Chain selection is updated asynchronously after replacing a
+    // single-chain structure. Do not mistake a transient Chain-A-only plot
+    // for a completed four-chain analysis.
+    await page.waitForFunction(() => {
+      const plot = document.getElementById("plotly");
+      const badge = document.getElementById("ram-current-structure");
+      const chainTraces = (plot?.data || [])
+        .filter(trace => /^Chain [A-D]$/.test(trace.name || ""));
+      const stage = typeof window.getNGLStage === "function"
+        ? window.getNGLStage("NGL") : null;
+      const chainD = stage && stage.getRepresentationsByName("ram-chain-D");
+      return badge && badge.textContent.includes("1BBB") &&
+        chainTraces.length === 4 &&
+        chainD && chainD.list && chainD.list.length > 0;
+    }, {timeout:30000});
+    // Let NGL's WebGL renderer complete a frame before archiving screenshots.
+    await new Promise(resolve => setTimeout(resolve, 900));
+    const overviewNames = await page.$eval(
       ".ram-sequence-overview-chain .ram-sequence-chain-name",
       nodes => nodes.map(n => n.textContent.trim()));
     assert.deepEqual(overviewNames, ["Chain A", "Chain B", "Chain C", "Chain D"],

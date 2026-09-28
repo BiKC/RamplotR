@@ -246,9 +246,12 @@ const assert = require("node:assert/strict");
       };
     }, firstPoint);
     assert.ok(other, "Need at least two different visible residues.");
-    const rows = await page.$("#regions table tbody tr");
-    assert.ok(other.index < rows.length, "The selected DT row must be visible.");
-    await rows[other.index].click();
+    await page.evaluate(index => {
+      const rows = document.querySelectorAll("#regions table tbody tr");
+      const row = rows[index];
+      if (!row) throw new Error("The selected DT row is no longer present.");
+      row.click();
+    }, other.index);
     await page.waitForFunction(({ before, sele }) =>
       document.querySelector("#selectedResidueInfo strong") &&
       document.querySelector("#selectedResidueInfo strong").textContent !== before &&

@@ -173,6 +173,9 @@ body > .container-fluid { max-width: none; padding: 0; }
 .ram-chart-label { color: #405965; font-size: 12px; font-weight: 750; letter-spacing: .01em; margin: 0 0 4px 5px; }
 .ram-chart-help { color: var(--ram-muted); font-size: 11px; line-height: 1.5; margin: 0 5px 12px; }
 .ram-plot { width: 100%; min-height: 430px; overflow: hidden; }
+/* A hidden placeholder must stay hidden despite the flex layout rule. */
+.ram-plot-empty[hidden] { display: none !important; }
+#plotly:empty { display: none; }
 .ram-plot-empty {
   min-height: 430px; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 8px;

@@ -478,7 +478,25 @@
   if (typeof window.addEventListener === "function")
     window.addEventListener("resize", scheduleResize);
 
-  // Bootstrap 3 dispatches tab events through jQuery, not DOM EventTarget.
+  // When the viewport changes while the plot tab is hidden, the window
+  // resize listener correctly skips its zero-width plot. Bootstrap can then
+  // activate the tab without another resize event. Watch the pane itself so
+  // the square plot is always measured again after it becomes visible.
+  if (plot && typeof plot.closest === "function" &&
+      typeof window.MutationObserver === "function") {
+    const pane = plot.closest(".tab-pane");
+    if (pane) {
+      const tabObserver = new window.MutationObserver(function () {
+        if (pane.classList.contains("active")) scheduleResize();
+      });
+      tabObserver.observe(pane, {
+        attributes: true, attributeFilter: ["class"]
+      });
+    }
+  }
+
+  // Support both Bootstrap's jQuery event and native tab events.
+  document.addEventListener("shown.bs.tab", scheduleResize);
   if (window.jQuery)
     window.jQuery(document).on("shown.bs.tab", scheduleResize);
 

@@ -193,7 +193,15 @@ ui <- fluidPage(
               c("General", "Glycine", "Preproline", "Proline")
             ),
             tags$p(class = "ram-field-hint",
-                   "Residue-aware mode evaluates glycine, proline and pre-proline against their own reference distributions.")
+                   "Residue-aware mode uses separate RamplotR reference distributions."),
+            tags$details(class = "ram-details",
+              tags$summary("How do these regions differ from MolProbity?"),
+              tags$p(class = "ram-field-hint",
+                "RamplotR reference groups and contours are not identical to official wwPDB/MolProbity criteria. Avoid interpreting these labels as official structural-validation results."),
+              tags$a(href = "https://github.com/BiKC/RamplotR/blob/main/docs/phase-a-results.md",
+                     target = "_blank", rel = "noopener noreferrer",
+                     "Independent validation results")
+            )
           ),
           tags$section(
             class = "ram-panel",

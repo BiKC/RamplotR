@@ -1,0 +1,104 @@
+name: Independent wwPDB validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "shinyRam/R/**"
+      - "benchmarks/wwpdb_helpers.R"
+      - "benchmarks/compare_wwpdb.R"
+      - "tests/wwpdb.R"
+      - "tests/phase-a-baseline.R"
+      - "validation/**"
+      - ".github/workflows/wwpdb-validation.yml"
+  pull_request:
+    paths:
+      - "shinyRam/R/**"
+      - "benchmarks/wwpdb_helpers.R"
+      - "benchmarks/compare_wwpdb.R"
+      - "tests/wwpdb.R"
+      - "tests/phase-a-baseline.R"
+      - "validation/**"
+      - ".github/workflows/wwpdb-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  independent-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        accession: ["1CRN", "1UBQ", "6VXX", "2DQ4", "1D3Z"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - name: Install independent report parser, checksum and structure reader
+        run: Rscript -e 'install.packages(c("xml2", "digest", "bio3d"))'
+      - name: Test synthetic wwPDB report and stable residue identifiers
+        run: Rscript tests/wwpdb.R
+      - name: Download public coordinates and official wwPDB validation report
+        shell: bash
+        env:
+          ACCESSION: ${{ matrix.accession }}
+        run: |
+          set -euo pipefail
+          lower="${ACCESSION,,}"
+          middle="${lower:1:2}"
+          mkdir -p "benchmarks/output/wwpdb/${ACCESSION}/source"
+          curl --fail --location --retry 4 --retry-all-errors \
+            --connect-timeout 20 --max-time 120 \
+            -o "benchmarks/output/wwpdb/${ACCESSION}/source/${ACCESSION}.cif" \
+            "https://files.rcsb.org/download/${ACCESSION}.cif"
+          curl --fail --location --retry 4 --retry-all-errors \
+            --connect-timeout 20 --max-time 120 \
+            -o "benchmarks/output/wwpdb/${ACCESSION}/source/${lower}_validation.xml.gz" \
+            "https://files.rcsb.org/pub/pdb/validation_reports/${middle}/${lower}/${lower}_validation.xml.gz"
+          test -s "benchmarks/output/wwpdb/${ACCESSION}/source/${ACCESSION}.cif"
+          test -s "benchmarks/output/wwpdb/${ACCESSION}/source/${lower}_validation.xml.gz"
+          sha256sum "benchmarks/output/wwpdb/${ACCESSION}/source/"* \
+            > "benchmarks/output/wwpdb/${ACCESSION}/source/SHA256SUMS"
+      - name: Cross-check experimental coordinates and independent classifications
+        shell: bash
+        env:
+          ACCESSION: ${{ matrix.accession }}
+        run: |
+          set -euo pipefail
+          lower="${ACCESSION,,}"
+          Rscript benchmarks/compare_wwpdb.R "$ACCESSION" original \
+            "benchmarks/output/wwpdb/${ACCESSION}" \
+            "benchmarks/output/wwpdb/${ACCESSION}/source/${lower}_validation.xml.gz" \
+            "benchmarks/output/wwpdb/${ACCESSION}/source/${ACCESSION}.cif"
+      - name: Confirm pinned public-source hashes and scientific baseline
+        shell: bash
+        env:
+          ACCESSION: ${{ matrix.accession }}
+        run: |
+          Rscript tests/phase-a-baseline.R "$ACCESSION"             "benchmarks/output/wwpdb/$ACCESSION"
+      - name: Add independent validation summary
+        if: success()
+        shell: bash
+        env:
+          ACCESSION: ${{ matrix.accession }}
+        run: |
+          {
+            echo "### Independent wwPDB comparison: $ACCESSION"
+            echo "Coverage and angular differences are gated; class disagreements are recorded."
+            echo '~~~'
+            cat "benchmarks/output/wwpdb/$ACCESSION/summary.csv"
+            echo '~~~'
+            echo "Artifact includes official-report and coordinate checksums, all joined residues and confusion matrices."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve source files, per-residue results and environment
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ramplotr-wwpdb-${{ matrix.accession }}
+          path: benchmarks/output/wwpdb/${{ matrix.accession }}/
+          retention-days: 90
+          if-no-files-found: warn

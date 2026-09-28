@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic report with the same ModelledSubgroup attribute schema as wwPDB.
+     NOT real PDB validation data or an independent scientific reference. -->
+<wwPDB-validation-information>
+  <ModelledSubgroup model="1" chain="A" resnum="1" icode="" resname="ALA" altcode="" phi="-179.8" psi="100.0" rama="Favored"/>
+  <ModelledSubgroup model="1" chain="A" resnum="2" icode="" resname="GLY" altcode="B" phi="25" psi="25" rama="OUTLIER"/>
+  <ModelledSubgroup model="1" chain="A" resnum="2" icode="" resname="GLY" altcode="" phi="-70" psi="80" rama="Favored"/>
+  <ModelledSubgroup model="1" chain="B" resnum="10" icode="A" resname="PRO" altcode="" phi="-70" psi="145" rama="Allowed"/>
+  <ModelledSubgroup model="1" chain="B" resnum="11" icode="" resname="SER" altcode="" phi="-50" psi="-40" rama="OUTLIER"/>
+  <ModelledSubgroup model="2" chain="A" resnum="1" icode="" resname="ALA" altcode="" phi="35" psi="10" rama="OUTLIER"/>
+  <ModelledSubgroup model="1" chain="B" resnum="12" icode="" resname="THR" altcode="" />
+</wwPDB-validation-information>

@@ -647,37 +647,69 @@ server <- function(input, output, session) {
           # create html output to display the statistics
         
             output$summary <- renderUI({
-  HTML(paste0(
-    "<div style='font-size:16px; line-height:1.6;'>",
-    "<p><b>Statistics for the regions:</b></p>",
-    "<table>",
-    "<tr><th style='padding: 0 1em;'>Region</th><th style='padding: 0 1em;'>No. of residues</th><th style='padding: 0 1em;'>%</th></tr>",
-    "<tr><td style='padding: 0 1em;'>Favoured regions:</td><td style='padding: 0 1em;'>", fr_count, "</td><td style='padding: 0 1em;'>(", fr_percent, "%)</td></tr>",
-    "<tr><td style='padding: 0 1em;'>Allowed regions:</td><td style='padding: 0 1em;'>", ar_count, "</td><td style='padding: 0 1em;'>(", ar_percent, "%)</td></tr>",
-    "<tr><td style='padding: 0 1em;'>Generously allowed regions:</td><td style='padding: 0 1em;'>", gar_count, "</td><td style='padding: 0 1em;'>(", gar_percent, "%)</td></tr>",
-    "<tr><td style='padding: 0 1em;'>Not allowed regions:</td><td style='padding: 0 1em;'>", nar_count, "</td><td style='padding: 0 1em;'>(", nar_percent, "%)</td></tr>",
-    "<tr><td style='padding: 0 1em;'>Non-glycine and non-proline residues:</td><td style='padding: 0 1em;'>", total_count, "</td><td style='padding: 0 1em;'>(", total_percent, "%)</td></tr>",
-    "</table>",
-    "<hr>",
-    "<p><b>End-residues (Excl. Gly and Pro)</b></p>",
-    "<table>",
-    "<tr><td style='padding: 0 1em;'>Total no. of end-residues:</td><td style='padding: 0 1em;'>", end_count, "</td></tr>",
-    "</table>",
-    "<hr>",
-    "<p><b>Glycine and proline residues</b></p>",
-    "<table>",
-    "<tr><td style='padding: 0 1em;'>Glycine residues:</td><td style='padding: 0 1em;'>", gly_count, "</td></tr>",
-    "<tr><td style='padding: 0 1em;'>Proline residues:</td><td style='padding: 0 1em;'>", pro_count, "</td></tr>",
-    "</table>",
-    "<hr>",
-    "<p><b>Total no. of residues</b></p>",
-    "<table>",
-    "<tr><td style='padding: 0 1em;'>Total no. of residues:</td><td style='padding: 0 1em;'>", total_count2, "</td></tr>",
-    "</table>",
-    "</div>"
-  ))
+  percent_label <- function(p) {
+    if (is.na(p)) "n/a" else sprintf("%.2f%%", p)
+  }
+  metric <- function(label, value, hint) {
+    tags$div(
+      class = "ram-summary-metric",
+      tags$span(class = "ram-summary-metric-label", label),
+      tags$strong(as.character(value)),
+      tags$small(hint)
+    )
+  }
+  region_row <- function(label, count, percent) {
+    tags$tr(
+      tags$td(label),
+      tags$td(class = "ram-numeric", format(count, big.mark = ",")),
+      tags$td(class = "ram-numeric", percent_label(percent))
+    )
+  }
+  tags$div(
+    class = "ram-summary",
+    tags$div(
+      class = "ram-summary-metrics",
+      metric("Selected residues", total_count2, "Across selected chains"),
+      metric("Classified, excluding Gly/Pro", total_count,
+             "Residues with defined backbone angles"),
+      metric("Outliers", nar_count, "Outside the selected reference regions")
+    ),
+    tags$h3("Region breakdown"),
+    tags$p(class = "ram-summary-note",
+           "Percentages use classified residues other than glycine and proline as the denominator."),
+    tags$div(
+      class = "ram-summary-table-wrap",
+      tags$table(
+        class = "ram-summary-table",
+        tags$thead(
+          tags$tr(tags$th("Region"), tags$th("Residues"), tags$th("Share"))
+        ),
+        tags$tbody(
+          region_row("Favoured", fr_count, fr_percent),
+          region_row("Allowed", ar_count, ar_percent),
+          region_row("Generously allowed", gar_count, gar_percent),
+          region_row("Not allowed", nar_count, nar_percent),
+          region_row("Total classified", total_count, total_percent)
+        )
+      )
+    ),
+    tags$div(
+      class = "ram-summary-footnotes",
+      tags$div(
+        tags$strong(format(end_count, big.mark = ",")),
+        tags$span("Missing or terminal angles (excluding Gly/Pro)")
+      ),
+      tags$div(
+        tags$strong(format(gly_count, big.mark = ",")),
+        tags$span("Glycine residues")
+      ),
+      tags$div(
+        tags$strong(format(pro_count, big.mark = ",")),
+        tags$span("Proline residues")
+      )
+    )
+  )
 })
-
 
 
         name<-ifelse(inputType=="file",tools::file_path_sans_ext(basename(input$structfile$name)),accPDB)

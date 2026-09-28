@@ -242,3 +242,57 @@ body > .container-fluid { max-width: none; padding: 0; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 }
+
+/* Summary statistics retain the original classification counts and denominator. */
+.ram-summary { color: var(--ram-ink); }
+.ram-summary h3 {
+  margin: 27px 0 7px;
+  font-size: 16px; font-weight: 720; color: var(--ram-strong);
+}
+.ram-summary-metrics {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.ram-summary-metric {
+  display: flex; flex-direction: column; gap: 6px;
+  background: #f5f8f8; border: 1px solid #e4eded;
+  border-radius: 11px; padding: 18px 18px 15px;
+}
+.ram-summary-metric-label {
+  font-size: 11px; letter-spacing: .02em;
+  color: #4d6a75; font-weight: 700;
+}
+.ram-summary-metric strong {
+  font-size: 26px; font-weight: 750; letter-spacing: -.04em;
+  font-variant-numeric: tabular-nums; color: var(--ram-strong);
+}
+.ram-summary-metric small { font-size: 11px; line-height: 1.45; color: var(--ram-muted); }
+.ram-summary-note { color: var(--ram-muted); font-size: 12px; margin: 0 0 14px; }
+.ram-summary-table-wrap { max-width: 720px; width: 100%; overflow-x: auto; }
+.ram-summary-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.ram-main .ram-summary-table th {
+  background: #f5f8f8; color: #405964; font-size: 12px;
+  text-transform: none; letter-spacing: .01em;
+}
+.ram-main .ram-summary-table td, .ram-main .ram-summary-table th {
+  padding: 12px 14px; border-bottom: 1px solid #e4ecee;
+}
+.ram-summary-table td:not(:first-child), .ram-summary-table th:not(:first-child) {
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+.ram-summary-table tbody tr:last-child { font-weight: 700; background: #f5f8f8; }
+.ram-summary-footnotes {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px; margin: 23px 0 10px; max-width: 780px;
+}
+.ram-summary-footnotes > div { border-top: 2px solid #d7e6e7; padding-top: 11px; }
+.ram-summary-footnotes strong {
+  display: block; margin-bottom: 5px; font-size: 18px;
+  font-weight: 750; font-variant-numeric: tabular-nums;
+}
+.ram-summary-footnotes span { color: var(--ram-muted); font-size: 11px; line-height: 1.5; }
+@media(max-width: 700px) {
+  .ram-summary-metrics { grid-template-columns: 1fr; gap: 8px; }
+  .ram-summary-metric { padding: 13px 15px; }
+  .ram-summary-footnotes { grid-template-columns: 1fr; gap: 11px; }
+}

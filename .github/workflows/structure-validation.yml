@@ -1,0 +1,36 @@
+name: Structure validation and benchmark
+
+on:
+  push:
+    branches: ["upgrade/validation-benchmarks"]
+  pull_request:
+    paths:
+      - "shinyRam/R/**"
+      - "benchmarks/**"
+      - ".github/workflows/structure-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  structure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - name: Install Bio3D
+        run: Rscript -e 'install.packages("bio3d")'
+      - name: Compare torsions against Bio3D
+        run: Rscript benchmarks/validate_vs_bio3d.R 1CRN benchmarks/output/validation-1crn.csv
+      - name: Benchmark the same structure
+        run: Rscript benchmarks/run.R 1CRN 3 original benchmarks/output/benchmark-1crn.csv
+      - name: Archive numerical results and R session details
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ramplotr-validation-results
+          path: benchmarks/output/
+          if-no-files-found: warn

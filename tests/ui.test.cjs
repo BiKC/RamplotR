@@ -7,6 +7,10 @@ const handlers = {};
 const listeners = {};
 let selected = "pdb";
 let rendered = null;
+const events = {};
+const inputs = [];
+const restyles = [];
+let nglClick = null;
 
 function fakeClassList() {
   const names = new Set();
@@ -24,7 +28,8 @@ const uploadWrap = { classList: fakeClassList() };
 const plot = {
   clientWidth: 650,
   style: {},
-  classList: { contains: () => true }
+  classList: { contains: () => true },
+  on(name, fn) { events[name] = fn; }
 };
 const placeholderText = { textContent: "" };
 const empty = {
@@ -50,16 +55,23 @@ const document = {
 };
 const window = {
   Shiny: {
-    addCustomMessageHandler(name, callback) { handlers[name] = callback; }
+    addCustomMessageHandler(name, callback) { handlers[name] = callback; },
+    setInputValue(name, value) { inputs.push({name, value}); }
   },
   Plotly: {
     react(node, traces, layout, config) {
       rendered = { node, traces, layout, config };
       return Promise.resolve();
     },
+    restyle(node, change, traces) { restyles.push({node, change, traces}); },
     Plots: { resize() {} }
   }
 };
+window.getNGLStage = () => ({
+  signals: { clicked: {
+    add(fn) { nglClick = fn; }, remove(fn) { if (nglClick === fn) nglClick = null; }
+  }}
+});
 const source = fs.readFileSync("shinyRam/www/custom.js", "utf8");
 vm.runInNewContext(source, { window, document, Event });
 
@@ -78,6 +90,7 @@ handlers.process({
     chain: ["A", "A"],
     resn: ["ALA", "<GLY>"],
     resi: [1, 2],
+    insertion_code: ["", "A"],
     phi: [null, 91.2],
     psi: [null, -37.1]
   },
@@ -91,7 +104,7 @@ handlers.process({
   chainColors: ["#116e70"]
 });
 assert.equal(rendered.node, plot, "The expected plot container must be used");
-assert.equal(rendered.traces.length, 5, "Four contours plus one chain trace");
+assert.equal(rendered.traces.length, 6, "Four contours, one chain and one selection trace");
 assert.equal(rendered.traces[4].x.length, 1,
              "A missing torsion must not turn into a false (0,0) point");
 assert.equal(rendered.traces[4].x[0], 91.2);
@@ -102,4 +115,29 @@ assert.equal(rendered.layout.yaxis.scaleanchor, "x",
 assert.equal(rendered.config.responsive, true);
 assert.equal(empty.hidden, true);
 assert.ok(badge.textContent.includes("1 plotted residues"));
-console.log("RamplotR JS source controls and plot rendering checks passed.");
+// Plotly.react promises resolve on the next microtask; point-click handlers
+// are registered after rendering, not before.
+Promise.resolve().then(() => {
+  assert.equal(typeof events.plotly_click, "function");
+  assert.equal(rendered.traces[4].customdata[0][2], "A",
+               "Insertions must stay attached to the plotted residue.");
+  handlers["ram-selection"]({ chain: "A", resi: 2, insertion_code: "A" });
+  assert.equal(restyles.length, 1, "Linked selection must highlight the plot.");
+  assert.equal(restyles[0].change.x[0][0], 91.2);
+  events.plotly_click({
+    points: [{ customdata: ["A", 2, "A", "GLY"] }]
+  });
+  assert.equal(inputs.at(-1).name, "ramPlotPick");
+  assert.equal(inputs.at(-1).value.insertion_code, "A");
+  handlers["ram-bind-ngl"]({});
+  assert.equal(typeof nglClick, "function",
+               "The NGL stage must listen for atom picking.");
+  nglClick({ atom: { chainname: "A", resno: 2, inscode: "A" } });
+  assert.equal(inputs.at(-1).name, "ramNglPick",
+               "An NGL click must publish the same residue identity.");
+  assert.equal(inputs.at(-1).value.resi, 2);
+  handlers["ram-selection"](null);
+  assert.equal(restyles.at(-1).change.x[0].length, 0,
+               "Clear selection must remove the overlay.");
+  console.log("RamplotR plot, source switching and three-way picking tests passed.");
+}).catch(e => { console.error(e); process.exitCode = 1; });

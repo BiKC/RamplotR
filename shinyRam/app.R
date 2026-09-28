@@ -371,7 +371,17 @@ ui <- fluidPage(
                     tags$p("Counts and percentages for the selected residues and chains.")
                   )
                 ),
-                htmlOutput("summary")
+                htmlOutput("summary"),
+                tags$details(class = "ram-details ram-export-panel",
+                  tags$summary("Export figures and a reproducible report"),
+                  tags$p(class = "ram-field-hint",
+                    "The SVG/PNG figure uses your current palette, chains and selected reference; the HTML report includes all selected residues and analysis provenance."),
+                  tags$div(class = "ram-export-actions",
+                    downloadButton("downloadSVG", "Vector SVG"),
+                    downloadButton("downloadPNG", "High-resolution PNG"),
+                    downloadButton("downloadReport", "HTML report")
+                  )
+                )
               )
             )
           )
@@ -641,6 +651,50 @@ server <- function(input, output, session) {
       utils::write.csv(isolate(table_rows()), file, row.names = FALSE, na = "")
     }
   )
+  # Publication figures are drawn independently of the browser's plot size;
+  # exported data always matches the selected chains, reference and palette.
+  safe_filename <- function(extension) {
+    current <- isolate(loaded())
+    title <- if (is.null(current)) "RamplotR" else current$name
+    paste0(gsub("[^A-Za-z0-9_-]", "_", title), "_ramplotr.", extension)
+  }
+  export_plot <- function(path, format) {
+    data <- req(displayed())
+    structure <- req(loaded())
+    ram_save_figure(
+      path, data, plot_reference(), active_palette(),
+      stats::setNames(current_chain_colors(), structure$chains),
+      format = format, title = paste0(structure$name, " · RamplotR")
+    )
+  }
+  output$downloadSVG <- downloadHandler(
+    filename = function() safe_filename("svg"),
+    content = function(file) export_plot(file, "svg")
+  )
+  output$downloadPNG <- downloadHandler(
+    filename = function() safe_filename("png"),
+    content = function(file) export_plot(file, "png")
+  )
+  output$downloadReport <- downloadHandler(
+    filename = function() safe_filename("html"),
+    content = function(file) {
+      data <- req(displayed())
+      structure <- req(loaded())
+      image <- tempfile(fileext = ".svg")
+      on.exit(unlink(image), add = TRUE)
+      export_plot(image, "svg")
+      reference_file <- file.path("static", input$bgtype,
+        if (input$background %in% allAA ||
+            identical(input$background, "preProline")) input$background
+        else "General")
+      provenance <- ram_report_metadata(
+        structure$name, input$bgtype, input$background,
+        input$validationMode, 1L, reference_file
+      )
+      ram_save_html_report(file, data, provenance, image)
+    }
+  )
+
   output$sequenceView <- renderUI({
     req(loaded(), input$sequenceChain)
     data <- ram_sequence_data(displayed())

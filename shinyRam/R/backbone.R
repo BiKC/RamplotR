@@ -7,6 +7,7 @@ ram_cross <- function(a, b) {
 }
 
 ram_dihedral <- function(p0, p1, p2, p3) {
+  if (any(!is.finite(c(p0, p1, p2, p3)))) return(NA_real_)
   b0 <- p0 - p1
   b1 <- p2 - p1
   b2 <- p3 - p2

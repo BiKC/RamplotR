@@ -852,3 +852,17 @@ body > .container-fluid { max-width: none; padding: 0; }
 .ram-has-data .ram-source .ram-source-choice .shiny-input-container {
   width:100% !important; margin-bottom:0;
 }
+
+
+/* A short laptop viewport needs a proportional molecular canvas, not the
+   same 430px stage used on a tall desktop. Secondary layers remain accessible
+   in their disclosure without taking space from the 2D/3D views. */
+@media (min-width:900px) and (max-height:870px) {
+  .ram-has-data .ram-ngl,
+  .ram-has-data .ram-ngl .html-widget,
+  .ram-has-data .ram-ngl .shiny-html-output {
+    min-height:clamp(300px,42vh,360px);
+    height:clamp(300px,42vh,360px) !important;
+  }
+  .ram-has-data .ram-viewer-details { margin-top:6px; }
+}

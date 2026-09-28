@@ -11,6 +11,28 @@ const events = {};
 const inputs = [];
 const restyles = [];
 let nglClick = null;
+let nglReady = false;
+const stickSelections = [];
+const cameraMoves = [];
+const rockEvents = [];
+const spinEvents = [];
+const stage = {
+  signals: { clicked: {
+    add(fn) { nglClick = fn; },
+    remove(fn) { if (nglClick === fn) nglClick = null; }
+  }},
+  getRepresentationsByName(name) {
+    assert.equal(name, "ram-highlight");
+    return { list: [{}], setSelection(sele) { stickSelections.push(sele); } };
+  },
+  setRock(value) { rockEvents.push(value); },
+  setSpin(value) { spinEvents.push(value); },
+  autoView(duration) { cameraMoves.push({ overview: true, duration }); }
+};
+const structure = {
+  structure: {},
+  autoView(sele, duration) { cameraMoves.push({ sele, duration }); }
+};
 
 function fakeClassList() {
   const names = new Set();
@@ -67,11 +89,8 @@ const window = {
     Plots: { resize() {} }
   }
 };
-window.getNGLStage = () => ({
-  signals: { clicked: {
-    add(fn) { nglClick = fn; }, remove(fn) { if (nglClick === fn) nglClick = null; }
-  }}
-});
+window.getNGLStage = () => nglReady ? stage : null;
+window.getNGLStructure = () => nglReady ? [structure] : null;
 const source = fs.readFileSync("shinyRam/www/custom.js", "utf8");
 vm.runInNewContext(source, { window, document, Event });
 
@@ -122,9 +141,27 @@ setImmediate(() => {
   assert.equal(typeof events.plotly_click, "function");
   assert.equal(rendered.traces[4].customdata[0][2], "A",
                "Insertions must stay attached to the plotted residue.");
+  // NGL may finish loading after the 2D plot was clicked.
   handlers["ram-selection"]({ chain: "A", resi: 2, insertion_code: "A" });
   assert.equal(restyles.length, 1, "Linked selection must highlight the plot.");
   assert.equal(restyles[0].change.x[0][0], 91.2);
+  assert.equal(stickSelections.length, 0,
+               "Do not manipulate NGL before it is ready.");
+  nglReady = true;
+  handlers["ram-bind-ngl"]({});
+  assert.equal(stickSelections.at(-1), "2^A:A",
+               "A selected residue must be shown in orange sticks.");
+  assert.deepEqual(cameraMoves.at(-1), { sele: "2^A:A", duration: 650 },
+                   "NGL should animate camera focus to the selected residue.");
+  assert.deepEqual(rockEvents, [false], "Stop rocking during residue zoom.");
+  assert.deepEqual(spinEvents, [false], "Stop spinning during residue zoom.");
+  handlers["ram-selection"]({ chain: "A", resi: 2, insertion_code: "A" });
+  assert.equal(cameraMoves.length, 1,
+               "Repeated plot redraws must not refocus the same residue.");
+  handlers["ram-selection"]({ chain: "A", resi: 1, insertion_code: "" });
+  assert.deepEqual(cameraMoves.at(-1), { sele: "1:A", duration: 650 },
+                   "Selecting a different residue must move the camera.");
+  handlers["ram-selection"]({ chain: "A", resi: 2, insertion_code: "A" });
   events.plotly_click({
     points: [{ customdata: ["A", 2, "A", "GLY"] }]
   });
@@ -140,6 +177,10 @@ setImmediate(() => {
   handlers["ram-selection"](null);
   assert.equal(restyles.at(-1).change.x[0].length, 0,
                "Clear selection must remove the overlay.");
+  assert.equal(stickSelections.at(-1), "none",
+               "Clear selection must hide residue sticks.");
+  assert.deepEqual(cameraMoves.at(-1), { overview: true, duration: 450 },
+                   "Clearing selection must restore the whole structure view.");
   console.log("RamplotR plot, source switching and three-way picking tests passed.");
   } catch (e) { console.error(e); process.exitCode = 1; }
 });

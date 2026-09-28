@@ -539,7 +539,6 @@ server <- function(input, output, session) {
       data[, columns, drop = FALSE],
       rownames = FALSE,
       selection = "single",
-      extensions = "Buttons",
       options = list(
         pageLength = 12, scrollX = TRUE, autoWidth = TRUE,
         dom = "ftip", order = list(list(0, "asc"), list(1, "asc")),
@@ -629,7 +628,10 @@ server <- function(input, output, session) {
       matrix = plot_reference(),
       name = data$name,
       backgroundColors = c(input$bg1, input$bg2, input$bg3, input$bg4),
-      chainColors = current_chain_colors(),
+      chainColors = {
+        colors <- current_chain_colors()
+        colors[match(unique(displayed()$chain), data$chains)]
+      },
       limits = ram_density_thresholds(plot_reference())
     )
   }) %>% shiny::debounce(100)

@@ -327,6 +327,32 @@ ui <- fluidPage(
                       "Surface rendering can take longer for large structures.")
                   )
                 )
+              ),
+              # Available in the main analysis view for every chain. The
+              # collapsed position map is compact; expand it for residue
+              # letters and synchronized 2D / 3D selection.
+              tags$details(
+                id = "ram-sequence-panel", class = "ram-sequence-panel",
+                tags$summary(
+                  tags$div(class = "ram-sequence-summary-title",
+                    tags$strong("Sequence navigator"),
+                    tags$span(class = "ram-sequence-summary-hint",
+                      "Every selected chain · expand to inspect residues")
+                  ),
+                  uiOutput("sequenceOverview")
+                ),
+                tags$div(class = "ram-sequence-detail",
+                  tags$p(class = "ram-sequence-instruction",
+                    "Select a letter to highlight its Ramachandran point and zoom to it in the 3D structure. Scroll individual chains sideways to reach more residues."),
+                  tags$div(class = "ram-sequence-legend",
+                    tags$span(class="ram-swatch ram-sw-favoured", "Favoured"),
+                    tags$span(class="ram-swatch ram-sw-allowed", "Allowed"),
+                    tags$span(class="ram-swatch ram-sw-generously-allowed", "Generously allowed"),
+                    tags$span(class="ram-swatch ram-sw-outlier", "Outlier"),
+                    tags$span(class="ram-swatch ram-sw-missing", "Missing angles")
+                  ),
+                  uiOutput("sequenceView")
+                )
               )
             ),
             tabPanel(
@@ -357,24 +383,6 @@ ui <- fluidPage(
                 tags$p(class = "ram-table-hint",
                   "Click any residue to inspect it. Your selection remains available above every tab."),
                 tags$div(class = "ram-residue-table", DT::DTOutput("regions"))
-              )
-            ),
-            tabPanel(
-              title = "Sequence", value = "sequence",
-              tags$div(class = "ram-subtab-content",
-                tags$div(class = "ram-result-head",
-                  tags$div(tags$h2("Sequence navigator"),
-                    tags$p("Select any amino acid to inspect its backbone geometry in 2D and 3D."))
-                ),
-                selectInput("sequenceChain", "Protein chain", choices = character(0)),
-                tags$div(class = "ram-sequence-legend",
-                  tags$span(class="ram-swatch ram-sw-favoured", "Favoured"),
-                  tags$span(class="ram-swatch ram-sw-allowed", "Allowed"),
-                  tags$span(class="ram-swatch ram-sw-generously-allowed", "Generously allowed"),
-                  tags$span(class="ram-swatch ram-sw-outlier", "Outlier"),
-                  tags$span(class="ram-swatch ram-sw-missing", "Missing angles")
-                ),
-                uiOutput("sequenceView")
               )
             ),
             tabPanel(
@@ -628,8 +636,6 @@ server <- function(input, output, session) {
       loaded(list(key = key, name = name, torsions = torsions, chains = chains,
                   pdb = pdb, nmodels = ram_model_count(pdb), source_id = source_id,
                   viewer_format = viewer_format))
-      updateSelectInput(session, "sequenceChain",
-                        choices = chains, selected = chains[[1L]])
       incProgress(0.25, detail = "Preparing interactive views")
     })
   }, ignoreInit = TRUE)
@@ -827,30 +833,79 @@ server <- function(input, output, session) {
     }
   )
 
+  sequence_groups <- reactive({
+    req(loaded())
+    ram_sequence_groups(displayed())
+  })
+  # Keep the condensed position maps reactive even while the full sequence
+  # navigator is collapsed; all selected chains remain visible.
+  output$sequenceOverview <- renderUI({
+    groups <- sequence_groups()
+    if (!length(groups)) return(tags$span(class="ram-sequence-empty",
+      "No residues match the current filters."))
+    tags$div(class="ram-sequence-overview", role="group",
+      "aria-label"="Selected protein chains and residue classifications",
+      lapply(seq_along(groups), function(k) {
+        chain <- groups[[k]]
+        title <- names(groups)[[k]]
+        status <- ram_sequence_status(chain$region)
+        bins <- ram_sequence_overview_bins(chain$region)
+        tags$div(class="ram-sequence-overview-chain",
+          tags$span(class="ram-sequence-chain-name",
+            if (identical(title, "Unassigned")) title else paste("Chain", title)),
+          tags$div(class="ram-sequence-mini", role="img",
+            "aria-label"=sprintf("%s: %d residues, %d outliers, %d missing angles.",
+              title, nrow(chain), sum(status=="outlier"), sum(status=="missing")),
+            lapply(bins, function(value) {
+              tags$span(class=paste("ram-sequence-mini-cell",
+                 paste0("ram-seq-",value)), "aria-hidden"="true")
+            })
+          ),
+          tags$span(class="ram-sequence-chain-count",
+            sprintf("%s aa",format(nrow(chain),big.mark=",")))
+        )
+      })
+    )
+  })
+  outputOptions(output,"sequenceOverview",suspendWhenHidden=FALSE)
+
   output$sequenceView <- renderUI({
-    req(loaded(), input$sequenceChain)
-    data <- ram_sequence_data(displayed())
-    data <- data[data$chain == input$sequenceChain, , drop = FALSE]
-    if (!nrow(data)) return(tags$p("No residues match these filters."))
-    tags$div(class = "ram-sequence-grid", role = "group",
-      "aria-label" = paste("Protein chain", input$sequenceChain),
-      lapply(seq_len(nrow(data)), function(i) {
-        residue <- data[i, , drop = FALSE]
-        status <- if (is.na(residue$region)) "missing" else
-          switch(residue$region,
-            Favoured = "favoured", Allowed = "allowed",
-            "Generously allowed" = "generously-allowed",
-            "Not allowed" = "outlier", "missing")
-        tags$button(type = "button",
-          class = paste("ram-seq-res", paste0("ram-seq-", status)),
-          "data-chain" = residue$chain[[1L]],
-          "data-resi" = residue$resi[[1L]],
-          "data-insertion" = residue$insertion_code[[1L]],
-          title = sprintf("%s %s%d%s · %s",
-            residue$resn[[1L]], residue$chain[[1L]], residue$resi[[1L]],
-            residue$insertion_code[[1L]],
-            if (is.na(residue$region)) "Missing angles" else residue$region),
-          residue$letter[[1L]])
+    groups <- sequence_groups()
+    if (!length(groups)) return(tags$p("No residues match these filters."))
+    tags$div(class="ram-sequence-chains", role="group",
+      "aria-label"="Residue navigation for all selected protein chains",
+      lapply(seq_along(groups), function(k) {
+        chain <- groups[[k]]
+        chain_name <- names(groups)[[k]]
+        statuses <- ram_sequence_status(chain$region)
+        tags$section(class="ram-sequence-chain",
+          tags$div(class="ram-sequence-chain-heading",
+            tags$strong(if (identical(chain_name, "Unassigned"))
+              chain_name else paste("Chain",chain_name)),
+            tags$span(sprintf("%s residues",
+              format(nrow(chain),big.mark=","))),
+            tags$span(class="ram-sequence-scroll-hint","Scroll sideways →")
+          ),
+          tags$div(class="ram-sequence-grid", role="group",
+            "aria-label"=paste("Select a residue in",chain_name),
+            lapply(seq_len(nrow(chain)), function(i) {
+              residue <- chain[i,,drop=FALSE]
+              tags$button(type="button",
+                class=paste("ram-seq-res",
+                  paste0("ram-seq-",statuses[[i]])),
+                "data-chain"=residue$chain[[1L]],
+                "data-resi"=residue$resi[[1L]],
+                "data-insertion"=residue$insertion_code[[1L]],
+                title=sprintf("%s %s%d%s · %s",
+                  residue$resn[[1L]],residue$chain[[1L]],
+                  residue$resi[[1L]],residue$insertion_code[[1L]],
+                  if (is.na(residue$region[[1L]])) "Missing angles"
+                  else residue$region[[1L]]),
+                "aria-pressed"="false",
+                residue$letter[[1L]])
+            })
+          )
+        )
       })
     )
   })

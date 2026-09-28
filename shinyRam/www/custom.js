@@ -138,7 +138,9 @@
         text: label,
         hovertemplate: "%{text}<extra></extra>",
         name: "Chain " + (chain || "unassigned"),
-        showlegend: true,
+        // Large assemblies can contain hundreds of chains; avoid a legend
+        // that covers most of the scientific plotting area.
+        showlegend: uniqueChains.length <= 8,
         marker: {
           color: safeColor(chainColors[index],
                            defaultChainColors[index % defaultChainColors.length]),
@@ -247,10 +249,13 @@
     observer.observe(plot.parentElement || plot);
   }
 
-  document.addEventListener("shown.bs.tab", function () {
-    if (plot && window.Plotly && plot.classList.contains("js-plotly-plot")) {
-      window.Plotly.Plots.resize(plot);
-    }
-    window.dispatchEvent(new Event("resize"));
-  });
+  // Bootstrap 3 dispatches tab events through jQuery, not DOM EventTarget.
+  if (window.jQuery) {
+    window.jQuery(document).on("shown.bs.tab", function () {
+      if (plot && window.Plotly && plot.classList.contains("js-plotly-plot")) {
+        window.Plotly.Plots.resize(plot);
+      }
+      window.dispatchEvent(new Event("resize"));
+    });
+  }
 })();

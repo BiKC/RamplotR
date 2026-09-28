@@ -10,8 +10,10 @@ const vm=require("node:vm"),fs=require("node:fs");
     "ram-density-status":{textContent:""}
   };
   const events={
-    load:{target:{closest:selector=>selector==="#ram-density-load"}},
-    clear:{target:{closest:selector=>selector==="#ram-density-clear"}}
+    load:{target:{closest:selector=>selector==="#ram-density-load"},
+          preventDefault(){}},
+    clear:{target:{closest:selector=>selector==="#ram-density-clear"},
+           preventDefault(){}}
   };
   const representation={changes:[],setParameters(p){this.changes.push(p);}};
   const component={reprList:[representation],

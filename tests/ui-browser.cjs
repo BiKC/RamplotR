@@ -232,6 +232,20 @@ const assert = require("node:assert/strict");
         .reduce((n, t) => n + t.x.length, 0);
       return count > 0 && count < expected;
     }, { timeout: 18000 }, fullCount);
+    // Sequence maps keep their true protein length when the plot shows only
+    // one amino acid. Filtered-out positions become disabled, not deleted.
+    await page.waitForFunction(() => {
+      const count = document.querySelector(".ram-sequence-chain-count");
+      return count && count.textContent.includes("46 aa");
+    }, {timeout:12000});
+    await page.click("#ram-sequence-panel > summary");
+    await page.waitForFunction(() => {
+      const buttons = document.querySelectorAll("#sequenceView .ram-seq-res");
+      return buttons.length === 46 &&
+        document.querySelectorAll("#sequenceView .ram-seq-res:disabled").length > 0 &&
+        document.querySelectorAll("#sequenceView .ram-seq-res:not(:disabled)").length > 0;
+    }, {timeout:12000});
+    await page.click("#ram-sequence-panel > summary");
     await page.evaluate(() => {
       const values = Array.from(document.querySelector("#AA").options)
         .map(option => option.value);

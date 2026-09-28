@@ -164,10 +164,12 @@ const puppeteer=require("puppeteer-core");
     await page.click("#calculateEnsemble");
     try {
       await page.waitForFunction(()=>{
-        const table=document.querySelector("#ensembleRows table");
+        // DataTables can create a separate header table when its tab is
+        // resized; inspect rows across the output, not only its first table.
+        const rows=document.querySelectorAll("#ensembleRows tbody tr");
         const summary=document.querySelector("#ensembleResultSummary");
-        return !!(table&&table.querySelectorAll("tbody tr").length>2&&
-          summary&&summary.textContent.includes("models analysed"));
+        return !!(rows.length>2&&summary&&
+          summary.textContent.includes("models analysed"));
       },{timeout:90000});
     }catch(error){
       const details=await page.evaluate(()=>({

@@ -290,7 +290,16 @@ ui <- fluidPage(
                            NGLVieweR::NGLVieweROutput("NGL")),
                   tags$div(
                     class = "ram-viewer-options",
-                    tags$div(class = "ram-viewer-options-title", "Display"),
+                    tags$div(class = "ram-viewer-options-title", "Molecular representation"),
+                    tags$div(class = "ram-representation",
+                      radioButtons("nglRepresentation", label = NULL, inline = TRUE,
+                        choices = c("Cartoon" = "cartoon", "Ribbon" = "ribbon",
+                          "Sticks" = "licorice", "Ball & stick" = "ball+stick",
+                          "Surface" = "surface"), selected = "cartoon")
+                    ),
+                    tags$p(class = "ram-viewer-hint",
+                      "Surface rendering may take longer for large structures. Selected residues remain orange sticks."),
+                    tags$div(class = "ram-viewer-options-title", "Additional features"),
                     tags$div(
                       class = "ram-toggles",
                       checkboxInput("ligands", "Ligands"),
@@ -887,6 +896,28 @@ server <- function(input, output, session) {
         is.null(isolate(loaded()))) return()
     viewer_ready(TRUE)
     session$sendCustomMessage("ram-bind-ngl", list())
+  })
+
+  # Swap only named chain representations. The named orange highlight
+  # representation survives changes to the whole-structure rendering mode.
+  observe({
+    data <- req(loaded())
+    req(viewer_ready(), input$nglRepresentation)
+    style <- input$nglRepresentation
+    if (!style %in% c("cartoon", "ribbon", "licorice", "ball+stick", "surface"))
+      return()
+    colors <- isolate(current_chain_colors())
+    for (k in seq_along(data$chains)) {
+      chain <- data$chains[[k]]
+      name <- paste0("ram-chain-", chain)
+      proxy <- NGLVieweR_proxy("NGL")
+      proxy %>% removeSelection(name)
+      proxy %>% addSelection(style, param = list(
+        name = name, sele = paste0(":", chain, " and protein"),
+        color = colors[[k]],
+        opacity = if (identical(style, "surface")) 0.8 else 1
+      ))
+    }
   })
 
   # Existing molecular toggles operate independently of plot redraws.

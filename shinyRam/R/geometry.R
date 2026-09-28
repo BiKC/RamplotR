@@ -27,7 +27,9 @@ ram_extra_geometry <- function(pdb, torsions, peptide_min = 1.0,
   result <- data.frame(
     omega=rep(NA_real_,n), peptide_bond_length=rep(NA_real_,n),
     omega_status=rep("Missing",n), chi1=rep(NA_real_,n),
-    chi1_available=rep(FALSE,n), stringsAsFactors=FALSE)
+    chi1_available=rep(FALSE,n),
+    cb_ca_distance=rep(NA_real_,n), cb_signed_volume=rep(NA_real_,n),
+    stringsAsFactors=FALSE)
   if (!n) return(result)
   if (!"insert" %in% names(atoms)) atoms$insert <- ""
   if (!"alt" %in% names(atoms)) atoms$alt <- ""
@@ -60,6 +62,21 @@ ram_extra_geometry <- function(pdb, torsions, peptide_min = 1.0,
   c_atom <- get_atom(seq_len(n), "C")
   n_atom <- get_atom(seq_len(n), "N")
   cb <- get_atom(seq_len(n), "CB")
+  cb_rows <- which(complete.cases(cbind(ca,cb)))
+  if(length(cb_rows)) result$cb_ca_distance[cb_rows] <-
+    sqrt(rowSums((cb[cb_rows,,drop=FALSE]-ca[cb_rows,,drop=FALSE])^2))
+  # Signed tetrahedral volume describes N–CA–C–CB chirality. It is a
+  # measured geometry value, NOT a validated Cβ-deviation/outlier score.
+  cb_volume_rows <- which(complete.cases(cbind(n_atom,ca,c_atom,cb)))
+  if(length(cb_volume_rows)) {
+    v1 <- n_atom[cb_volume_rows,,drop=FALSE]-ca[cb_volume_rows,,drop=FALSE]
+    v2 <- c_atom[cb_volume_rows,,drop=FALSE]-ca[cb_volume_rows,,drop=FALSE]
+    v3 <- cb[cb_volume_rows,,drop=FALSE]-ca[cb_volume_rows,,drop=FALSE]
+    cross <- cbind(v1[,2]*v2[,3]-v1[,3]*v2[,2],
+                   v1[,3]*v2[,1]-v1[,1]*v2[,3],
+                   v1[,1]*v2[,2]-v1[,2]*v2[,1])
+    result$cb_signed_volume[cb_volume_rows] <- rowSums(cross*v3)
+  }
   chi_target <- unname(ram_geom_chi1_atom[as.character(torsions$resn)])
   target <- matrix(NA_real_, nrow=n, ncol=3L)
   for (atom_name in unique(chi_target[!is.na(chi_target)])) {

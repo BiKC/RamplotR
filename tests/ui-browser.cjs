@@ -96,8 +96,11 @@ const assert = require("node:assert/strict");
       const p = document.getElementById("plotly");
       if (!p || !p._fullLayout) return false;
       const width = p.clientWidth;
+      const cardWidth = p.closest(".ram-chart-card").clientWidth;
       const targetHeight = Math.max(285, Math.min(690, Math.round(width + 35)));
-      return Math.abs(p._fullLayout.height - targetHeight) <= 3 &&
+      return width > 0 && width <= cardWidth + 2 &&
+             Math.abs(p._fullLayout.width - width) <= 3 &&
+             Math.abs(p._fullLayout.height - targetHeight) <= 3 &&
              p._fullLayout.xaxis._length >= 0.45 * width &&
              p._fullLayout.yaxis._length >= 0.45 * width;
     }, { timeout: 15000 });

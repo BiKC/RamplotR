@@ -1254,8 +1254,12 @@ server <- function(input, output, session) {
   observeEvent(input$NGL_rendering, {
     if (!identical(input$NGL_rendering, FALSE) ||
         is.null(isolate(loaded()))) return()
+    first_ready <- !isTRUE(isolate(viewer_ready()))
     viewer_ready(TRUE)
-    session$sendCustomMessage("ram-bind-ngl", list())
+    # The NGL widget reuses its stage when a second PDB is loaded. Reframe
+    # the new structure after it has finished loading, not at submit time.
+    session$sendCustomMessage("ram-bind-ngl",
+      list(resetView = first_ready))
   })
 
   # Swap only named chain representations. The named orange highlight

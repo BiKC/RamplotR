@@ -584,28 +584,56 @@ server <- function(input, output, session) {
       updatePickerInput(session, "AA", selected = input$background)
   }, ignoreInit = TRUE)
 
+  prediction_downloads <- character()
+  session$onSessionEnded(function() unlink(prediction_downloads))
   observeEvent(input$submit, {
-    type <- if (identical(input$inputSource, "upload")) "file" else "code"
-    if (type == "file" && (is.null(input$structfile) ||
-                           is.null(input$structfile$datapath))) {
+    source_type <- input$inputSource
+    if (!source_type %in% c("pdb", "upload", "afdb")) return()
+    is_upload <- identical(source_type, "upload")
+    is_afdb <- identical(source_type, "afdb")
+    if (is_upload && (is.null(input$structfile) ||
+                      is.null(input$structfile$datapath))) {
       showNotification("Choose a PDB or mmCIF file first.", type = "error")
       return()
     }
-    source_id <- if (type == "file") input$structfile$datapath else
-      toupper(trimws(input$PDB))
-    key <- paste(type, source_id, sep = ":")
+    source_label <- if (is_upload) input$structfile$datapath else if (is_afdb)
+      toupper(trimws(input$afdbAccession)) else toupper(trimws(input$PDB))
+    declared_source <- if (is_afdb) "alphafold_db" else if (is_upload)
+      input$predictionSource else "experimental"
+    if (is.null(declared_source) || !nzchar(declared_source))
+      declared_source <- "experimental"
+    sidecar <- if (is_upload && !is.null(input$predictionJson))
+      input$predictionJson$datapath else ""
+    summary_file <- if (is_upload && !is.null(input$predictionSummaryJson))
+      input$predictionSummaryJson$datapath else ""
+    key <- paste(source_type, source_label, declared_source,
+                 sidecar, summary_file, sep = ":")
     previous <- isolate(loaded())
-    if (!is.null(previous) && identical(previous$key, key)) {
-      # The user may click Analyse again, but no expensive reloading is needed.
-      return()
-    }
+    if (!is.null(previous) && identical(previous$key, key)) return()
     withProgress(message = "Analysing structure", value = 0, {
-      incProgress(0.25, detail = "Loading coordinates")
+      incProgress(0.15, detail = "Loading coordinates")
+      afdb_files <- NULL
+      if (is_afdb) {
+        afdb_files <- tryCatch({
+          if (!requireNamespace("jsonlite", quietly = TRUE))
+            stop("Install jsonlite to retrieve AlphaFold DB structures.")
+          ram_download_afdb(ram_afdb_entry(source_label))
+        }, error = function(e) {
+          showNotification(conditionMessage(e), type = "error", duration = 12)
+          NULL
+        })
+        if (is.null(afdb_files)) return()
+        prediction_downloads <<- c(prediction_downloads,
+                                     afdb_files$structure, afdb_files$pae)
+      }
+      source_id <- if (is_afdb) afdb_files$structure else source_label
+      original_name <- if (is_afdb) afdb_files$original_name else if (is_upload)
+        input$structfile$name else NULL
       pdb <- tryCatch(
         ram_load_structure(
-          path = if (type == "file") source_id else NULL,
-          original_name = if (type == "file") input$structfile$name else NULL,
-          pdb_id = if (type == "code") source_id else NULL
+          path = if (is_upload || is_afdb) source_id else NULL,
+          original_name = original_name,
+          pdb_id = if (identical(source_type, "pdb")) source_id else NULL
         ),
         error = function(e) {
           showNotification(conditionMessage(e), type = "error", duration = 12)

@@ -41,7 +41,9 @@
       y: Array.from({length: n}, (_, i) => i + 1),
       colorscale: [[0, "#f5faf8"], [0.25, "#b6d8d3"],
                    [0.55, "#4e9f9e"], [1, "#173b53"]],
-      zmin: 0, zmax: 32,
+      zmin: 0, zmax: Math.max(10, Math.min(100,
+        Math.ceil(Math.max.apply(null, payload.z.map(row =>
+          Math.max.apply(null, row)))))),
       colorbar: {title: {text: "Å"}, thickness: 11,
                  tickfont: {size: 10}},
       hovertemplate:

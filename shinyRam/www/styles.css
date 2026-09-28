@@ -951,3 +951,5 @@ body > .container-fluid { max-width: none; padding: 0; }
     grid-template-columns:minmax(0,1fr);
   }
 }
+
+.ram-confidence-metric.ram-review-high { background:#fceae2; color:#8f4c32; }

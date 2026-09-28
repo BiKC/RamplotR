@@ -674,6 +674,11 @@ server <- function(input, output, session) {
         )
         if (!is.null(prediction) && is_afdb)
           prediction$confidence_file <- afdb_files$pae_source
+        if (!is.null(prediction) && is_upload && !is.null(input$predictionJson))
+          prediction$confidence_file <- input$predictionJson$name
+        if (!is.null(prediction) && is.finite(file.info(confidence_file)$size)) {
+          prediction$confidence_md5 <- unname(tools::md5sum(confidence_file))
+        }
         if (!is.null(prediction) && length(prediction$notes))
           showNotification(paste(prediction$notes, collapse = " "),
                            type = "warning", duration = 14)
@@ -929,6 +934,12 @@ server <- function(input, output, session) {
         provenance$prediction_source <- structure$prediction$source
         provenance$prediction_model <- structure$prediction$model_id
         provenance$confidence_file <- structure$prediction$confidence_file
+        if (!is.null(structure$prediction$confidence_md5))
+          provenance$confidence_file_md5 <- structure$prediction$confidence_md5
+        if (is.finite(structure$prediction$ptm))
+          provenance$prediction_pTM <- structure$prediction$ptm
+        if (is.finite(structure$prediction$iptm))
+          provenance$prediction_ipTM <- structure$prediction$iptm
         provenance$PAE_available <- !is.null(structure$prediction$pae)
         provenance$confidence_limitations <- paste(
           structure$prediction$notes, collapse = "; ")
@@ -1101,7 +1112,8 @@ server <- function(input, output, session) {
     lower_inrange <- sum(is.finite(data$plddt) & data$plddt < 70 &
       !is.na(data$region) & data$region != "Not allowed")
     tagList(
-      tags$span(class = "ram-confidence-metric ram-review-high",
+      tags$span(class = if (high_outliers > 0L)
+        "ram-confidence-metric ram-review-high" else "ram-confidence-metric",
         paste(high_outliers, "high-confidence Ramachandran outliers")),
       tags$span(class = "ram-confidence-metric",
         paste(lower_inrange, "lower-confidence residues with in-range geometry"))

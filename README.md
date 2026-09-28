@@ -33,6 +33,10 @@ The residue table has readable angles, combined scientific/review filters and CS
 
 The optional comparison tab aligns a chain from each of two structures by sequence and displays angular and classification differences, including insertions and deletions. Multi-model structures can be inspected model by model. The Summary tab exports vector SVG and 300-dpi PNG plots plus a self-contained report with reproducibility settings.
 
+### AlphaFold and ESMFold confidence (Phase B)
+
+AlphaFold DB accession lookup and explicit AlphaFold 2/3, ColabFold and ESMFold upload provenance can add pLDDT tracks beneath every chain. AlphaFold PAE and AF3 confidence JSON are optional, strictly matched to the selected coordinates, and shown as a linked, collapsible heatmap. ESMFold local PDBs expose pLDDT from their B-factor fields; standard ESMFold does not provide PAE. Experimental B-factors are never interpreted as prediction confidence. See the [prediction guide](docs/phase-b-guide.md).
+
 For screenshots, limitations and the complete workflow see the [inspection and publication guide](docs/inspection-user-guide.md). The interface layout and browser verification history are documented in [interface-refresh.md](docs/interface-refresh.md).
 
 ## Independent Phase A validation

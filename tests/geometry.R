@@ -13,7 +13,7 @@ residue <- function(chain, no, name, insert, atoms, coords) {
 first <- residue("A",1,"SER","",c("N","CA","C","CB","OG"),
   rbind(c(0,0,0),c(1,0,0),c(1,1,0),c(1,-1,0),c(2,-1,1)))
 second <- residue("A",2,"PRO","",c("N","CA","C","CB","CG"),
-  rbind(c(1,2.4,0),c(2,2.4,1),c(3,2.4,1),c(2,1.4,1),c(3,1.4,2)))
+  rbind(c(1.6,2.25,0.2),c(2,2.4,1),c(3,2.4,1),c(2,1.4,1),c(3,1.4,2)))
 pdb <- list(atom=rbind(first,second))
 torsion <- ram_extract_torsions(pdb)
 assert(nrow(torsion)==2L && torsion$bonded_to_next[[1]],

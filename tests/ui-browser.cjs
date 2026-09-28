@@ -80,18 +80,23 @@ const assert = require("node:assert/strict");
       previousHidden: getComputedStyle(document.getElementById("prevReview")).display
         === "none",
       reviewLabel: document.getElementById("nextReview").textContent.trim(),
-      molecularStyles: Array.from(document.querySelector("#nglRepresentation").options)
-        .map(item => item.value),
-      advancedSettings: document.querySelector(".ram-viewer-details")
-        .hasAttribute("open")
+      molecularStyles: Array.from(document.querySelectorAll(
+        'input[name="nglRepresentation"]')).map(item => item.value),
+      selectedStyle: document.querySelector(
+        'input[name="nglRepresentation"]:checked')?.value,
+      visibleLayers: Array.from(document.querySelectorAll(
+        '.ram-viewer-options input[type="checkbox"]')).every(item =>
+          item.closest(".ram-toggles")?.getBoundingClientRect().height > 0)
     }));
     assert.ok(cleanControls.compactInspector && cleanControls.previousHidden,
       "The empty residue inspector must not display unnecessary buttons.");
     assert.equal(cleanControls.reviewLabel,"Review issues");
     assert.deepEqual(cleanControls.molecularStyles,
       ["cartoon","ribbon","licorice","ball+stick","surface"]);
-    assert.equal(cleanControls.advancedSettings,false,
-      "Advanced molecular overlays start collapsed.");
+    assert.equal(cleanControls.selectedStyle, "cartoon",
+      "Cartoon must be the default molecular representation.");
+    assert.equal(cleanControls.visibleLayers, true,
+      "Molecular layers and motion switches should be visible without a disclosure.");
     assert.equal(plot.yAnchor, "x", "Axes must be equally scaled.");
     assert.ok(Math.abs(plot.xRange[0] + 180) < 1 &&
               Math.abs(plot.xRange[1] - 180) < 1 &&
@@ -295,27 +300,15 @@ const assert = require("node:assert/strict");
     // another row should move the plot highlight back to that residue.
     // Change the protein representation while retaining the orange residue
     // overlay; then restore cartoon before continuing linked-view tests.
-    await page.evaluate(() => {
-      const el = document.querySelector("#nglRepresentation");
-      if (el.selectize) el.selectize.setValue("licorice");
-      else {
-        el.value = "licorice";
-        el.dispatchEvent(new Event("change",{bubbles:true}));
-      }
-    });
+    await page.evaluate(() =>
+      document.querySelector('input[name="nglRepresentation"][value="licorice"]').click());
     await page.waitForFunction(() => {
       const group = window.getNGLStage("NGL")?.getRepresentationsByName("ram-chain-A");
       return group && group.list && group.list.some(item =>
         (item.repr?.type || "").toLowerCase() === "licorice");
     }, {timeout:20000});
-    await page.evaluate(() => {
-      const el = document.querySelector("#nglRepresentation");
-      if (el.selectize) el.selectize.setValue("cartoon");
-      else {
-        el.value = "cartoon";
-        el.dispatchEvent(new Event("change",{bubbles:true}));
-      }
-    });
+    await page.evaluate(() =>
+      document.querySelector('input[name="nglRepresentation"][value="cartoon"]').click());
     await page.waitForFunction(() => {
       const group = window.getNGLStage("NGL")?.getRepresentationsByName("ram-chain-A");
       const highlight = window.getNGLStage("NGL")?.getRepresentationsByName("ram-highlight");

@@ -601,3 +601,135 @@ body > .container-fluid { max-width: none; padding: 0; }
   .ram-has-data .ram-source .ram-submit .btn { width:100%; }
   .ram-has-data .ram-global-inspector { position:relative; top:0; }
 }
+
+
+/* Visual polish: the initial empty inspector is a gentle review prompt,
+   not a permanently crowded toolbar. Selected residues open the full bar. */
+.ram-global-inspector.is-empty {
+  position: relative; top: auto;
+  background: #f8fbfa; backdrop-filter: none;
+  border: 1px solid #deebe8;
+  box-shadow: none;
+}
+.ram-global-inspector.is-empty .ram-inspector-actions #prevReview,
+.ram-global-inspector.is-empty .ram-inspector-actions #showInPlot,
+.ram-global-inspector.is-empty .ram-inspector-actions #clearResidue {
+  display: none;
+}
+.ram-global-inspector.is-empty #nextReview {
+  background: #e5f2ef; border-color: #c1dcd6; color: #135c62;
+}
+.ram-global-inspector .ram-inspector-actions .btn {
+  transition: background-color .15s ease, border-color .15s ease;
+}
+
+/* Two compact loading controls and one clear action; native radio circles
+   are visually replaced by keyboard-friendly segmented buttons. */
+.ram-source-choice .shiny-options-group {
+  display: flex; align-items: center; flex-wrap: nowrap;
+  gap: 3px !important; padding: 3px; border: 1px solid #e0eae7;
+  border-radius: 9px; background: #f2f7f5;
+}
+.ram-source-choice .radio-inline {
+  position: relative; display: inline-flex; justify-content: center;
+  align-items: center; text-align: center; flex: 1 1 0;
+  min-height: 34px; padding: 7px 10px !important;
+  color: #546f74; background: transparent !important;
+  border: 1px solid transparent !important; border-radius: 7px;
+  font-weight: 650; line-height: 1.2; white-space: nowrap;
+  transition: background-color .15s ease, box-shadow .15s ease;
+}
+.ram-source-choice .radio-inline:has(input:checked) {
+  background: #fff !important; color: #12656a;
+  border-color: #d1e5e0 !important;
+  box-shadow: 0 1px 3px rgba(21,74,78,.08);
+}
+.ram-source-choice .radio-inline input[type="radio"] {
+  position: absolute; width: 1px; height: 1px; margin: 0;
+  opacity: 0; pointer-events: none;
+}
+.ram-source-choice .radio-inline:focus-within {
+  outline: 2px solid #317e95; outline-offset: 2px;
+}
+.ram-source-picker .form-control {
+  min-width: 0; background: #fbfdfc;
+}
+.ram-source-picker .input-group-btn .btn { background: #edf6f3; color: #195d64; font-weight: 700; }
+.ram-source-picker .progress {
+  height: 3px; border-radius: 99px; background: #eef4f2;
+}
+.ram-source-controls { gap: 12px; grid-template-columns: minmax(195px,235px) minmax(0,1fr) auto; }
+.ram-source .ram-submit { padding-bottom: 0; }
+.ram-has-data .ram-source-controls { grid-template-columns: minmax(178px,210px) minmax(0,1fr) auto; }
+
+/* Keep the NGL model front and centre. A small style selector is always
+   available; overlays and animation live in one tidy disclosure. */
+.ram-viewer-header {
+  display: flex; align-items: start; justify-content: space-between;
+  flex-wrap: wrap; gap: 9px; margin-bottom: 10px;
+}
+.ram-viewer-heading { flex: 1 1 150px; min-width: 0; }
+.ram-viewer-heading .ram-chart-label { margin-top: 3px; }
+.ram-viewer-heading .ram-chart-help { margin-bottom: 0; max-width: 270px; }
+.ram-viewer-style { flex: 0 0 130px; max-width: 100%; }
+.ram-viewer-style .form-group { margin: 0 !important; }
+.ram-viewer-style label.control-label {
+  display: block; margin-bottom: 3px;
+  color: #5d747d; font-size: 10px; font-weight: 750;
+}
+.ram-viewer-style select.form-control {
+  width: 100%; height: 36px; padding: 6px 10px;
+  border: 1px solid #bcd8d2; border-radius: 8px;
+  background: #f0f8f5; color: #135b63; font-size: 12px; font-weight: 700;
+  box-shadow: none;
+}
+.ram-viewer-note {
+  padding: 9px 3px 0; color: #6b8188; font-size: 11px;
+}
+.ram-viewer-details {
+  margin-top: 11px; border-top: 1px solid #e5efec;
+  padding: 0 2px !important;
+}
+.ram-viewer-details > summary {
+  position: relative; list-style: none; cursor: pointer;
+  padding: 12px 24px 11px 2px;
+  color: #275e67; font-size: 12px; font-weight: 750;
+}
+.ram-viewer-details > summary::-webkit-details-marker { display: none; }
+.ram-viewer-details > summary::after {
+  content: ""; position: absolute; right: 5px; top: 14px;
+  width: 8px; height: 8px; border-right: 2px solid #65868b;
+  border-bottom: 2px solid #65868b; transform: rotate(45deg);
+  transition: transform .15s ease;
+}
+.ram-viewer-details[open] > summary::after { transform: rotate(225deg); top: 18px; }
+.ram-viewer-details .ram-toggles { padding: 3px 0 10px; grid-template-columns:repeat(2,minmax(0,1fr)); }
+.ram-viewer-details .ram-viewer-hint { margin: 0 0 10px; }
+.ram-viewer-details .ram-toggles .checkbox label { font-size: 12px; }
+.ram-viewer-details[open] { background: #fbfdfc; border-radius: 0 0 9px 9px; }
+
+/* DT's selected state should follow our teal palette, not the stock blue. */
+.ram-residue-table table.dataTable tbody tr.selected,
+.ram-residue-table table.dataTable tbody tr.selected > td {
+  background: #dcefeb !important; color: #133f48 !important;
+  box-shadow: inset 0 2px #1b7c80, inset 0 -2px #1b7c80 !important;
+}
+.ram-residue-table table.dataTable tbody tr.selected td:focus-visible {
+  outline: 2px solid #1b7c80; outline-offset: -2px;
+}
+@media (max-width: 800px) {
+  .ram-source-controls { grid-template-columns: minmax(160px,210px) minmax(0,1fr); }
+  .ram-source .ram-submit { grid-column: 1 / -1; }
+  .ram-source .ram-submit .btn { width: 100%; }
+}
+@media (max-width: 580px) {
+  .ram-source-controls, .ram-has-data .ram-source-controls { grid-template-columns: minmax(0,1fr); }
+  .ram-viewer-style { flex-basis: 120px; }
+  .ram-global-inspector.is-empty { gap: 9px; }
+  .ram-global-inspector.is-empty .ram-inspector-actions { width: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ram-global-inspector .ram-inspector-actions .btn,
+  .ram-source-choice .radio-inline,
+  .ram-viewer-details > summary::after { transition: none; }
+}

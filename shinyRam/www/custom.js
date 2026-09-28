@@ -512,6 +512,11 @@
     window.Shiny.addCustomMessageHandler("ram-comparison", drawComparison);
     window.Shiny.addCustomMessageHandler("ram-selection", function (choice) {
       selectedResidue = choice && !choice.clear ? choice : null;
+      const inspector = document.querySelector(".ram-global-inspector");
+      if (inspector) inspector.classList.toggle("is-empty", !selectedResidue);
+      const reviewButton = document.getElementById("nextReview");
+      if (reviewButton) reviewButton.textContent =
+        selectedResidue ? "Next issue" : "Review issues";
       refreshSelection();
       markSequenceSelection();
       syncNglSelection(true);

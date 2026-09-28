@@ -395,6 +395,27 @@ ui <- fluidPage(
                       ),
                       tags$p(class = "ram-viewer-hint",
                         "Surface rendering can take longer for large structures.")
+                    ),
+                    tags$details(class="ram-density-panel",
+                      tags$summary("Local cryo-EM density map"),
+                      tags$p(class="ram-field-hint",
+                        "Overlay a local CCP4/MRC map. This is a visual aid, not an experimental map-fit score."),
+                      tags$input(type="file",id="ram-density-file",
+                                 accept=".map,.mrc,.ccp4"),
+                      tags$div(class="ram-density-level",
+                        tags$label("Map threshold (σ)", `for`="ram-density-level"),
+                        tags$input(type="range",id="ram-density-level",
+                                   min="0.5",max="5",step="0.25",value="2"),
+                        tags$span(id="ram-density-value","2.0σ")
+                      ),
+                      tags$div(class="ram-density-buttons",
+                        tags$button(type="button",id="ram-density-load",
+                                    class="btn btn-primary btn-sm","Show map"),
+                        tags$button(type="button",id="ram-density-clear",
+                                    class="btn btn-default btn-sm","Remove")
+                      ),
+                      tags$p(id="ram-density-status",role="status",
+                             "No map loaded.")
                     )
                   )
                 )
@@ -514,7 +535,8 @@ ui <- fluidPage(
     )
   ),
   tags$script(src = "custom.js"),
-  tags$script(src = "prediction.js")
+  tags$script(src = "prediction.js"),
+  tags$script(src = "density.js")
 )
 # Structure parsing is deliberately triggered by the Analyse button. Every
 # downstream result is a reactive expression, so adjusting settings never
@@ -740,6 +762,7 @@ server <- function(input, output, session) {
           selected = chains
         )
       })
+      session$sendCustomMessage("ram-clear-density",list())
       loaded(list(key = key, name = name, torsions = torsions, chains = chains,
                   pdb = pdb, nmodels = ram_model_count(pdb), source_id = source_id,
                   viewer_format = viewer_format, prediction = prediction))

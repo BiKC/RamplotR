@@ -33,6 +33,9 @@ jobs:
           node --check shinyRam/www/custom.js
           node tests/ui.test.cjs
         shell: bash
+      - name: Verify AlphaFold and ESMFold confidence formats
+        run: Rscript tests/predictions.R
+        shell: bash
       - name: Verify residue review, sequence, pairwise alignment and model selection
         run: Rscript tests/inspection.R
         shell: bash

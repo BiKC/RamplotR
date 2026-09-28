@@ -1,0 +1,38 @@
+name: Scientific regression tests
+
+on:
+  push:
+    branches: [main, "upgrade/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: R scientific tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - name: Check source syntax
+        run: Rscript -e 'for (p in c("shinyRam/app.R", list.files("shinyRam/R", full.names=TRUE))) parse(file=p)'
+        shell: bash
+      - name: Verify residue classifications and density thresholds
+        run: Rscript tests/scientific.R
+        shell: bash
+      - name: Verify peptide continuity and torsion calculations
+        run: Rscript tests/peptide.R
+        shell: bash
+      - name: Verify structure input and reference-specific classifications
+        run: |
+          Rscript tests/input.R
+          Rscript tests/classification.R
+        shell: bash

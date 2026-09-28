@@ -10,7 +10,6 @@
 
 # shiny related packages
 library(shiny)
-library(shinycssloaders)
 library(shinyWidgets)
 library(colourpicker)
 
@@ -19,10 +18,10 @@ library(bio3d)
 library(NGLVieweR)
 
 # Used for processing data
-library(plyr)
 
 source(file.path("R", "ramachandran.R"), local = TRUE)
 source(file.path("R", "backbone.R"), local = TRUE)
+source(file.path("R", "io.R"), local = TRUE)
 
 color_set <- c(
   "#7FC97F", "#BEAED4", "#FDC086", "#FFFF99",
@@ -79,7 +78,6 @@ ui <- fluidPage(
   # Application title
   titlePanel("RamplotR"),
   tags$head(
-    tags$script(src = "https://cdn.rawgit.com/arose/ngl/v0.10.4-1/dist/ngl.js"),
     tags$script(src = "https://cdn.plot.ly/plotly-2.14.0.min.js")
   ),
   # Sidebar with a slider input for number of bins
@@ -96,10 +94,14 @@ ui <- fluidPage(
           actionButton("submit", "Apply Changes", class = "btn-primary btn-lg")
         ),
         column(6,
-          fileInput("structfile",label = "Or upload a custom file")
+          fileInput("structfile",label = "Upload a structure file",
+                    accept = c(".pdb", ".ent", ".cif", ".mmcif", ".mcif"))
         )
       ),
       
+      radioButtons("inputSource", "Use structure from",
+                   choices = c("PDB accession" = "pdb", "Uploaded file" = "upload"),
+                   selected = "pdb", inline = TRUE),
       hr(),
       h4("Background settings"),
       selectInput("validationMode", "Residue classification",
@@ -217,7 +219,6 @@ server <- function(input, output, session) {
   output$dummy <- reactive(FALSE)
   outputOptions(output, "dummy", suspendWhenHidden = FALSE)
   # session$onSessionEnded(stopApp)
-  options(warn = -1)
   session$userData$previousPDB <- ""
   # reactive(bio3d::write.pdb(pdb = pdb(), file = paste0(accPDB(), '.pdb')))
 
@@ -328,40 +329,42 @@ server <- function(input, output, session) {
     withProgress(message = "Making plot", value = 0, {
       inputType<-""
       isolate({
-        if (is.null(input$structfile$datapath)){
-          inputType<-"code"
-          accPDB <- input$PDB
+        inputType <- if (identical(input$inputSource, "upload")) "file" else "code"
+        if (inputType == "file" && is.null(input$structfile$datapath)) {
+          showNotification("Choose a PDB or mmCIF file first.", type = "error")
+          return(invisible(NULL))
         }
-        else {
-          inputType<-"file"
-          accPDB <- input$structfile$datapath
-        }
-        if (session$userData$previousPDB != accPDB) {
-          #print("yup")
-          incProgress(1 / 4, detail = paste("Fetching sequence"))
-          if (inputType=="file") {
-            pdb<-bio3d::read.pdb(accPDB)
-          }
-          else {
-            pdb <- tryCatch(expr = {
-              bio3d::read.cif(accPDB)
-            }, error = function(e) {
-              #print(e)
-              bio3d::read.pdb(accPDB)
-            })
-          }
+        accPDB <- if (inputType == "file") input$structfile$datapath else
+          toupper(trimws(input$PDB))
+        structure_key <- paste(inputType, accPDB, sep = ":")
+        if (!identical(session$userData$previousPDB, structure_key)) {
+          incProgress(1 / 4, detail = "Reading structure")
+          pdb <- tryCatch(
+            ram_load_structure(
+              path = if (inputType == "file") accPDB else NULL,
+              original_name = if (inputType == "file") input$structfile$name else NULL,
+              pdb_id = if (inputType == "code") accPDB else NULL
+            ),
+            error = function(e) {
+              showNotification(conditionMessage(e), type = "error", duration = 12)
+              NULL
+            }
+          )
+          if (is.null(pdb)) return(invisible(NULL))
           incProgress(1 / 4, detail = paste("Transforming data"))
           # Keep insertion codes and validate peptide connectivity before
           # classifying glycine, proline and pre-proline residues.
           torsion <- ram_extract_torsions(pdb)
           chains <- unique(torsion$chain)
-          print(torsion)
           # Store the results in the user data
           session$userData$torsion <- torsion
 
           chains<-unique(session$userData$torsion$chain)
 
-          nglview<-NGLVieweR(data = accPDB)%>%setRock()
+          # Shiny upload paths lack an extension; identify the format explicitly.
+          viewer_format <- if (inputType == "file")
+            ram_detect_format(input$structfile$name) else NULL
+          nglview <- NGLVieweR(data = accPDB, format = viewer_format) %>% setRock()
           counter=1
           for (i in unique(chains)) {
             #print(i)
@@ -372,20 +375,14 @@ server <- function(input, output, session) {
           
           output$chainColors <- renderUI({
             isolate({
-              x <- vector("list", length(chains))
-              c <- 1
-              for (i in chains) {
-                col<-color_set[((c - 1) %% length(color_set)) + 1]
-                x[[i]] <-
-                  list(colourpicker::colourInput(
-                    paste0("chain", i),
-                    label = paste("Chain", i),
-                    value = col
-                  ))
-                c <- c + 1
-              }
-
-              dropdown(x, label = "Chain color settings")
+              widgets <- lapply(seq_along(chains), function(k) {
+                colourpicker::colourInput(
+                  paste0("chain", chains[[k]]),
+                  label = paste("Chain", chains[[k]]),
+                  value = color_set[((k - 1L) %% length(color_set)) + 1L]
+                )
+              })
+              dropdown(widgets, label = "Chain color settings")
             })
           })
 
@@ -405,7 +402,7 @@ server <- function(input, output, session) {
           
           
           
-          session$userData$previousPDB <- accPDB
+          session$userData$previousPDB <- structure_key
           incProgress(1 / 4, detail = paste("Filter data"))
         } else {
           incProgress(3 / 4, detail = paste("Filter data"))
@@ -438,7 +435,6 @@ server <- function(input, output, session) {
           #updatePickerInput(session, "AA", selected = input$background)
           torsionsubset <- subset(session$userData$torsion, resn %in% input$AA)
           # also subset for chains
-          print(input$chainselection)
           if (!is.null(input$chainselection)) {
             torsionsubset <- subset(torsionsubset, chain %in% input$chainselection)
           }
@@ -446,11 +442,6 @@ server <- function(input, output, session) {
         incProgress(1 / 4, detail = paste("Creating plot"))
         # session$sendCustomMessage("updateFig", input$PDB)
         # get input chain colors from ui
-        chain_colors <- vector("list", length(unique(torsionsubset$chain)))
-        for (i in unique(torsionsubset$chain)) {
-          chain_colors[[i]] <- input[[paste0("chain", i)]]
-        }
-
         ttab <- reactive({
           ram_classify_torsions(
             session$userData$torsion,

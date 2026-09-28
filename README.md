@@ -1,42 +1,50 @@
 # RamplotR
 
-R shiny app for making Ramachandran plots.
+RamplotR is an R Shiny application for interactive Ramachandran plots of protein structures. It includes residue and chain filters, multiple reference-density datasets, regional statistics, an optional residue-aware classification and a 3D molecular viewer.
 
-The calculation of the density backgrounds for the ramachadran plots is done based on the list of proteins proposed by [Lovell et al. (2003)](https://pubmed.ncbi.nlm.nih.gov/12557186/).
+## Historical published version
+
+The tagged version [v0.1.0-legacy](https://github.com/BiKC/RamplotR/releases/tag/v0.1.0-legacy) preserves the implementation available before the 2026 scientific corrections. Use this tag to reproduce analysis performed with the earlier application. New scientific behaviour and reference classifications may differ and should be recorded in subsequent analyses.
 
 ## Usage
 
-### Published version
+The original app has been hosted at https://bioit.shinyapps.io/RamplotR/. The hosted deployment may not match the current repository.
 
-This app is published via shinyapps.io and can be used via https://bioit.shinyapps.io/RamplotR/.
+To run this repository locally, install a current R 4.x and the following CRAN packages:
 
-### Install it yourself
-
-1. Install R from the [website](https://www.r-project.org/) (tested using v4.03)
-2. Run the following code:
-
-```R
-# Install the packages above if they are not already installed
-installed_packages <- rownames(installed.packages())
-required_packages <- c("shiny", "shinycssloaders", "shinyWidgets", "colourpicker", "bio3d", "plyr")
-for (p in required_packages) {
-  if (!(p %in% installed_packages)) {
-    install.packages(p)
-  }
-}
+```r
+install.packages(c("shiny", "shinyWidgets", "colourpicker", "bio3d", "NGLVieweR"))
+shiny::runApp("shinyRam")
 ```
 
-3. Run the app.R script
+The input panel lets you select a four-character PDB identifier or upload a local PDB or mmCIF structure (.pdb, .ent, .cif, .mcif, .mmcif). Uploads retain insertion codes and atom alternate locations for backbone processing. For now the app reads the first structural model.
 
-## Example image of the app
+## Scientific interpretation
 
-![Example image of the app](images/app.png)
+Reference density grids are in `shinyRam/static/`. They include the original distributions derived from the protein selection discussed by [Lovell et al. (2003)](https://pubmed.ncbi.nlm.nih.gov/12557186/), plus additional datasets. The chosen background controls the visual plot; residue-aware classification uses corresponding General, GLY, PRO and preProline grids from the selected dataset. The explicitly labelled legacy mode reproduces classification against the displayed background.
 
-## To be done
+Reference distributions and density-percentile thresholds in RamplotR must not be described as equivalent to MolProbity quality metrics without independent validation. Save the selected reference dataset, scientific mode, threshold settings and application version alongside published results.
 
-- Custom PDB upload support
-- Add CIF support
-- Output a statistic output of the number of residues in each region
-- Output a list of residues in each region
-- Recalculate the density backgrounds with newer best proteins?
-- Optimize the calculation of the torsion angles (now with bio3d but can be quite slow)
+## Regression tests
+
+Pure-R tests do not require Shiny or Bio3D. From the repository root:
+
+```sh
+Rscript tests/scientific.R
+Rscript tests/peptide.R
+Rscript tests/input.R
+Rscript tests/classification.R
+```
+
+GitHub Actions runs these tests and checks R source syntax on Linux and Windows. Integration checks using actual PDB/mmCIF structures and an independent structural validator are still planned.
+
+## Project files
+
+- `shinyRam/app.R`: user interface and Shiny server
+- `shinyRam/R/`: structure loading, backbone analysis and classifications
+- `shinyRam/static/`: reference-density matrices
+- `shinyRam/www/`: plotting JavaScript and bundled viewer assets
+- `tests/`: isolated scientific and input tests
+- `docs/upgrade-worklog.md`: upgrade plan and verification status
+
+MIT license; see LICENSE.

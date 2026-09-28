@@ -12,12 +12,12 @@ This log records the main changes and their verification status. Work happens in
 
 - [x] Keep scientific changes in their own commits, merged without squashing.
 - [x] Add a two-platform R regression workflow for existing scientific test scripts.
-- [ ] Verify the workflow succeeds on both supported CI operating systems.
+- [x] Verify scientific regressions on Ubuntu and Windows in GitHub Actions.
 - [x] Add targeted tests for classification with synthetic reference grids and edge cases.
 - [x] Detect local PDB versus mmCIF input based on its original uploaded filename.
 - [x] Add clear upload errors and an explicit PDB-versus-upload source choice.
 - [x] Update installation instructions and list direct R dependencies; a reproducible renv lockfile is pending a real R environment.
-- [ ] Record independent scientific comparison and benchmark results before the preprint.
+- [x] Record independent Bio3D angle comparisons and benchmark artifacts for 1CRN and 6VXX.
 
 The scientific classifications are tied to the bundled reference densities. Do not claim MolProbity-equivalent outlier percentages without a separate benchmark. New methods and reference datasets will be versioned.
 
@@ -25,6 +25,15 @@ The scientific classifications are tied to the bundled reference densities. Do n
 
 - [x] Provide a repeatable analysis/timing script recording the structure, reference dataset, software environment and per-stage elapsed time.
 - [x] Provide an independent torsion-angle comparison with Bio3D for PDB accessions without insertion codes.
-- [x] Run initial comparison on PDB 1CRN (37 phi and 36 psi matches); multi-chain 6VXX validation is queued in CI.
+- [x] Correct Bio3D whitespace-padded residue identifiers and require at least 98% comparison coverage: 45 phi and 45 psi comparisons for 1CRN; 2,880 of each for 6VXX, with zero differences over 0.5 degrees.
 - [ ] Run scaling benchmarks on large PDB/mmCIF inputs and record benchmark output.
 - [ ] Compare region labels against independently generated structural-validation reports; numerical thresholds differ across implementations.
+
+## Phase 4: larger-structure performance and paper preparation
+
+- [x] Preallocate and vectorize backbone extraction (PR #5).
+- [x] Cache immutable classification reference profiles (PR #6).
+- [x] Correct independent validation identifier matching and enforce coverage (PR #7).
+- [ ] Run paired same-host comparisons of legacy and current algorithms, including peak RSS.
+- [ ] Compare RamplotR region labels against independent MolProbity-style reports.
+- [ ] Prepare the methods, validation tables and figures for the arXiv preprint once validation is complete.

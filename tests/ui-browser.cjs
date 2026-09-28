@@ -74,20 +74,25 @@ const assert = require("node:assert/strict");
       };
     });
     assert.ok(plot.traces >= 5, "Expected contours and at least one chain.");
-    const cleanControls = await page.evaluate(() => ({
-      compactInspector: document.querySelector(".ram-global-inspector")
-        .classList.contains("is-empty"),
-      previousHidden: getComputedStyle(document.getElementById("prevReview")).display
-        === "none",
-      reviewLabel: document.getElementById("nextReview").textContent.trim(),
-      molecularStyles: Array.from(document.querySelectorAll(
-        'input[name="nglRepresentation"]')).map(item => item.value),
-      selectedStyle: document.querySelector(
-        'input[name="nglRepresentation"]:checked')?.value,
-      visibleLayers: Array.from(document.querySelectorAll(
-        '.ram-viewer-options input[type="checkbox"]')).every(item =>
+    // Use DOM collections directly; Shiny may replace individual controls
+    // while a reactive update is being applied to the page.
+    const cleanControls = await page.evaluate(() => {
+      const styles = document.querySelectorAll('input[name="nglRepresentation"]');
+      const layers = document.querySelectorAll(
+        '.ram-viewer-options input[type="checkbox"]');
+      return {
+        compactInspector: document.querySelector(".ram-global-inspector")
+          .classList.contains("is-empty"),
+        previousHidden: getComputedStyle(document.getElementById("prevReview")).display
+          === "none",
+        reviewLabel: document.getElementById("nextReview").textContent.trim(),
+        molecularStyles: Array.prototype.map.call(styles || [], item => item.value),
+        selectedStyle: document.querySelector(
+          'input[name="nglRepresentation"]:checked')?.value,
+        visibleLayers: Array.prototype.every.call(layers || [], item =>
           item.closest(".ram-toggles")?.getBoundingClientRect().height > 0)
-    }));
+      };
+    });
     assert.ok(cleanControls.compactInspector && cleanControls.previousHidden,
       "The empty residue inspector must not display unnecessary buttons.");
     assert.equal(cleanControls.reviewLabel,"Review issues");

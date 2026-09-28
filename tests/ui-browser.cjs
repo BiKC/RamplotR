@@ -247,6 +247,7 @@ const assert = require("node:assert/strict");
     }, firstPoint);
     assert.ok(other, "Need at least two different visible residues.");
     const rows = await page.$("#regions table tbody tr");
+    assert.ok(other.index < rows.length, "The selected DT row must be visible.");
     await rows[other.index].click();
     await page.waitForFunction(({ before, sele }) =>
       document.querySelector("#selectedResidueInfo strong") &&

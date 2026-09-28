@@ -11,6 +11,11 @@
   const plot = document.getElementById("plotly");
   const empty = document.getElementById("plot-empty");
   const currentStructure = document.getElementById("ram-current-structure");
+  const selectedLabel = document.getElementById("ram-selected-residue");
+  let lastPoints = [];
+  let selectedResidue = null;
+  let overlayIndex = -1;
+  let clickBound = false;
 
   function safeColor(value, fallback) {
     return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value)
@@ -114,12 +119,15 @@
     const residueIds = array(df.resi);
     const phis = array(df.phi);
     const psis = array(df.psi);
+    const insertionCodes = array(df.insertion_code);
+    const points = [];
+    lastPoints = points;
     const uniqueChains = [...new Set(chains.map(String))];
     const chainColors = array(obj.chainColors);
     let totalPoints = 0;
 
     uniqueChains.forEach(function (chain, index) {
-      const x = [], y = [], label = [];
+      const x = [], y = [], label = [], customdata = [];
       chains.forEach(function (name, row) {
         if (String(name) !== chain) return;
         const phi = phis[row];
@@ -129,6 +137,13 @@
             !Number.isFinite(phi) || !Number.isFinite(psi)) return;
         x.push(phi);
         y.push(psi);
+        const residue = {
+          chain: String(chain), resi: Number(residueIds[row]),
+          insertion_code: String(insertionCodes[row] || ""),
+          resn: String(amino[row] || ""), phi: phi, psi: psi
+        };
+        points.push(residue);
+        customdata.push(residue);
         label.push(
           "<b>Chain " + escapeText(chain || "unassigned") + "</b><br>" +
           escapeText(amino[row]) + " " + escapeText(residueIds[row]) + "<br>" +
@@ -141,7 +156,7 @@
         type: x.length > 2500 ? "scattergl" : "scatter",
         mode: "markers",
         x: x, y: y,
-        text: label,
+        text: label, customdata: customdata,
         hovertemplate: "%{text}<extra></extra>",
         name: "Chain " + (chain || "unassigned"),
         // Large assemblies can contain hundreds of chains; avoid a legend
@@ -155,6 +170,16 @@
           line: { color: "#ffffff", width: 0.7 }
         }
       });
+    });
+
+    // Keep one lightweight overlay for linked selections. Updating it does
+    // not trigger scientific reclassification or a full contour redraw.
+    overlayIndex = traces.length;
+    traces.push({
+      type: "scatter", mode: "markers",
+      x: [], y: [], showlegend: false, hoverinfo: "skip",
+      marker: { size: 15, symbol: "circle-open", color: "#ec4c2c",
+                line: { width: 3, color: "#ec4c2c" } }
     });
 
     const narrow = plot.clientWidth < 540;
@@ -228,6 +253,18 @@
         totalPoints.toLocaleString() + " plotted residues";
     }
     Promise.resolve(window.Plotly.react(plot, traces, layout, config))
+      .then(function () {
+        if (!clickBound && typeof plot.on === "function") {
+          plot.on("plotly_click", function (event) {
+            const point = event && event.points && event.points[0];
+            if (!point || !point.customdata || !window.Shiny) return;
+            window.Shiny.setInputValue("ramplotr_point", point.customdata,
+                                       { priority: "event" });
+          });
+          clickBound = true;
+        }
+        applySelection(selectedResidue);
+      })
       .catch(function () {
         plot.style.display = "none";
         if (empty) {
@@ -239,8 +276,31 @@
       });
   }
 
+  function sameResidue(a, b) {
+    return a && b && String(a.chain) === String(b.chain) &&
+      Number(a.resi) === Number(b.resi) &&
+      String(a.insertion_code || "") === String(b.insertion_code || "");
+  }
+
+  function applySelection(residue) {
+    selectedResidue = residue || null;
+    if (selectedLabel) {
+      selectedLabel.textContent = residue
+        ? "Selected: " + (residue.resn || "Residue") + " " + residue.resi +
+          (residue.insertion_code || "") + " · chain " + residue.chain
+        : "Click a point or residue-table row to highlight it in 3D";
+    }
+    if (!plot || overlayIndex < 0 || !plot.data || !window.Plotly) return;
+    const point = lastPoints.find(x => sameResidue(x, residue));
+    window.Plotly.restyle(plot, {
+      x: [point ? [point.phi] : []],
+      y: [point ? [point.psi] : []]
+    }, [overlayIndex]);
+  }
+
   if (window.Shiny) {
     window.Shiny.addCustomMessageHandler("process", drawPlot);
+    window.Shiny.addCustomMessageHandler("ramplotr-select", applySelection);
   }
 
   // Resize Plotly if the sidebar or viewport changes size. Do not recreate

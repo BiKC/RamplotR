@@ -77,7 +77,12 @@ const document = {
 };
 const window = {
   Shiny: {
-    addCustomMessageHandler(name, callback) { handlers[name] = callback; },
+    addCustomMessageHandler(name, callback) {
+      // Mirror real Shiny's contract: handlers must declare one argument.
+      assert.equal(callback.length, 1,
+                   "Shiny handler " + name + " must accept one message argument.");
+      handlers[name] = callback;
+    },
     setInputValue(name, value) { inputs.push({name, value}); }
   },
   Plotly: {

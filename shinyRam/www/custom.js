@@ -408,7 +408,8 @@
       refreshSelection();
       syncNglSelection(true);
     });
-    window.Shiny.addCustomMessageHandler("ram-bind-ngl", function () {
+    // Shiny requires every custom message handler to declare one argument.
+    window.Shiny.addCustomMessageHandler("ram-bind-ngl", function (_message) {
       bindNglPick();
       syncNglSelection(true);
     });

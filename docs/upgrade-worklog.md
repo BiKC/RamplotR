@@ -13,7 +13,7 @@ This log records the main changes and their verification status. Work happens in
 - [x] Keep scientific changes in their own commits, merged without squashing.
 - [x] Add a two-platform R regression workflow for existing scientific test scripts.
 - [ ] Verify the workflow succeeds on both supported CI operating systems.
-- [ ] Add targeted tests for classification with synthetic reference grids and edge cases.
+- [x] Add targeted tests for classification with synthetic reference grids and edge cases.
 - [x] Detect local PDB versus mmCIF input based on its original uploaded filename.
 - [x] Add clear upload errors and an explicit PDB-versus-upload source choice.
 - [ ] Update installation instructions and dependency manifest.

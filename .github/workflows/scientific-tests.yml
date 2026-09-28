@@ -31,3 +31,8 @@ jobs:
       - name: Verify peptide continuity and torsion calculations
         run: Rscript tests/peptide.R
         shell: bash
+      - name: Verify structure input and reference-specific classifications
+        run: |
+          Rscript tests/input.R
+          Rscript tests/classification.R
+        shell: bash

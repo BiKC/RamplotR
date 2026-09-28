@@ -152,17 +152,14 @@ ui <- fluidPage(
             actionButton("submit", "Analyze structure", class = "btn-primary")
           )
         ),
-        tags$p(
-          class = "ram-tip",
-          "Classification uses the selected reference dataset; the plotted background can be changed independently."
-        )
       ),
       tags$section(
-        class = "ram-global-inspector", "aria-label" = "Selected residue",
-        tags$div(class = "ram-inspector-copy", uiOutput("selectedResidueInfo")),
+        class = "ram-global-inspector is-empty", "aria-label" = "Residue inspection",
+        tags$div(class = "ram-inspector-copy", "aria-live" = "polite",
+                 uiOutput("selectedResidueInfo")),
         tags$div(class = "ram-inspector-actions",
           actionButton("prevReview", "Previous issue", class = "btn-default btn-sm"),
-          actionButton("nextReview", "Next issue", class = "btn-default btn-sm"),
+          actionButton("nextReview", "Review issues", class = "btn-default btn-sm"),
           actionButton("showInPlot", "Show in plot", class = "btn-primary btn-sm"),
           actionButton("clearResidue", "Clear", class = "btn-default btn-sm")
         )
@@ -294,31 +291,35 @@ ui <- fluidPage(
                 ),
                 tags$section(
                   class = "ram-chart-card", "aria-label" = "3D molecular viewer",
-                  tags$h3(class = "ram-chart-label", "Molecular structure"),
-                  tags$p(class = "ram-chart-help",
-                         "Click a residue to highlight it in the plot and table. Drag to rotate."),
-                  tags$div(class = "ram-ngl",
-                           NGLVieweR::NGLVieweROutput("NGL")),
-                  tags$div(
-                    class = "ram-viewer-options",
-                    tags$div(class = "ram-viewer-options-title", "Molecular representation"),
-                    tags$div(class = "ram-representation",
-                      radioButtons("nglRepresentation", label = NULL, inline = TRUE,
+                  tags$div(class = "ram-viewer-header",
+                    tags$div(class = "ram-viewer-heading",
+                      tags$h3(class = "ram-chart-label", "Molecular structure"),
+                      tags$p(class = "ram-chart-help",
+                        "Select a residue in the structure, or drag to rotate.")
+                    ),
+                    tags$div(class = "ram-viewer-style",
+                      selectInput("nglRepresentation", "View",
                         choices = c("Cartoon" = "cartoon", "Ribbon" = "ribbon",
                           "Sticks" = "licorice", "Ball & stick" = "ball+stick",
                           "Surface" = "surface"), selected = "cartoon")
-                    ),
-                    tags$p(class = "ram-viewer-hint",
-                      "Surface rendering may take longer for large structures. Selected residues remain orange sticks."),
-                    tags$div(class = "ram-viewer-options-title", "Additional features"),
-                    tags$div(
-                      class = "ram-toggles",
+                    )
+                  ),
+                  tags$div(class = "ram-ngl",
+                    NGLVieweR::NGLVieweROutput("NGL")),
+                  tags$div(class = "ram-viewer-note",
+                    "Selected residues appear as orange sticks."),
+                  tags$details(
+                    class = "ram-viewer-options ram-viewer-details",
+                    tags$summary("Layers & motion"),
+                    tags$div(class = "ram-toggles",
                       checkboxInput("ligands", "Ligands"),
                       checkboxInput("dna", "DNA"),
                       checkboxInput("rna", "RNA"),
                       checkboxInput("spinning", "Spin"),
                       checkboxInput("rocking", "Rock", value = TRUE)
-                    )
+                    ),
+                    tags$p(class = "ram-viewer-hint",
+                      "Surface rendering may take longer for large structures.")
                   )
                 )
               )

@@ -21,6 +21,9 @@ library(NGLVieweR)
 # Used for processing data
 library(plyr)
 
+source(file.path("R", "ramachandran.R"), local = TRUE)
+source(file.path("R", "backbone.R"), local = TRUE)
+
 color_set <- c(
   "#7FC97F", "#BEAED4", "#FDC086", "#FFFF99",
   "#386CB0", "#F0027F", "#BF5B17", "#666666"
@@ -99,6 +102,9 @@ ui <- fluidPage(
       
       hr(),
       h4("Background settings"),
+      selectInput("validationMode", "Residue classification",
+                  c("Residue-aware (recommended)" = "residue",
+                    "Selected background (legacy)" = "legacy")),
       fluidRow(
         column(6,selectInput(
           "bgtype","Reference dataset for background density",
@@ -215,23 +221,11 @@ server <- function(input, output, session) {
   session$userData$previousPDB <- ""
   # reactive(bio3d::write.pdb(pdb = pdb(), file = paste0(accPDB(), '.pdb')))
 
+  # Reference cutoffs are deterministic and calculated once per density grid.
   searchlimit <- function(matrix, percentage, x = 1) {
-    totalGen <- 100 * sum(matrix$z[matrix$z > x]) / sum(matrix$z)
-    error <- abs(totalGen - percentage)
-    if (error < 0.1) {
-      return(x)
-    } else {
-      if (totalGen > percentage) {
-        searchlimit(matrix, percentage, x = x + x / 2)
-      } else {
-        searchlimit(matrix, percentage, x = x - x / 2)
-      }
-    }
+    ram_density_thresholds(matrix, percentage)[[1L]]
   }
-  densityToPercent <- function(matrix, x) {
-    100 * sum(matrix$z[matrix$z > x]) / sum(matrix$z)
-  }
-  
+
   observeEvent(input$ligands,{
     if(input$ligands){
       NGLVieweR_proxy("NGL")%>%addSelection(type = "ball+stick", param=list(name="ligand",sele= "ligand"))
@@ -357,41 +351,10 @@ server <- function(input, output, session) {
             })
           }
           incProgress(1 / 4, detail = paste("Transforming data"))
-          pdb<<-pdb
-          # Get the list of unique chains
-          chains <- unique(pdb$atom[,"chain"])
-
-          # Initialize an empty data frame to store the results
-          torsion <- data.frame()
-
-          # Loop over each chain
-          for (chain in chains) {
-
-            print(chain)
-            # Subset the pdb data for the current chain
-            pdb_chain <- trim.pdb(pdb, chain = chain)
-            # Identify the residue numbers that correspond to the residue names in allAA
-            resno_allAA <- unique(pdb_chain$atom[pdb_chain$atom[,"resid"] %in% allAA, "resno"])
-
-            # Subset the pdb_chain object to only include those residue numbers
-            pdb_chain <- trim.pdb(pdb_chain, resno = resno_allAA)
-            
-            # if there is no data for the current chain, skip it
-            if (nrow(pdb_chain$atom) == 0) {
-              next
-            }
-            # Calculate the torsion angles for the current chain
-            torsion_chain <- torsion.pdb(pdb_chain)
-            
-            # Add the chain information to the torsion angles data frame
-            tortab_chain <- torsion_chain[["tbl"]][, c("phi", "psi")]
-            spltor_chain <- strsplit(rownames(tortab_chain), split = ".", fixed = T)
-            torsion_chain <- cbind(tortab_chain, as.data.frame(do.call(rbind, spltor_chain)))
-            torsion_chain <- rename(torsion_chain, c("V1" = "resi", "V2" = "chain", "V3" = "resn"))
-            
-            # Combine the results row wise
-            torsion <- rbind(torsion, torsion_chain)
-          }
+          # Keep insertion codes and validate peptide connectivity before
+          # classifying glycine, proline and pre-proline residues.
+          torsion <- ram_extract_torsions(pdb)
+          chains <- unique(torsion$chain)
           print(torsion)
           # Store the results in the user data
           session$userData$torsion <- torsion
@@ -448,14 +411,12 @@ server <- function(input, output, session) {
           incProgress(3 / 4, detail = paste("Filter data"))
         }
         if (input$background == "preProline"){
-          matrix <- readRDS(paste0("static/",input$bgtype,"/preProline"))
+          matrix <- ram_read_reference(file.path("static", input$bgtype, "preProline"))
           # get a subset of only those amino acids that precede a proline
           torsionsubset <- data.frame()
-          for (i in 1:length(session$userData$torsion$resn) - 1) {
-            if (session$userData$torsion$resn[i + 1] == "PRO") {
-              torsionsubset <- rbind(torsionsubset, session$userData$torsion[i, ])
-            }
-          }
+          torsionsubset <- subset(session$userData$torsion,
+                                 bonded_to_next & !is.na(next_resn) &
+                                   next_resn == "PRO")
           torsionsubset <- subset(torsionsubset, resn %in% input$AA)
           # also subset for chains
           # since chainselection is added as uiOutput, it is not available in the beginning, so check if it exists, otherwise subset for all chains
@@ -465,7 +426,7 @@ server <- function(input, output, session) {
           
         }
         else if (!input$background %in% allAA) {
-          matrix <- readRDS(paste0("static/",input$bgtype,"/General"))
+          matrix <- ram_read_reference(file.path("static", input$bgtype, "General"))
           torsionsubset <- session$userData$torsion
           torsionsubset <- subset(torsionsubset, resn %in% input$AA)
           # also subset for chains
@@ -473,7 +434,7 @@ server <- function(input, output, session) {
             torsionsubset <- subset(torsionsubset, chain %in% input$chainselection)
           }
         } else {
-          matrix <- readRDS(paste0("static/",input$bgtype,"/",input$background))
+          matrix <- ram_read_reference(file.path("static", input$bgtype, input$background))
           #updatePickerInput(session, "AA", selected = input$background)
           torsionsubset <- subset(session$userData$torsion, resn %in% input$AA)
           # also subset for chains
@@ -491,50 +452,13 @@ server <- function(input, output, session) {
         }
 
         ttab <- reactive({
-          limits <- c(
-            searchlimit(matrix, 85), # smaller than this value is favoured
-            searchlimit(matrix, 98), # smaller than this value is allowed
-            searchlimit(matrix, 99.95) # smaller than this value is generously allowed and larger than this value is not allowed
+          ram_classify_torsions(
+            session$userData$torsion,
+            reference_dir = file.path("static", input$bgtype),
+            selected_reference = matrix,
+            mode = input$validationMode,
+            threshold_fn = searchlimit
           )
-          ttab <- session$userData$torsion
-          # add a column to the tortab data frame that contains the region of the amino acid
-          # based on the limits
-          # tortab has two columns containing the phi and psi angles but they should be rounded to 0 decimals
-          # matrix has the density matrix where x and y are the phi and psi angles and z is the density
-          # z is a two dimensional matrix with the density for each phi and psi angle
-          ttab$region <- NA
-          ttab$density <- NA
-          for (i in 1:nrow(ttab)) {
-            # check if phi and psi are not na
-            if (!is.na(ttab$phi[i]) && !is.na(ttab$psi[i])) {
-              # round phi and psi to 0 decimals
-              phi <- round(ttab$phi[i], 0)
-              psi <- round(ttab$psi[i], 0)
-              # get the density for the phi and psi angles
-              # index of phi in matrix
-              phi_index <- which(matrix$x == phi)
-              # index of psi in matrix
-              psi_index <- which(matrix$y == psi)
-              # get the density
-              ttab$density[i] <- matrix$z[psi_index, phi_index]
-              # get the region based on the limits
-              if (ttab$density[i] > limits[1]) {
-                ttab$region[i] <- "Favoured"
-              } else if (ttab$density[i] > limits[2]) {
-                ttab$region[i] <- "Allowed"
-              } else if (ttab$density[i] > limits[3]) {
-                ttab$region[i] <- "Generously allowed"
-              } else {
-                ttab$region[i] <- "Not allowed"
-              }
-              # change density to percentage using densityToPercent function
-              ttab$density[i] <- densityToPercent(matrix, ttab$density[i])
-            }
-          }
-          
-
-
-          ttab
         })
         output$regions <- renderDataTable({
 
@@ -569,41 +493,38 @@ server <- function(input, output, session) {
           # --------------------------
           # Total no. of residues (no. of residues)
 
+          # All statistics use the same amino-acid and chain selection as the plot.
+          stats_table <- subset(ttab(), resn %in% input$AA)
+          if (!is.null(input$chainselection)) {
+            stats_table <- subset(stats_table, chain %in% input$chainselection)
+          }
           # define a function to negate the %in% operator
           `%nin%` <- Negate(`%in%`)
           # exclude glycine and proline
           exclude <- c("GLY", "PRO")
           
-          # get the number of end-residues
-          # end-residues are the residues that are at the beginning or end of a chain, so they don't have a region (na) and they are not glycine or proline
-          ttabsub2 <- ttab()
-          ttabsub2 <- ttabsub2[is.na(ttabsub2$region), ]
-          print(ttabsub2)
-          end_count <- nrow(subset(ttabsub2, resn %nin% exclude & resn %in% allAA))
-
-          # get the number of residues for each region
-          # for the following, we do not include glycine and proline
-          count_no_gly_pro <- nrow(subset(ttab(), resn %nin% exclude & resn %in% allAA)) - end_count
-          fr_count <- nrow(subset(ttab(), region == "Favoured" & resn %nin% exclude & resn %in% allAA))
-          fr_percent <- round(100 * fr_count / count_no_gly_pro, 2) # round to 2 decimals
-          ar_count <- nrow(subset(ttab(), region == "Allowed" & resn %nin% exclude & resn %in% allAA))
-          ar_percent <- round(100 * ar_count / count_no_gly_pro, 2)
-          gar_count <- nrow(subset(ttab(), region == "Generously allowed" & resn %nin% exclude & resn %in% allAA))
-          gar_percent <- round(100 * gar_count / count_no_gly_pro, 2)
-          nar_count <- nrow(subset(ttab(), region == "Not allowed" & resn %nin% exclude & resn %in% allAA))
-          nar_percent <- round(100 * nar_count / count_no_gly_pro, 2)
+          missing_angles <- is.na(stats_table$region)
+          end_count <- sum(missing_angles & !stats_table$resn %in% exclude)
+          eligible <- stats_table[!missing_angles & !stats_table$resn %in% exclude, , drop = FALSE]
+          count_no_gly_pro <- nrow(eligible)
+          region_count <- function(name) sum(eligible$region == name, na.rm = TRUE)
+          region_percent <- function(n) {
+            if (count_no_gly_pro == 0L) return(NA_real_)
+            round(100 * n / count_no_gly_pro, 2)
+          }
+          fr_count <- region_count("Favoured")
+          ar_count <- region_count("Allowed")
+          gar_count <- region_count("Generously allowed")
+          nar_count <- region_count("Not allowed")
+          fr_percent <- region_percent(fr_count)
+          ar_percent <- region_percent(ar_count)
+          gar_percent <- region_percent(gar_count)
+          nar_percent <- region_percent(nar_count)
           total_count <- count_no_gly_pro
-          total_percent <- round(100 * total_count / count_no_gly_pro, 2)
-
-          
-          # exclude glycine and proline
-          ttabsub2 <- subset(ttabsub2, resn %nin% exclude & resn %in% allAA)
-          end_count <- nrow(ttabsub2)
-          # get the number of glycine and proline residues
-          gly_count <- nrow(subset(ttab(), resn == "GLY"))
-          pro_count <- nrow(subset(ttab(), resn == "PRO"))
-          # get the total number of residues
-          total_count2 <- nrow(subset(ttab(), resn %in% allAA))
+          total_percent <- region_percent(total_count)
+          gly_count <- sum(stats_table$resn == "GLY")
+          pro_count <- sum(stats_table$resn == "PRO")
+          total_count2 <- nrow(stats_table)
 
           # create html output to display the statistics
         
@@ -655,11 +576,7 @@ server <- function(input, output, session) {
             chainColors = unlist(lapply(unique(torsionsubset$chain), function(x) {
               input[[paste0("chain", x)]]
             })),
-            limits = c(
-              searchlimit(matrix, 85),
-              searchlimit(matrix, 98),
-              searchlimit(matrix, 99.95)
-            )
+            limits = ram_density_thresholds(matrix)
           )
         )
       })

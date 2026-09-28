@@ -820,6 +820,11 @@ body > .container-fluid { max-width: none; padding: 0; }
   border:2px solid #134f55; outline:2px solid #8fcfc4;
   outline-offset:1px; box-shadow:none;
 }
+.ram-sequence-chain .ram-seq-res:disabled {
+  opacity:.37; filter:grayscale(.55); cursor:not-allowed;
+  border-style:dashed;
+}
+
 @media(max-width:580px) {
   .ram-sequence-panel > summary { padding:12px 30px 12px 10px; }
   .ram-sequence-overview-chain { grid-template-columns:55px minmax(0,1fr) 42px; gap:6px; }

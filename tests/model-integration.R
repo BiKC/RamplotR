@@ -1,5 +1,6 @@
 source(file.path("shinyRam","R","io.R"))
 source(file.path("shinyRam","R","backbone.R"))
+source(file.path("shinyRam","R","inspection.R"))
 name <- "benchmarks/output/ui-preview/1D3Z.pdb"
 if (!file.exists(name)) stop("Download the 1D3Z NMR fixture first.")
 pdb <- ram_load_structure(path=name,original_name="1D3Z.pdb")

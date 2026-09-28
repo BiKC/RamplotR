@@ -362,6 +362,48 @@ ui <- fluidPage(
               )
             ),
             tabPanel(
+              title = "Compare", value = "compare",
+              tags$div(class = "ram-subtab-content",
+                tags$div(class = "ram-result-head",
+                  tags$div(tags$h2("Compare protein conformations"),
+                    tags$p("Align one chain from each structure by amino-acid sequence. Compare angles and classifications, not residue numbers alone."))
+                ),
+                tags$div(class = "ram-compare-source",
+                  radioButtons("compareInputSource", "Comparison input",
+                    choices = c("PDB accession" = "pdb", "Uploaded file" = "upload"),
+                    selected = "pdb", inline = TRUE),
+                  tags$div(id = "ram-compare-pdb", textInput(
+                    "comparePDB", "Second structure", value = "1CRN",
+                    placeholder = "e.g. 1CRN")),
+                  tags$div(id = "ram-compare-upload", class = "is-hidden",
+                    fileInput("compareFile", "Second PDB/mmCIF file",
+                      accept = c(".pdb", ".ent", ".cif", ".mmcif", ".mcif"))),
+                  actionButton("compareSubmit", "Load comparison", class="btn-primary")
+                ),
+                uiOutput("compareChainControls"),
+                tags$div(class = "ram-compare-status", uiOutput("compareSummary")),
+                tags$div(id = "comparePlot", class = "ram-compare-plot"),
+                tags$div(class = "ram-table-toolbar",
+                  selectInput("compareFilter", "Show comparison",
+                    choices = c("All aligned residues" = "All",
+                      "Changed classification" = "changed",
+                      "Angle difference ≥ 30°" = "large",
+                      "Insertions / deletions" = "gaps"), selected = "All"),
+                  downloadButton("downloadComparison", "Export comparison CSV")
+                ),
+                tags$div(class = "ram-residue-table", DT::DTOutput("comparison")),
+                tags$details(class = "ram-details",
+                  tags$summary("Optional 3D superposition"),
+                  tags$p(class = "ram-field-hint",
+                    "Aligns the chosen chains in NGL for a visual comparison. Large structures may render slowly."),
+                  checkboxInput("showComparison3D", "Show superposed structures",
+                    value = FALSE),
+                  conditionalPanel(condition = "input.showComparison3D",
+                    NGLVieweR::NGLVieweROutput("NGLCompare", height = "460px"))
+                )
+              )
+            ),
+            tabPanel(
               title = "Summary", value = "summary",
               tags$div(
                 class = "ram-subtab-content",
@@ -406,6 +448,7 @@ ui <- fluidPage(
 # refetches the structure or recomputes backbone torsions.
 server <- function(input, output, session) {
   loaded <- reactiveVal(NULL)
+  comparison_loaded <- reactiveVal(NULL)
   selected_residue <- reactiveVal(NULL)
   viewer_ready <- reactiveVal(FALSE)
   current_model <- reactive({
@@ -574,6 +617,56 @@ server <- function(input, output, session) {
       incProgress(0.25, detail = "Preparing interactive views")
     })
   }, ignoreInit = TRUE)
+
+  # Comparison loading is a separate, deliberate action, so changing plot
+  # settings does not repeatedly refetch the secondary structure.
+  observeEvent(input$compareSubmit, {
+    is_upload <- identical(input$compareInputSource, "upload")
+    if (is_upload && (is.null(input$compareFile) ||
+                      is.null(input$compareFile$datapath))) {
+      showNotification("Choose a second PDB or mmCIF file.", type="error")
+      return()
+    }
+    secondary <- if (is_upload) input$compareFile$datapath else
+      toupper(trimws(input$comparePDB))
+    source_name <- if (is_upload) input$compareFile$name else secondary
+    data <- tryCatch(
+      ram_load_structure(
+        path = if (is_upload) secondary else NULL,
+        original_name = if (is_upload) source_name else NULL,
+        pdb_id = if (is_upload) NULL else secondary
+      ), error = function(e) {
+        showNotification(conditionMessage(e), type="error", duration=12)
+        NULL
+      }
+    )
+    if (is.null(data)) return()
+    torsions <- tryCatch(ram_extract_torsions(ram_model_at(data, 1L)),
+      error = function(e) {
+        showNotification(conditionMessage(e), type="error",duration=12)
+        NULL
+      })
+    if (is.null(torsions)) return()
+    comparison_loaded(list(pdb=data, torsions=torsions,
+      name=tools::file_path_sans_ext(basename(source_name)),
+      source_id=secondary,
+      viewer_format=if (is_upload) ram_detect_format(source_name) else NULL,
+      nmodels=ram_model_count(data)))
+  }, ignoreInit=TRUE)
+  output$compareChainControls <- renderUI({
+    first <- req(loaded())
+    second <- req(comparison_loaded())
+    tags$div(class="ram-compare-chains",
+      selectInput("compareChainA", paste("Chain in", first$name),
+        choices=first$chains, selected=first$chains[[1L]]),
+      selectInput("compareChainB", paste("Chain in", second$name),
+        choices=unique(second$torsions$chain),
+        selected=unique(second$torsions$chain)[[1L]]),
+      if (second$nmodels > 1L)
+        selectInput("compareModel", "Second structure model",
+          choices=as.character(seq_len(second$nmodels)), selected="1")
+    )
+  })
 
   plot_reference <- reactive({
     req(loaded(), input$bgtype, input$background)
@@ -744,6 +837,106 @@ server <- function(input, output, session) {
           residue$letter[[1L]])
       })
     )
+  })
+
+  comparison_torsions <- reactive({
+    second <- req(comparison_loaded())
+    choice <- if (is.null(input$compareModel)) 1L else
+      suppressWarnings(as.integer(input$compareModel))
+    if (length(choice) != 1L || is.na(choice) || choice <= 1L ||
+        choice > second$nmodels) return(second$torsions)
+    ram_extract_torsions(ram_model_at(second$pdb, choice))
+  })
+  comparison_data <- reactive({
+    first <- req(loaded())
+    second <- req(comparison_loaded())
+    req(input$compareChainA, input$compareChainB, input$bgtype,
+        input$validationMode)
+    original <- classified()
+    original <- original[original$chain == input$compareChainA, , drop=FALSE]
+    secondary <- ram_classify_torsions(comparison_torsions(),
+      reference_dir = file.path("static", input$bgtype),
+      selected_reference=plot_reference(),
+      mode=input$validationMode,
+      threshold_fn=ram_density_thresholds)
+    secondary <- secondary[secondary$chain == input$compareChainB, , drop=FALSE]
+    if (!nrow(original) || !nrow(secondary))
+      return(data.frame())
+    ram_compare_torsions(original, secondary)
+  })
+  filtered_comparison <- reactive({
+    result <- comparison_data()
+    if (!nrow(result)) return(result)
+    criterion <- input$compareFilter
+    if (identical(criterion, "changed"))
+      result <- result[result$class_changed, , drop=FALSE]
+    else if (identical(criterion, "large"))
+      result <- result[(!is.na(result$delta_phi) & abs(result$delta_phi)>=30) |
+                       (!is.na(result$delta_psi) & abs(result$delta_psi)>=30),
+                       , drop=FALSE]
+    else if (identical(criterion, "gaps"))
+      result <- result[result$alignment %in% c("Insertion","Deletion"),
+                       , drop=FALSE]
+    result
+  })
+  output$compareSummary <- renderUI({
+    result <- req(comparison_data())
+    if (!nrow(result)) return(tags$p("Select two nonempty protein chains."))
+    aligned <- result$alignment %in% c("Match", "Substitution")
+    tags$div(class="ram-compare-metrics",
+      tags$span(tags$strong(sum(aligned)), " aligned residues"),
+      tags$span(tags$strong(sum(result$class_changed)), " region changes"),
+      tags$span(tags$strong(sum(!aligned)), " insertions / deletions"),
+      tags$span("Angular differences account for the -180° / +180° boundary.")
+    )
+  })
+  output$comparison <- DT::renderDT({
+    result <- filtered_comparison()
+    names <- c("chain_a","residue_a","amino_a",
+      "chain_b","residue_b","amino_b","delta_phi","delta_psi",
+      "class_changed","alignment")
+    if (!all(names %in% names(result))) return(DT::datatable(data.frame()))
+    shown <- result[,names,drop=FALSE]
+    shown$delta_phi <- round(shown$delta_phi,1)
+    shown$delta_psi <- round(shown$delta_psi,1)
+    shown$class_changed <- ifelse(shown$class_changed,"Yes","No")
+    DT::datatable(shown, rownames=FALSE,
+      colnames=c("Chain A","Pos A","AA A","Chain B","Pos B","AA B",
+                 "Δφ (°)","Δψ (°)","Region changed","Alignment"),
+      options=list(pageLength=15,scrollX=FALSE,autoWidth=FALSE,dom="ftip"),
+      class="compact stripe hover")
+  }, server=FALSE)
+  output$downloadComparison <- downloadHandler(
+    filename=function() "RamplotR_structure_comparison.csv",
+    content=function(file) utils::write.csv(
+      isolate(filtered_comparison()), file,row.names=FALSE,na="")
+  )
+  observeEvent(comparison_data(), {
+    result <- comparison_data()
+    if (nrow(result))
+      session$sendCustomMessage("ram-comparison", list(
+        nameA=req(loaded())$name,
+        nameB=req(comparison_loaded())$name,
+        phiA=result$phi_a, psiA=result$psi_a,
+        phiB=result$phi_b, psiB=result$psi_b
+      ))
+  })
+  output$NGLCompare <- NGLVieweR::renderNGLVieweR({
+    req(input$showComparison3D,input$compareChainA,input$compareChainB)
+    first <- req(loaded()); second <- req(comparison_loaded())
+    widget <- NGLVieweR(data=first$source_id,format=first$viewer_format) %>%
+      NGLVieweR::stageParameters(backgroundColor="#f7fafb") %>%
+      addRepresentation("cartoon", param=list(
+        sele=paste0(":",input$compareChainA," and protein"),
+        color="#CE6A4D",name="primary"))
+    widget <- NGLVieweR::addStructure(widget, data=second$source_id,
+                                     format=second$viewer_format) %>%
+      addRepresentation("cartoon",param=list(
+        sele=paste0(":",input$compareChainB," and protein"),
+        color="#317E9A",name="secondary"))
+    NGLVieweR::setSuperpose(widget, reference=1,
+      sele_reference=paste0(":",input$compareChainA),
+      sele_target=paste0(":",input$compareChainB))
   })
 
   output$summary <- renderUI({

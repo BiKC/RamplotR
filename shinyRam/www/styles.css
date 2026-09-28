@@ -314,3 +314,9 @@ body > .container-fluid { max-width: none; padding: 0; }
 
 /* The NGL canvas now uses a light stage; keep its surrounding card consistent. */
 .ram-ngl { background: #f7fafb; border-radius: 9px; overflow: hidden; }
+
+/* Linked residue inspection: persistent selection across plot, table and 3D. */
+.ram-selection-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 38px; margin: 7px 3px 0; padding: 9px 5px 2px; border-top: 1px solid var(--ram-border); color: var(--ram-muted); font-size: 12px; }
+.ram-selection-bar .btn { border-color: var(--ram-border); color: var(--ram-accent-dark); padding: 5px 10px; }
+.ram-selection-bar .btn:hover { background: var(--ram-accent-soft); }
+@media(max-width: 580px) { .ram-selection-bar { flex-wrap: wrap; } }

@@ -26,7 +26,7 @@ jobs:
           use-public-rspm: true
       - name: Install the application's R dependencies
         run: |
-          Rscript -e 'install.packages(c("shiny", "shinyWidgets", "colourpicker", "bio3d", "NGLVieweR", "DT", "jsonlite"))'
+          Rscript -e 'install.packages(c("shiny", "shinyWidgets", "colourpicker", "bio3d", "NGLVieweR", "DT", "jsonlite", "xml2"))'
       - name: Validate publication figure and report exports
         run: Rscript tests/reports.R
       - name: Install headless-browser controller
@@ -53,6 +53,8 @@ jobs:
             https://files.rcsb.org/download/1D3Z.pdb \
             -o benchmarks/output/ui-preview/1D3Z.pdb
           Rscript tests/model-integration.R
+      - name: Exercise offline batch analysis and NMR-ensemble exports
+        run: Rscript tests/batch-integration.R
       - name: Start the Shiny application
         shell: bash
         run: |

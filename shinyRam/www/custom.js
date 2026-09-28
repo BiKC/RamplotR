@@ -28,8 +28,11 @@
     const resi = Number(item.resi);
     if (!Number.isInteger(resi) || !/^[A-Za-z0-9_-]*$/.test(chain) ||
         !/^[A-Za-z0-9]*$/.test(ins)) return null;
-    return String(resi) + (ins ? "^" + ins : "") +
+    const residue = String(resi) + (ins ? "^" + ins : "") +
       (chain ? ":" + chain : "");
+    const model = Number(item.modelIndex);
+    return item.multipleModels && Number.isInteger(model) && model > 0
+      ? residue + " and /" + (model - 1) : residue;
   }
 
   function syncNglSelection(zoom) {
@@ -50,7 +53,8 @@
     // than adding a new representation for every residue click.
     highlight.setSelection(sele || "none");
 
-    const key = sele ? selectionKey(selectedResidue) : "";
+    const key = sele ? selectionKey(selectedResidue) + "::" +
+      String(selectedResidue.modelIndex || 1) : "";
     if (sele && zoom && key !== focusedKey) {
       const component = structures.find(function (item) {
         return item && item.structure && typeof item.autoView === "function";

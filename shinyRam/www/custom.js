@@ -245,6 +245,21 @@
 
   // Resize Plotly if the sidebar or viewport changes size. Do not recreate
   // the scientific traces or reset the current plot selection on resize.
+  function resizePlot() {
+    if (!plot || !window.Plotly ||
+        !plot.classList.contains("js-plotly-plot")) return;
+    const height = plotHeight();
+    // Plotly.Plots.resize alone preserves the original desktop layout height,
+    // which makes the angular plot crop or collapse on narrow screens.
+    if (Math.abs((plot._fullLayout && plot._fullLayout.height || 0) - height) >= 2) {
+      window.Plotly.relayout(plot, { height: height }).then(function () {
+        window.Plotly.Plots.resize(plot);
+      });
+    } else {
+      window.Plotly.Plots.resize(plot);
+    }
+  }
+
   if (plot && window.ResizeObserver) {
     let previousWidth = 0;
     const observer = new ResizeObserver(function () {
@@ -252,7 +267,7 @@
       if (!width || Math.abs(width - previousWidth) < 5 ||
           !plot.classList.contains("js-plotly-plot")) return;
       previousWidth = width;
-      if (window.Plotly) window.Plotly.Plots.resize(plot);
+      resizePlot();
     });
     observer.observe(plot.parentElement || plot);
   }
@@ -260,10 +275,7 @@
   // Bootstrap 3 dispatches tab events through jQuery, not DOM EventTarget.
   if (window.jQuery) {
     window.jQuery(document).on("shown.bs.tab", function () {
-      if (plot && window.Plotly && plot.classList.contains("js-plotly-plot")) {
-        window.Plotly.Plots.resize(plot);
-      }
-      window.dispatchEvent(new Event("resize"));
+      resizePlot();
     });
   }
 })();

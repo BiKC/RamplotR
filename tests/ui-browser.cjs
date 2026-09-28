@@ -223,14 +223,37 @@ const assert = require("node:assert/strict");
       document.querySelector("#regions tbody tr.selected"), { timeout: 18000 });
     const before = await page.$eval("#selectedResidueInfo strong",
                                    e => e.textContent);
+    // A single page.$ returns only the first row; find and actually click a
+    // different visible residue so the table -> NGL path is exercised.
+    const other = await page.evaluate(first => {
+      const rows = Array.from(document.querySelectorAll("#regions tbody tr"));
+      const index = rows.findIndex(row => {
+        const cells = row.querySelectorAll("td");
+        return cells.length >= 3 &&
+          (cells[0].textContent.trim() !== String(first[0]) ||
+           Number(cells[1].textContent.trim()) !== Number(first[1]) ||
+           cells[2].textContent.trim() !== String(first[2] || ""));
+      });
+      if (index < 0) return null;
+      const cells = rows[index].querySelectorAll("td");
+      const chain = cells[0].textContent.trim();
+      const resi = cells[1].textContent.trim();
+      const insertion = cells[2].textContent.trim();
+      return {
+        index: index,
+        sele: resi + (insertion ? "^" + insertion : "") +
+          (chain ? ":" + chain : "")
+      };
+    }, firstPoint);
+    assert.ok(other, "Need at least two different visible residues.");
     const rows = await page.$("#regions table tbody tr");
-    if (rows.length > 1) {
-      await rows[1].click();
-      await page.waitForFunction(old =>
-        document.querySelector("#selectedResidueInfo strong") &&
-        document.querySelector("#selectedResidueInfo strong").textContent !== old,
-        { timeout: 18000 }, before);
-    }
+    await rows[other.index].click();
+    await page.waitForFunction(({ before, sele }) =>
+      document.querySelector("#selectedResidueInfo strong") &&
+      document.querySelector("#selectedResidueInfo strong").textContent !== before &&
+      window.__ramStickSelections.includes(sele) &&
+      window.__ramZoomCalls.some(call => call.sele === sele),
+      { timeout: 20000 }, { before, sele: other.sele });
     await page.click('.nav-tabs a[data-value="plot"]');
     await page.click("#clearResidue");
     try {

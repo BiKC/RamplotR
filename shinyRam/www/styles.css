@@ -498,3 +498,106 @@ body > .container-fluid { max-width: none; padding: 0; }
 @media(max-width:800px) {
   .ram-compare-source { grid-template-columns:1fr; }
 }
+
+
+/* Dense analysis workspace. The introductory layout is deliberately retained
+   until the first structure has been successfully visualised. */
+.ram-heading-compact { display:none; }
+.ram-main { position:relative; }
+.ram-workspace-toolbar { display:none; position:absolute; top:8px; right:18px; z-index:4; }
+.ram-has-data .ram-workspace-toolbar { display:block; }
+.ram-settings-toggle {
+  border:1px solid #bed9d5; border-radius:8px; background:#f2f9f7;
+  padding:7px 11px; color:#155a62; font-size:11px; font-weight:750;
+  cursor:pointer; min-height:32px;
+}
+.ram-settings-toggle:hover { background:#e2f2ee; }
+.ram-settings-toggle:focus-visible { outline:2px solid #197980; outline-offset:2px; }
+.ram-has-data .ram-main > .tabbable > .nav-tabs { padding-right:132px; }
+
+.ram-has-data .ram-intro { display:none; }
+.ram-has-data .ram-source {
+  display:grid; grid-template-columns:max-content minmax(0,1fr);
+  gap:12px; align-items:center; padding:10px 15px;
+  margin:10px 0 11px;
+}
+.ram-has-data .ram-source .ram-heading-full,
+.ram-has-data .ram-source .ram-section-heading p,
+.ram-has-data .ram-source .ram-tip { display:none; }
+.ram-has-data .ram-source .ram-heading-compact { display:inline; }
+.ram-has-data .ram-source .ram-section-heading h2 { font-size:13px; }
+.ram-has-data .ram-source-controls {
+  margin:0; grid-template-columns:minmax(170px,210px) minmax(120px,1fr) auto;
+  gap:12px; align-items:center;
+}
+.ram-has-data .ram-source .control-label {
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+}
+.ram-has-data .ram-source .radio-inline { padding-top:7px; padding-bottom:7px; }
+.ram-has-data .ram-source .ram-source-picker .form-control,
+.ram-has-data .ram-source .ram-submit .btn { height:37px; min-height:37px; }
+.ram-has-data .ram-source .ram-submit { padding:0; }
+.ram-has-data .ram-global-inspector {
+  padding:8px 12px; margin-bottom:11px; border-radius:9px;
+  gap:6px 12px; top:0;
+}
+.ram-has-data .ram-inspector-data {
+  display:flex; flex-wrap:wrap; align-items:center; gap:6px 17px;
+}
+.ram-has-data .ram-inspector-data > div:first-child { gap:7px; }
+.ram-has-data .ram-inspector-actions { gap:5px; }
+.ram-has-data .ram-inspector-actions .btn { padding:6px 9px; }
+
+/* Make the two scientific views the focus, not repeating captions or padding. */
+.ram-has-data .ram-workspace { gap:14px; padding-bottom:15px; }
+.ram-has-data .ram-sidebar { gap:10px; }
+.ram-has-data .ram-sidebar .ram-panel { padding:14px 16px 12px; }
+.ram-has-data .ram-sidebar .ram-section-heading { margin-bottom:10px; }
+.ram-has-data .ram-sidebar .form-group { margin-bottom:9px; }
+.ram-has-data .ram-sidebar .ram-field-hint { font-size:10px; line-height:1.4; }
+.ram-has-data .ram-main { padding:7px 16px 15px; }
+.ram-has-data .ram-main > .tabbable > .tab-content { padding-top:13px; }
+.ram-has-data .ram-main > .tabbable > .nav-tabs > li > a {
+  padding:10px 12px 11px;
+}
+.ram-has-data .ram-result-head { margin-bottom:12px; }
+.ram-has-data .ram-chart-card { padding:12px 11px 10px; }
+.ram-has-data .ram-chart-help { margin-bottom:8px; }
+
+/* A genuine focus mode, not a second copy of the plots or viewer. */
+.ram-focus-mode .ram-workspace { grid-template-columns:minmax(0,1fr); }
+.ram-focus-mode .ram-sidebar, .ram-focus-mode .ram-source,
+.ram-focus-mode .ram-intro { display:none !important; }
+.ram-focus-mode .ram-workspace-toolbar { display:block; }
+.ram-focus-mode .ram-global-inspector { margin-top:10px; }
+@media (min-width:1100px) and (max-width:1220px) {
+  .ram-charts { grid-template-columns:minmax(0,1.15fr) minmax(290px,.85fr); }
+}
+@media (min-width:900px) and (max-height:930px) {
+  .ram-has-data .ram-sidebar .ram-section-heading p { display:none; }
+  .ram-has-data .ram-sidebar .ram-field-hint { display:none; }
+  .ram-has-data .ram-header .ram-inner { min-height:58px; }
+  .ram-has-data .ram-header .ram-brand-mark {
+    width:37px; height:37px; border-radius:10px; font-size:19px;
+  }
+  .ram-has-data .ram-global-inspector .ram-inspector-angles { gap:6px 11px; }
+  .ram-has-data .ram-chart-help { font-size:10px; }
+}
+@media (max-width:800px) {
+  .ram-has-data .ram-workspace-toolbar { display:none; }
+  .ram-has-data .ram-main > .tabbable > .nav-tabs { padding-right:0; }
+  .ram-has-data .ram-source { display:block; }
+  .ram-has-data .ram-source .ram-section-heading { margin-bottom:8px; }
+  .ram-has-data .ram-source-controls {
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:9px;
+  }
+  .ram-has-data .ram-source .ram-submit { grid-column:1/-1; }
+  .ram-has-data .ram-inspector-data { display:grid; }
+}
+@media (max-width:580px) {
+  .ram-has-data .ram-source-controls { grid-template-columns:1fr; }
+  .ram-has-data .ram-source .ram-submit { grid-column:1; }
+  .ram-has-data .ram-source .ram-submit .btn { width:100%; }
+  .ram-has-data .ram-global-inspector { position:relative; top:0; }
+}

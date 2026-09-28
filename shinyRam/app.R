@@ -841,14 +841,18 @@ server <- function(input, output, session) {
     )
     columns <- c("chain", "resi", "insertion_code", "resn",
                  "phi", "psi", "region", "density")
+    if ("plddt" %in% names(data))
+      columns <- c(columns, "plddt", "confidence_category")
     shown <- data[, columns, drop = FALSE]
+    if ("plddt" %in% names(shown)) shown$plddt <- round(shown$plddt, 1L)
     shown$phi <- round(shown$phi, 1L)
     shown$psi <- round(shown$psi, 1L)
     shown$density <- round(shown$density, 1L)
     widget <- DT::datatable(
       shown, rownames = FALSE,
       colnames = c("Chain", "Residue", "Ins.", "AA", "Phi (°)", "Psi (°)",
-                   "Region", "Percentile"),
+                   "Region", "Percentile",
+                   if ("plddt" %in% names(shown)) c("pLDDT", "Confidence")),
       selection = list(mode = "single",
                        selected = if (length(marked)) marked[[1L]] else integer(0)),
       options = list(
@@ -915,6 +919,14 @@ server <- function(input, output, session) {
         structure$name, input$bgtype, input$background,
         input$validationMode, current_model(), reference_file
       )
+      if (!is.null(structure$prediction)) {
+        provenance$prediction_source <- structure$prediction$source
+        provenance$prediction_model <- structure$prediction$model_id
+        provenance$confidence_file <- structure$prediction$confidence_file
+        provenance$PAE_available <- !is.null(structure$prediction$pae)
+        provenance$confidence_limitations <- paste(
+          structure$prediction$notes, collapse = "; ")
+      }
       ram_save_html_report(file, data, provenance, image)
     }
   )
@@ -1316,6 +1328,7 @@ server <- function(input, output, session) {
                      insertion_code = row$insertion_code[[1L]]))
   })
   observeEvent(input$ramSeqPick, select_from(input$ramSeqPick))
+  observeEvent(input$ramPaePick, select_from(input$ramPaePick))
   observeEvent(input$showInPlot, {
     updateTabsetPanel(session, "analysisTabs", selected = "plot")
   })
@@ -1379,7 +1392,16 @@ server <- function(input, output, session) {
         tags$span(paste("φ", angle(row$phi[[1L]]))),
         tags$span(paste("ψ", angle(row$psi[[1L]]))),
         tags$span(if (is.finite(row$density[[1L]]))
-          sprintf("Density percentile %.1f", row$density[[1L]]) else "")
+          sprintf("Density percentile %.1f", row$density[[1L]]) else ""),
+        if ("plddt" %in% names(row) && is.finite(row$plddt[[1L]]))
+          tags$span(class = "ram-inspector-plddt",
+            sprintf("pLDDT %.1f · %s", row$plddt[[1L]],
+                    row$confidence_category[[1L]])),
+        if ("plddt" %in% names(row) && is.finite(row$plddt[[1L]]) &&
+            row$plddt[[1L]] >= 90 &&
+            identical(as.character(row$region[[1L]]), "Not allowed"))
+          tags$span(class = "ram-inspector-warning",
+            "High model confidence, unusual backbone geometry; inspect locally.")
       )
     )
   })

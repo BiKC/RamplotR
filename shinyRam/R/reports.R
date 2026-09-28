@@ -102,9 +102,11 @@ ram_save_html_report <- function(path, data, metadata, svg_path,
     h(gsub("_"," ",name),metadata[[name]]))
   shown <- utils::head(data[,intersect(c(
     "chain","resi","insertion_code","resn","phi","psi","region",
-    "density","omega","omega_status","chi1","plddt","confidence_category"),
+    "density","omega","omega_status","chi1","cb_ca_distance",
+    "cb_signed_volume","plddt","confidence_category"),
     names(data)),drop=FALSE],max_report_rows)
-  for(field in intersect(c("phi","psi","density","omega","chi1","plddt"),
+  for(field in intersect(c("phi","psi","density","omega","chi1","cb_ca_distance",
+                       "cb_signed_volume","plddt"),
                          names(shown)))
     shown[[field]] <- round(shown[[field]],2L)
   official <- NULL

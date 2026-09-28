@@ -27,7 +27,7 @@ Reference distributions and density-percentile thresholds in RamplotR must not b
 
 ## Interface
 
-The primary plot and 3D viewer share a selected-residue inspector, which remains visible when you switch tabs. Click a point, row, sequence letter or residue in the molecular structure to show the corresponding residue across all views. The inspector includes **Show in plot**, **Clear**, and outlier-review navigation. Changing residue filters, density reference, classification mode or palette updates the result without refetching the structure.
+The primary plot and 3D viewer share a selected-residue inspector, which remains visible when you switch tabs. A compact sequence overview directly beneath these views shows **every selected chain at once**; expand it to browse individual residues without leaving the plot. The loaded interface also offers a condensed laptop layout and a reversible focus mode for hiding analysis settings. Click a point, row, sequence letter or residue in the molecular structure to show the corresponding residue across all views. The inspector includes **Show in plot**, **Clear**, and outlier-review navigation. Changing residue filters, density reference, classification mode or palette updates the result without refetching the structure.
 
 The residue table has readable angles, combined scientific/review filters and CSV export. The 3D viewer supports cartoon, ribbon, sticks, ball-and-stick and surface representations; additional layers and motion controls are in a compact disclosure. RamplotR's own ordered publication palette is selected by default, with legacy colour schemes and custom colours still available.
 

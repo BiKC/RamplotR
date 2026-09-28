@@ -57,6 +57,14 @@ const assert = require("node:assert/strict");
       document.getElementById("plotly").classList.contains("js-plotly-plot"),
       { timeout: 90000 }
     );
+    // The loaded-state CSS is applied in Plotly.react's completion
+    // callback. Wait for its scheduled responsive relayout before measuring.
+    await page.waitForFunction(() => {
+      const p = document.getElementById("plotly");
+      return p && p._fullLayout && p.clientWidth > 0 &&
+        p._fullLayout.xaxis._length >= 0.48 * p.clientWidth &&
+        p._fullLayout.yaxis._length >= 0.48 * p.clientWidth;
+    }, {timeout: 20000});
     const plot = await page.evaluate(() => {
       const p = document.getElementById("plotly");
       return {

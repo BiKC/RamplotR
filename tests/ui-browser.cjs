@@ -284,6 +284,11 @@ const assert = require("node:assert/strict");
         const p = document.getElementById("plotly");
         return {
           clientWidth: p.clientWidth,
+          styleHeight: p.style.height,
+          computedHeight: getComputedStyle(p).height,
+          plotClass: p.className,
+          windowWidth: window.innerWidth,
+          activeTab: document.querySelector(".ram-main .nav-tabs li.active a").textContent,
           layoutWidth: p._fullLayout && p._fullLayout.width,
           layoutHeight: p._fullLayout && p._fullLayout.height,
           axisWidth: p._fullLayout && p._fullLayout.xaxis._length,
@@ -292,6 +297,7 @@ const assert = require("node:assert/strict");
         };
       });
       console.error("Responsive layout diagnostics:", JSON.stringify(details));
+      console.error("Browser page errors:", errors);
       await page.screenshot({
         path: "benchmarks/output/ui-preview/mobile-debug.png", fullPage: true
       });

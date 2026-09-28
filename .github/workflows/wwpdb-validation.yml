@@ -7,6 +7,7 @@ on:
       - "benchmarks/wwpdb_helpers.R"
       - "benchmarks/compare_wwpdb.R"
       - "tests/wwpdb.R"
+      - "tests/phase-a-baseline.R"
       - "validation/**"
       - ".github/workflows/wwpdb-validation.yml"
   workflow_dispatch:
@@ -63,6 +64,12 @@ jobs:
             "benchmarks/output/wwpdb/${ACCESSION}" \
             "benchmarks/output/wwpdb/${ACCESSION}/source/${lower}_validation.xml.gz" \
             "benchmarks/output/wwpdb/${ACCESSION}/source/${ACCESSION}.cif"
+      - name: Confirm pinned public-source hashes and scientific baseline
+        shell: bash
+        env:
+          ACCESSION: ${{ matrix.accession }}
+        run: |
+          Rscript tests/phase-a-baseline.R "$ACCESSION"             "benchmarks/output/wwpdb/$ACCESSION"
       - name: Add independent validation summary
         if: success()
         shell: bash

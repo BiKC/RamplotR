@@ -16,6 +16,60 @@
   let selectionTrace = -1;
   let boundStage = null;
   let boundPickHandler = null;
+  let focusedKey = "";
+  let focusedStage = null;
+
+  // A residue identity is made of chain, sequence position and insertion
+  // code. Do not focus an arbitrary selector received from a browser event.
+  function nglSelection(item) {
+    if (!item || item.chain == null || item.resi == null) return null;
+    const chain = String(item.chain);
+    const ins = String(item.insertion_code || "");
+    const resi = Number(item.resi);
+    if (!Number.isInteger(resi) || !/^[A-Za-z0-9_-]*$/.test(chain) ||
+        !/^[A-Za-z0-9]*$/.test(ins)) return null;
+    return String(resi) + (ins ? "^" + ins : "") +
+      (chain ? ":" + chain : "");
+  }
+
+  function syncNglSelection(zoom) {
+    if (typeof window.getNGLStage !== "function" ||
+        typeof window.getNGLStructure !== "function") return false;
+    const stage = window.getNGLStage("NGL");
+    const structures = window.getNGLStructure("NGL");
+    if (!stage || !structures || !structures.length ||
+        typeof stage.getRepresentationsByName !== "function") return false;
+    const highlight = stage.getRepresentationsByName("ram-highlight");
+    if (!highlight || !highlight.list || !highlight.list.length) return false;
+    if (stage !== focusedStage) {
+      focusedStage = stage;
+      focusedKey = "";
+    }
+    const sele = nglSelection(selectedResidue);
+    // Update the already-created orange ball-and-stick representation rather
+    // than adding a new representation for every residue click.
+    highlight.setSelection(sele || "none");
+
+    const key = sele ? selectionKey(selectedResidue) : "";
+    if (sele && zoom && key !== focusedKey) {
+      const component = structures.find(function (item) {
+        return item && item.structure && typeof item.autoView === "function";
+      });
+      if (component) {
+        // Pause animations before an animated camera move so the selected
+        // side chain stays centered while it is being inspected.
+        if (typeof stage.setRock === "function") stage.setRock(false);
+        if (typeof stage.setSpin === "function") stage.setSpin(false);
+        component.autoView(sele, 650);
+        focusedKey = key;
+      }
+    } else if (!sele && focusedKey) {
+      // Clearing a selection restores the whole-structure overview.
+      if (typeof stage.autoView === "function") stage.autoView(450);
+      focusedKey = "";
+    }
+    return true;
+  }
 
   function selectionKey(item) {
     if (!item || item.chain == null || item.resi == null) return "";
@@ -78,6 +132,9 @@
         window.Shiny.setInputValue("ramNglPick", pick, { priority: "event" });
     };
     stage.signals.clicked.add(boundPickHandler);
+    // A selection can be made before NGL finishes loading. Once the widget
+    // announces it is ready, apply both the stick representation and focus.
+    syncNglSelection(true);
     return true;
   }
 
@@ -342,9 +399,11 @@
     window.Shiny.addCustomMessageHandler("ram-selection", function (choice) {
       selectedResidue = choice || null;
       refreshSelection();
+      syncNglSelection(true);
     });
     window.Shiny.addCustomMessageHandler("ram-bind-ngl", function () {
       bindNglPick();
+      syncNglSelection(true);
     });
   }
 

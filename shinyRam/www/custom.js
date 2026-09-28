@@ -5,8 +5,8 @@
   "use strict";
 
   const defaultChainColors = [
-    "#1c7777", "#9366aa", "#cf823a", "#5a8eb8",
-    "#65915f", "#c25b76", "#a77e45", "#737d94"
+    "#CE6A4D", "#317E9A", "#8065A3", "#B68A3E",
+    "#498777", "#B65B7A", "#5070A0", "#826B4B"
   ];
   const plot = document.getElementById("plotly");
   const empty = document.getElementById("plot-empty");
@@ -156,6 +156,33 @@
     return Array.isArray(value) ? value : value == null ? [] : [value];
   }
 
+  // A delegated sequence click survives Shiny's HTML re-rendering, including
+  // when the user switches chains or changes scientific reference datasets.
+  document.addEventListener("click", function (event) {
+    const button = event.target && event.target.closest &&
+      event.target.closest(".ram-seq-res");
+    if (!button) return;
+    const pick = {
+      chain: button.dataset.chain,
+      resi: Number(button.dataset.resi),
+      insertion_code: button.dataset.insertion || ""
+    };
+    if (!Number.isInteger(pick.resi)) return;
+    if (window.Shiny && window.Shiny.setInputValue)
+      window.Shiny.setInputValue("ramSeqPick", pick, { priority: "event" });
+  });
+
+  function markSequenceSelection() {
+    const selected = selectionKey(selectedResidue);
+    document.querySelectorAll(".ram-seq-res").forEach(function (button) {
+      const key = selectionKey({
+        chain: button.dataset.chain, resi: Number(button.dataset.resi),
+        insertion_code: button.dataset.insertion || ""
+      });
+      button.setAttribute("aria-pressed", String(!!selected && selected === key));
+    });
+  }
+
   function changeSource() {
     const selected = document.querySelector('input[name="inputSource"]:checked');
     const upload = selected && selected.value === "upload";
@@ -222,10 +249,10 @@
     plot.style.height = plotHeight() + "px";
 
     const background = [
-      safeColor(shades[0], "#F1EEF6"),
-      safeColor(shades[1], "#BDC9E1"),
-      safeColor(shades[2], "#74A9CF"),
-      safeColor(shades[3], "#0570B0")
+      safeColor(shades[0], "#FFF8ED"),
+      safeColor(shades[1], "#D4ECE7"),
+      safeColor(shades[2], "#7DB9B5"),
+      safeColor(shades[3], "#126E74")
     ];
     // Preserve the original scientific contour cutoffs and layer order.
     const traces = [
@@ -406,6 +433,7 @@
     window.Shiny.addCustomMessageHandler("ram-selection", function (choice) {
       selectedResidue = choice && !choice.clear ? choice : null;
       refreshSelection();
+      markSequenceSelection();
       syncNglSelection(true);
     });
     // Shiny requires every custom message handler to declare one argument.
@@ -495,9 +523,29 @@
     }
   }
 
-  // Support both Bootstrap's jQuery event and native tab events.
-  document.addEventListener("shown.bs.tab", scheduleResize);
-  if (window.jQuery)
-    window.jQuery(document).on("shown.bs.tab", scheduleResize);
+  // Bootstrap hides the DT at initialisation. Recalculate *the same table's*
+  // columns on visibility changes: do not enable DataTables scrollX, which
+  // duplicates the header and creates cross-version alignment problems.
+  function adjustVisibleTables() {
+    if (window.jQuery && window.jQuery.fn &&
+        window.jQuery.fn.dataTable) {
+      const api = window.jQuery.fn.dataTable.tables({
+        visible: true, api: true
+      });
+      if (api && typeof api.columns === "function") api.columns.adjust();
+    }
+  }
+  document.addEventListener("shown.bs.tab", function () {
+    scheduleResize(); adjustVisibleTables();
+  });
+  if (window.jQuery) {
+    window.jQuery(document).on("shown.bs.tab", function () {
+      scheduleResize();
+      // Wait for the Bootstrap pane to finish its layout before measuring DT.
+      if (window.requestAnimationFrame)
+        window.requestAnimationFrame(adjustVisibleTables);
+      else adjustVisibleTables();
+    });
+  }
 
 })();

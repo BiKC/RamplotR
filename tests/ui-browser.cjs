@@ -94,7 +94,16 @@ const assert = require("node:assert/strict");
 
     // Changing presentation controls must update the displayed plot without
     // another click on Analyze, and without loading another structure.
-    await page.select("#colorscheme", "PDBSum");
+    await page.evaluate(() => {
+      // selectInput is Selectize-backed; changing its hidden native select
+      // bypasses the Shiny binding. Use the same API as a real user choice.
+      const el = document.querySelector("#colorscheme");
+      if (el.selectize) el.selectize.setValue("PDBSum");
+      else {
+        el.value = "PDBSum";
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    });
     try {
       await page.waitForFunction(() => {
         const p = document.getElementById("plotly");

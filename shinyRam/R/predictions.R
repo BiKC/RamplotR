@@ -256,3 +256,60 @@ ram_download_afdb <- function(entry,
   list(structure = coord, pae = pae, notes = notes,
        original_name = paste0("AF-", entry$accession, ext))
 }
+
+
+# Combine B-factor confidence and independently verified optional JSON without
+# altering any of the underlying torsion or Ramachandran calculations.
+ram_prepare_prediction <- function(pdb, torsions, source, sidecar = NULL,
+                                   summary_file = NULL, notes = character(),
+                                   model_id = "") {
+  baseline <- ram_prediction_from_atoms(pdb, torsions, source)
+  mapped <- if (!is.null(sidecar) && nzchar(sidecar))
+    ram_prediction_json(ram_read_confidence_json(sidecar), torsions,
+                        atoms = pdb$atom, source = source) else NULL
+  if (!is.null(mapped) && any(is.finite(mapped$plddt))) {
+    present <- is.finite(mapped$plddt)
+    baseline$plddt[present] <- mapped$plddt[present]
+    baseline$confidence_category <- ram_plddt_category(baseline$plddt)
+  }
+  summary <- if (!is.null(summary_file) && nzchar(summary_file))
+    ram_prediction_json(ram_read_confidence_json(summary_file), torsions,
+                        source = source) else NULL
+  metric <- function(key) {
+    if (!is.null(summary) && is.finite(summary[[key]])) return(summary[[key]])
+    if (!is.null(mapped) && is.finite(mapped[[key]])) return(mapped[[key]])
+    NA_real_
+  }
+  list(source = source, residues = baseline,
+       pae = if (!is.null(mapped)) mapped$pae else NULL,
+       pae_rows = if (!is.null(mapped)) mapped$pae_rows else integer(),
+       ptm = metric("ptm"), iptm = metric("iptm"),
+       notes = c(notes, if (!is.null(mapped)) mapped$notes),
+       model_id = model_id,
+       confidence_file = if (!is.null(sidecar)) basename(sidecar) else "")
+}
+
+# Cap Plotly payload size. Sampling is explicitly labelled: never report
+# sampled PAE values as a complete matrix or hide a chain/domain boundary.
+ram_pae_plot_data <- function(prediction, torsions, max_display = 400L) {
+  if (is.null(prediction) || is.null(prediction$pae)) return(NULL)
+  pae <- prediction$pae
+  if (nrow(pae) != ncol(pae) || nrow(pae) != length(prediction$pae_rows))
+    stop("PAE values and residue indices are inconsistent.")
+  n <- nrow(pae)
+  chosen <- if (n <= max_display) seq_len(n) else
+    unique(as.integer(round(seq(1, n, length.out = max_display))))
+  rows <- prediction$pae_rows[chosen]
+  if (anyNA(rows) || any(rows < 1L | rows > nrow(torsions)))
+    stop("PAE residue mapping is invalid.")
+  labels <- paste0(torsions$chain[rows], ":",
+    torsions$resi[rows], torsions$insertion_code[rows])
+  list(z = lapply(chosen, function(i) unname(as.numeric(pae[i, chosen]))),
+       labels = labels,
+       residues = lapply(rows, function(i) list(
+         chain = as.character(torsions$chain[[i]]),
+         resi = as.integer(torsions$resi[[i]]),
+         insertion_code = as.character(torsions$insertion_code[[i]]))),
+       total_tokens = n, displayed_tokens = length(chosen),
+       downsampled = length(chosen) != n)
+}

@@ -84,6 +84,11 @@ const assert = require("node:assert/strict");
     assert.ok(plot.axisPixels.x >= 0.48 * plot.width &&
               plot.axisPixels.y >= 0.48 * plot.width,
               "Angular axes must use at least half of the plot panel width.");
+    assert.equal(await page.$eval("#colorscheme", el => el.value),
+                 "RamplotR", "RamplotR must be the publication-default palette.");
+    assert.equal(await page.evaluate(() =>
+      document.getElementById("plotly").data[0].fillcolor),
+      "#D4ECE7", "The default contour must use the RamplotR identity palette.");
     // NGL loads and paints asynchronously after the Plotly response.
     // Give the viewer a moment to render before taking the desktop preview.
     await new Promise(resolve => setTimeout(resolve, 1600));
@@ -221,6 +226,22 @@ const assert = require("node:assert/strict");
     await page.waitForSelector("#regions table tbody tr", { timeout: 18000 });
     await page.waitForFunction(() =>
       document.querySelector("#regions tbody tr.selected"), { timeout: 18000 });
+    // One physical table (no DataTables scroll-head clone) must align the
+    // column headings with the corresponding residue values.
+    const geometry = await page.evaluate(() => {
+      const table = document.querySelector("#regions table");
+      const head = table.querySelectorAll("thead th");
+      const cells = table.querySelectorAll("tbody tr:first-child td");
+      return [0,1,2,3,4,5,6,7].map(i => ({
+        heading: head[i].getBoundingClientRect().left,
+        value: cells[i].getBoundingClientRect().left
+      }));
+    });
+    assert.ok(geometry.every(col => Math.abs(col.heading - col.value) <= 4),
+              "Residue table header and body columns must align.");
+    await page.screenshot({
+      path:"benchmarks/output/ui-preview/residue-table.png",fullPage:true
+    });
     const before = await page.$eval("#selectedResidueInfo strong",
                                    e => e.textContent);
     // A single page.$ returns only the first row; find and actually click a
@@ -336,6 +357,54 @@ const assert = require("node:assert/strict");
     }, { timeout: 20000 }, {
       selected: firstNglSelector, minZoom: previousZoomCount
     });
+
+    // A tab-independent inspector allows sequence selection and a one-click
+    // return to the 2D/3D plots.
+    await page.click('.nav-tabs a[data-value="sequence"]');
+    await page.waitForSelector(".ram-seq-res", {timeout:18000});
+    const sequencePick = await page.evaluate(first => {
+      const buttons = Array.from(document.querySelectorAll(".ram-seq-res"));
+      const other = buttons.find(b =>
+        b.dataset.chain !== String(first[0]) ||
+        Number(b.dataset.resi) !== Number(first[1]) ||
+        b.dataset.insertion !== String(first[2] || ""));
+      if (!other) return null;
+      other.click();
+      return other.dataset.resi;
+    }, firstPoint);
+    assert.ok(sequencePick, "Sequence navigator needs multiple residues.");
+    await page.waitForFunction(resi => {
+      const chosen = document.querySelector("#selectedResidueInfo strong");
+      return chosen && chosen.textContent.includes(" " + resi);
+    }, {timeout:15000}, sequencePick);
+    await page.click("#showInPlot");
+    await page.waitForFunction(() =>
+      !!document.querySelector('.nav-tabs li.active a[data-value="plot"]'),
+      {timeout:15000}
+    );
+
+    // Comparing 1CRN with itself tests sequence alignment without relying
+    // on any additional external downloads inside the Shiny session.
+    await page.click('.nav-tabs a[data-value="compare"]');
+    await page.evaluate(() =>
+      document.querySelector('input[name="compareInputSource"][value="upload"]').click());
+    await page.waitForFunction(() => {
+      const element = document.getElementById("ram-compare-upload");
+      return element && !element.classList.contains("is-hidden");
+    }, {timeout:15000});
+    await (await page.$("#compareFile")).uploadFile(
+      path.resolve("benchmarks/output/ui-preview/1CRN.pdb"));
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    await page.click("#compareSubmit");
+    await page.waitForSelector("#comparison tbody tr", {timeout:25000});
+    await page.waitForFunction(() => {
+      const p = document.getElementById("comparePlot");
+      return p && p.data && p.data.length >= 2;
+    }, {timeout:18000});
+    await page.screenshot({
+      path:"benchmarks/output/ui-preview/compare-self.png",fullPage:true
+    });
+    await page.click('.nav-tabs a[data-value="plot"]');
 
     // Check whether the browser delivered resize events and whether Plotly's
     // relayout handler actually received the new mobile dimensions.

@@ -20,10 +20,7 @@ ram_batch_options <- function(args) {
       if(i==length(args) || startsWith(args[[i+1L]],"--"))
         stop("Missing value for --",flag,call.=FALSE)
       value <- args[[i+1L]]
-      name <- switch(flag,"max-files"="max_files",
-                     "prediction-source"="prediction_source",
-                     "validation-xml"="validation_xml",
-                     "ensemble-models"="ensemble_models",flag)
+      name <- gsub("-","_",flag,fixed=TRUE)
       out[[name]] <- value
       i <- i+1L
     }
@@ -43,9 +40,9 @@ ram_batch_options <- function(args) {
     stop("Unknown prediction provenance.")
   for(field in c("model","max_files","ensemble_models")) {
     value <- suppressWarnings(as.integer(out[[field]]))
-    if(length(value)!=1L || is.na(value) ||
-       value<if(field=="ensemble_models") 0L else 1L ||
-       value>if(field=="max_files") 1000L else 100L)
+    lower <- if(field=="ensemble_models") 0L else 1L
+    upper <- if(field=="max_files") 1000L else 100L
+    if(length(value)!=1L || is.na(value) || value<lower || value>upper)
       stop("Invalid value for ",field)
     out[[field]] <- value
   }

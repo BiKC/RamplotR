@@ -32,8 +32,20 @@ jobs:
         run: |
           node --check shinyRam/www/custom.js
           node --check shinyRam/www/prediction.js
+          node --check shinyRam/www/density.js
+          node tests/density-ui.test.cjs
           node tests/ui.test.cjs
           node tests/prediction-ui.test.cjs
+        shell: bash
+      - name: Install optional official wwPDB XML parser
+        run: Rscript -e 'install.packages("xml2", repos="https://cloud.r-project.org")'
+        shell: bash
+      - name: Verify Phase C geometry, ensembles and offline CLI
+        run: |
+          Rscript tests/geometry.R
+          Rscript tests/experimental.R
+          Rscript tests/ensemble.R
+          Rscript tests/batch.R
         shell: bash
       - name: Verify AlphaFold and ESMFold confidence formats
         run: Rscript tests/predictions.R

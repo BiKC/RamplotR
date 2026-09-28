@@ -29,6 +29,9 @@ source(file.path("R", "io.R"), local = TRUE)
 source(file.path("R", "inspection.R"), local = TRUE)
 source(file.path("R", "reports.R"), local = TRUE)
 source(file.path("R", "predictions.R"), local = TRUE)
+source(file.path("R", "geometry.R"), local = TRUE)
+source(file.path("R", "experimental.R"), local = TRUE)
+source(file.path("R", "ensemble.R"), local = TRUE)
 
 # Chain colours and contour colours are designed together for a recognisable
 # RamplotR publication identity. Region meaning is encoded by ordered contrast,
@@ -392,11 +395,35 @@ ui <- fluidPage(
                       ),
                       tags$p(class = "ram-viewer-hint",
                         "Surface rendering can take longer for large structures.")
+                    ),
+                    tags$details(class="ram-density-panel",
+                      tags$summary("Local cryo-EM density map"),
+                      tags$p(class="ram-field-hint",
+                        "Overlay a local CCP4/MRC map. This is a visual aid, not an experimental map-fit score."),
+                      # Insert the file picker after Shiny's initial input
+                      # binding so the map stays client-side in the browser.
+                      tags$div(id="ram-density-file-slot",
+                               class="ram-density-picker"),
+                      tags$div(class="ram-density-level",
+                        tags$label("Map threshold (σ)", `for`="ram-density-level"),
+                        tags$input(type="range",id="ram-density-level",
+                                   min="0.5",max="5",step="0.25",value="2"),
+                        tags$span(id="ram-density-value","2.0σ")
+                      ),
+                      tags$div(class="ram-density-buttons",
+                        tags$button(type="button",id="ram-density-load",
+                                    class="btn btn-primary btn-sm","Show map"),
+                        tags$button(type="button",id="ram-density-clear",
+                                    class="btn btn-default btn-sm","Remove")
+                      ),
+                      tags$p(id="ram-density-status",role="status",
+                             "No map loaded.")
                     )
                   )
                 )
               ),
-              uiOutput("predictionPanel")
+              uiOutput("predictionPanel"),
+              uiOutput("geometryPanel")
             ),
             tabPanel(
               title = "Residue list", value = "residues",
@@ -482,6 +509,7 @@ ui <- fluidPage(
                   )
                 ),
                 htmlOutput("summary"),
+                uiOutput("ensemblePanel"),
                 tags$details(class = "ram-details ram-export-panel",
                   tags$summary("Export figures and a reproducible report"),
                   tags$p(class = "ram-field-hint",
@@ -509,7 +537,8 @@ ui <- fluidPage(
     )
   ),
   tags$script(src = "custom.js"),
-  tags$script(src = "prediction.js")
+  tags$script(src = "prediction.js"),
+  tags$script(src = "density.js")
 )
 # Structure parsing is deliberately triggered by the Analyse button. Every
 # downstream result is a reactive expression, so adjusting settings never
@@ -517,6 +546,8 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   loaded <- reactiveVal(NULL)
   comparison_loaded <- reactiveVal(NULL)
+  external_validation <- reactiveVal(NULL)
+  ensemble_results <- reactiveVal(NULL)
   selected_residue <- reactiveVal(NULL)
   viewer_ready <- reactiveVal(FALSE)
   current_model <- reactive({
@@ -733,9 +764,11 @@ server <- function(input, output, session) {
           selected = chains
         )
       })
+      session$sendCustomMessage("ram-clear-density",list())
       loaded(list(key = key, name = name, torsions = torsions, chains = chains,
                   pdb = pdb, nmodels = ram_model_count(pdb), source_id = source_id,
-                  viewer_format = viewer_format, prediction = prediction))
+                  viewer_format = viewer_format, prediction = prediction,
+                  declared_source = declared_source, input_source = source_type))
       incProgress(0.25, detail = "Preparing interactive views")
     })
   }, ignoreInit = TRUE)
@@ -805,6 +838,45 @@ server <- function(input, output, session) {
     if (model == 1L) return(data$torsions)
     ram_extract_torsions(ram_model_at(data$pdb, model))
   })
+  # Extra geometry depends on the selected model, not on plot palettes.
+  model_geometry <- reactive({
+    structure <- req(loaded())
+    ram_extra_geometry(ram_model_at(structure$pdb,current_model()),
+                       model_torsions())
+  })
+  observeEvent(loaded(), external_validation(NULL), ignoreInit=TRUE)
+  observeEvent(input$attachValidation, {
+    structure <- req(loaded())
+    if (!identical(structure$declared_source, "experimental") ||
+        identical(structure$input_source, "afdb")) {
+      showNotification(
+        "Official wwPDB reports apply to their deposited experimental structure, not a predicted model.",
+        type = "error", duration = 14)
+      return()
+    }
+    if (!isTRUE(input$confirmValidationSource)) {
+      showNotification(
+        "Confirm that the official wwPDB report belongs to this exact deposited structure and model.",
+        type = "warning", duration = 12)
+      return()
+    }
+    file <- req(input$validationXml)
+    record <- tryCatch(ram_external_validation_read(file$datapath),
+      error=function(e) {
+        showNotification(conditionMessage(e),type="error",duration=12)
+        NULL
+      })
+    if(is.null(record)) return()
+    external_validation(list(key=structure$key,records=record,
+      name=file$name,md5=unname(tools::md5sum(file$datapath))))
+    updateCheckboxInput(session, "confirmValidationSource", value = FALSE)
+    showNotification("Official wwPDB annotations attached. Check model and residue coverage.",
+                     type="message")
+  },ignoreInit=TRUE)
+  observeEvent(input$clearValidation, {
+    external_validation(NULL)
+  },ignoreInit=TRUE)
+
   classified <- reactive({
     structure <- req(loaded(), input$validationMode, input$bgtype)
     result <- ram_classify_torsions(
@@ -816,6 +888,11 @@ server <- function(input, output, session) {
     )
     if (current_model() == 1L)
       result <- ram_apply_prediction(result, structure$prediction)
+    result <- ram_join_geometry(result,model_geometry())
+    official <- external_validation()
+    if(!is.null(official) && identical(official$key,structure$key))
+      result <- ram_external_validation_join(result,official$records,
+                                               model=current_model())
     result
   })
   displayed <- reactive({
@@ -950,6 +1027,13 @@ server <- function(input, output, session) {
         provenance$confidence_limitations <- paste(
           structure$prediction$notes, collapse = "; ")
       }
+      ext <- external_validation()
+      if(!is.null(ext) && identical(ext$key,structure$key)) {
+        provenance$official_wwPDB_report <- ext$name
+        provenance$official_wwPDB_md5 <- ext$md5
+        provenance$official_wwPDB_model <- current_model()
+      }
+      provenance$extended_native_geometry <- "Omega and descriptive chi1; not MolProbity-equivalent"
       ram_save_html_report(file, data, provenance, image)
     }
   )
@@ -1055,6 +1139,71 @@ server <- function(input, output, session) {
       })
     )
   })
+
+  output$geometryPanel <- renderUI({
+    structure <- req(loaded())
+    tags$details(id="ram-geometry-panel",class="ram-confidence-panel",
+      tags$summary(
+        tags$span(class="ram-confidence-title","Extended structure verification"),
+        tags$span(class="ram-confidence-subtitle",
+          "Peptide and side-chain diagnostics · independent wwPDB evidence")
+      ),
+      tags$div(class="ram-confidence-body",
+        tags$p(class="ram-confidence-explainer",
+          "Omega and chi1 are descriptive measurements. Rotamer, clash, bond-angle and experimental-fit assessments are imported from the official wwPDB report when you attach one."),
+        uiOutput("geometrySummary"),
+        tags$div(class="ram-phase-c-attach",
+          fileInput("validationXml","Attach wwPDB validation XML (.xml or .xml.gz)",
+                    accept=c(".xml",".gz")),
+          checkboxInput("confirmValidationSource",
+            "This official report belongs to the loaded deposited experimental structure.",
+            value = FALSE),
+          actionButton("attachValidation","Attach report",class="btn-primary btn-sm"),
+          actionButton("clearValidation","Clear",class="btn-default btn-sm")
+        ),
+        uiOutput("officialSummary"),
+        tags$p(class="ram-confidence-explainer",
+          "Independent validation reports are for deposited experimental structures. They cannot validate an unpublished AlphaFold or ESMFold prediction."),
+        downloadButton("downloadGeometry","Export detailed residue CSV")
+      )
+    )
+  })
+  output$geometrySummary <- renderUI({
+    data <- displayed()
+    if(!nrow(data)) return(NULL)
+    metric <- function(label,count)
+      tags$span(class="ram-confidence-metric",paste(label,format(count,big.mark=",")))
+    tags$div(class="ram-confidence-metrics",
+      metric("Cis peptide bonds",sum(data$omega_status=="Cis",na.rm=TRUE)),
+      metric("Twisted peptide bonds",sum(data$omega_status=="Twisted",na.rm=TRUE)),
+      metric("Measured χ1 angles",sum(is.finite(data$chi1))),
+      metric("Measured Cβ bonds",sum(is.finite(data$cb_ca_distance))),
+      metric("Missing ω",sum(!is.finite(data$omega)))
+    )
+  })
+  output$officialSummary <- renderUI({
+    ext <- external_validation()
+    structure <- req(loaded())
+    if(is.null(ext) || !identical(ext$key,structure$key))
+      return(tags$p(class="ram-field-hint","No official validation report attached."))
+    values <- ram_external_validation_summary(classified())
+    tags$div(class="ram-official-summary",
+      tags$strong(paste("Official report:",ext$name)),
+      tags$p(sprintf("Matched %s of %s residues in model %s. %s independent Ramachandran outliers, %s rotamer outliers and %s residues with local clashes.",
+        values$matched,values$total,current_model(),
+        values$official_rama_outliers,values$official_rotamer_outliers,
+        values$residues_with_clashes)),
+      if(values$matched==0L)
+        tags$p(class="ram-confidence-warning",
+          "No report residues match this model's chain, numbering, insertion codes and residue types."),
+      tags$p(class="ram-field-hint",
+        "Independent wwPDB values may disagree with RamplotR's reference-specific region labels. Provenance and report checksum are preserved in exports.")
+    )
+  })
+  output$downloadGeometry <- downloadHandler(
+    filename=function() safe_filename("extended.csv"),
+    content=function(file) utils::write.csv(displayed(),file,row.names=FALSE,na="")
+  )
 
   output$predictionPanel <- renderUI({
     structure <- req(loaded())
@@ -1240,6 +1389,114 @@ server <- function(input, output, session) {
       sele_reference=paste0(":",input$compareChainA),
       sele_target=paste0(":",input$compareChainB))
   })
+
+  output$ensemblePanel <- renderUI({
+    structure <- req(loaded())
+    if(structure$nmodels<=1L) return(NULL)
+    tags$details(id="ram-ensemble-panel",class="ram-confidence-panel",
+      tags$summary(
+        tags$span(class="ram-confidence-title","Ensemble analysis"),
+        tags$span(class="ram-confidence-subtitle",
+          paste(structure$nmodels,"structural models · circular φ/ψ variation and region consistency"))
+      ),
+      tags$div(class="ram-confidence-body",
+        tags$p(class="ram-confidence-explainer",
+          "Model variation is matched by chain, residue and insertion code. Circular statistics correctly handle the -180°/180° boundary; models with missing coordinates contribute only observed angles."),
+        tags$div(class="ram-ensemble-actions",
+          actionButton("calculateEnsemble","Analyse ensemble",
+                       class="btn-primary btn-sm"),
+          downloadButton("downloadEnsemble","Export ensemble CSV")
+        ),
+        uiOutput("ensembleResultSummary"),
+        tags$div(class="ram-residue-table",DT::DTOutput("ensembleRows"))
+      )
+    )
+  })
+  ensemble_matches <- reactive({
+    value <- ensemble_results()
+    if(is.null(value)) return(NULL)
+    if(!identical(value$key,req(loaded())$key) ||
+       !identical(value$mode,input$validationMode) ||
+       !identical(value$reference,input$bgtype) ||
+       !identical(value$background,input$background)) return(NULL)
+    value$result
+  })
+  observeEvent(input$calculateEnsemble, {
+    structure <- req(loaded())
+    if(structure$nmodels<=1L) return()
+    withProgress(message="Analysing compatible ensemble models",value=0.2,{
+      result <- tryCatch(
+        ram_ensemble_analyze(structure$pdb,max_models=min(30L,structure$nmodels),
+          classifier=function(torsions)
+            ram_classify_torsions(torsions,
+              reference_dir=file.path("static",input$bgtype),
+              selected_reference=plot_reference(),mode=input$validationMode,
+              threshold_fn=ram_density_thresholds)),
+        error=function(e) {
+          showNotification(conditionMessage(e),type="error",duration=12)
+          NULL
+        })
+      if(!is.null(result))
+        ensemble_results(list(key=structure$key,mode=input$validationMode,
+          reference=input$bgtype,background=input$background,result=result))
+      incProgress(0.8)
+    })
+  },ignoreInit=TRUE)
+  output$ensembleResultSummary <- renderUI({
+    result <- ensemble_matches()
+    if(is.null(result)) return(tags$p(class="ram-field-hint",
+      "Run the ensemble analysis. Results are recalculated on request after changing the reference or classification settings."))
+    data <- result$summary
+    tags$div(class="ram-confidence-metrics",
+      tags$span(class="ram-confidence-metric",
+        sprintf("%s of %s models analysed",result$analyzed_models,
+                result$available_models)),
+      tags$span(class="ram-confidence-metric",
+        sprintf("%s residues with classification changes",
+                sum(data$changes_class,na.rm=TRUE))),
+      tags$span(class="ram-confidence-metric",
+        sprintf("%s residues with ≥20° angular spread",
+                sum(pmax(data$phi_sd,data$psi_sd,na.rm=TRUE)>=20,
+                    na.rm=TRUE))),
+      if(result$limited)
+        tags$span(class="ram-confidence-warning",
+          "Only the first 30 models are included; export records this limit.")
+    )
+  })
+  output$ensembleRows <- DT::renderDT({
+    result <- ensemble_matches()
+    req(result)
+    data <- result$summary
+    if(!nrow(data)) return(DT::datatable(data,rownames=FALSE))
+    fields <- c("chain","resi","insertion_code","resn",
+      "phi_mean","phi_sd","psi_mean","psi_sd","models_present",
+      "class_consistency","changes_class")
+    shown <- data[,fields,drop=FALSE]
+    for(field in c("phi_mean","phi_sd","psi_mean","psi_sd"))
+      shown[[field]] <- round(shown[[field]],1L)
+    shown$class_consistency <- round(shown$class_consistency*100,1L)
+    shown$changes_class <- ifelse(shown$changes_class,"Changed","Stable")
+    DT::datatable(shown,rownames=FALSE,selection="single",
+      colnames=c("Chain","Residue","Ins.","AA","φ mean","φ SD",
+        "ψ mean","ψ SD","Models","Class agreement (%)","Class"),
+      options=list(pageLength=12,autoWidth=FALSE,scrollX=TRUE,
+                   dom="ftip",order=list(list(10,"asc"))),
+      class="compact stripe hover")
+  },server=FALSE)
+  observeEvent(input$ensembleRows_rows_selected, {
+    data <- req(ensemble_matches())$summary
+    ix <- input$ensembleRows_rows_selected[[1L]]
+    if(!is.finite(ix) || ix<1L || ix>nrow(data)) return()
+    row <- data[ix,,drop=FALSE]
+    selected_residue(list(chain=as.character(row$chain[[1L]]),
+      resi=as.integer(row$resi[[1L]]),
+      insertion_code=as.character(row$insertion_code[[1L]])))
+  })
+  output$downloadEnsemble <- downloadHandler(
+    filename=function() safe_filename("ensemble.csv"),
+    content=function(file) utils::write.csv(req(ensemble_matches())$summary,
+                                               file,row.names=FALSE,na="")
+  )
 
   output$summary <- renderUI({
     data <- displayed()
@@ -1434,6 +1691,20 @@ server <- function(input, output, session) {
         tags$span(paste("ψ", angle(row$psi[[1L]]))),
         tags$span(if (is.finite(row$density[[1L]]))
           sprintf("Density percentile %.1f", row$density[[1L]]) else ""),
+        if ("omega" %in% names(row) && is.finite(row$omega[[1L]]))
+          tags$span(sprintf("ω %.1f° · %s",row$omega[[1L]],
+                            row$omega_status[[1L]])),
+        if ("chi1" %in% names(row) && is.finite(row$chi1[[1L]]))
+          tags$span(sprintf("χ1 %.1f°",row$chi1[[1L]])),
+        if ("wwpdb_rotamer" %in% names(row) &&
+            !is.na(row$wwpdb_rotamer[[1L]]))
+          tags$span(class="ram-inspector-plddt",
+                    paste("wwPDB rotamer",row$wwpdb_rotamer[[1L]])),
+        if ("wwpdb_clashes" %in% names(row) &&
+            is.finite(row$wwpdb_clashes[[1L]]) &&
+            row$wwpdb_clashes[[1L]]>0)
+          tags$span(class="ram-inspector-warning",
+                    paste("Official wwPDB clashes",row$wwpdb_clashes[[1L]])),
         if ("plddt" %in% names(row) && is.finite(row$plddt[[1L]]))
           tags$span(class = "ram-inspector-plddt",
             sprintf("pLDDT %.1f · %s", row$plddt[[1L]],

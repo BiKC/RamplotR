@@ -26,7 +26,7 @@ jobs:
           use-public-rspm: true
       - name: Install the application's R dependencies
         run: |
-          Rscript -e 'install.packages(c("shiny", "shinyWidgets", "colourpicker", "bio3d", "NGLVieweR", "DT", "jsonlite"))'
+          Rscript -e 'install.packages(c("shiny", "shinyWidgets", "colourpicker", "bio3d", "NGLVieweR", "DT", "jsonlite", "xml2"))'
       - name: Validate publication figure and report exports
         run: Rscript tests/reports.R
       - name: Install headless-browser controller
@@ -53,6 +53,8 @@ jobs:
             https://files.rcsb.org/download/1D3Z.pdb \
             -o benchmarks/output/ui-preview/1D3Z.pdb
           Rscript tests/model-integration.R
+      - name: Exercise offline batch analysis and NMR-ensemble exports
+        run: Rscript tests/batch-integration.R
       - name: Start the Shiny application
         shell: bash
         run: |
@@ -71,6 +73,8 @@ jobs:
         run: node tests/ui-browser.cjs
       - name: Verify AlphaFold and ESMFold uploads in the live browser
         run: node tests/prediction-browser.cjs
+      - name: Verify official wwPDB evidence, density UI and NMR ensemble
+        run: node tests/phase-c-browser.cjs
       - name: Archive desktop/mobile screenshot previews and logs
         if: always()
         uses: actions/upload-artifact@v4

@@ -39,6 +39,20 @@ AlphaFold DB accession lookup and explicit AlphaFold 2/3, ColabFold and ESMFold 
 
 For screenshots, limitations and the complete workflow see the [inspection and publication guide](docs/inspection-user-guide.md). The interface layout and browser verification history are documented in [interface-refresh.md](docs/interface-refresh.md).
 
+## Extended verification and research workflows (Phase C)
+
+RamplotR now provides optional **peptide omega and descriptive chi1
+measurements**, imports official **wwPDB rotamer, clash and bond/angle outlier
+annotations** as separate evidence, and can overlay **local CCP4/MRC cryo-EM
+maps** in NGL. Consistent multi-model structures can be analysed as circular
+phi/psi ensembles with residue-level classification agreement. For
+reproducible offline studies, `scripts/ramplotr-batch.R` processes a directory
+of PDB/mmCIF files and writes CSV, JSON, SVG and standalone HTML reports.
+None of the newly computed angle diagnostics is presented as an official
+MolProbity or density-fit score. See the
+[Phase C guide](docs/phase-c-guide.md) for usage, validation provenance,
+resource limits and scientific caveats.
+
 ## Independent Phase A validation
 
 The [independent validation protocol](docs/wwpdb-validation.md) uses official

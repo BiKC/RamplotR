@@ -538,9 +538,21 @@
       syncNglSelection(true);
     });
     // Shiny requires every custom message handler to declare one argument.
-    window.Shiny.addCustomMessageHandler("ram-bind-ngl", function (_message) {
+    window.Shiny.addCustomMessageHandler("ram-bind-ngl", function (message) {
       bindNglPick();
       syncNglSelection(true);
+      // NGLVieweR reuses the camera between renderValue calls. An old
+      // residue-focused camera can clip a newly loaded multi-chain protein
+      // even after its representations finish loading. Only reframe after
+      // an actual structure load, not after every representation change.
+      if (message && message.resetView === true && !selectedResidue &&
+          typeof window.getNGLStage === "function") {
+        const stage = window.getNGLStage("NGL");
+        if (stage && typeof stage.autoView === "function") {
+          if (typeof stage.handleResize === "function") stage.handleResize();
+          stage.autoView(450);
+        }
+      }
     });
   }
 

@@ -27,6 +27,10 @@ jobs:
         run: Rscript benchmarks/validate_vs_bio3d.R 1CRN benchmarks/output/validation-1crn.csv
       - name: Benchmark the same structure
         run: Rscript benchmarks/run.R 1CRN 3 original benchmarks/output/benchmark-1crn.csv
+      - name: Validate multi-chain viral protein
+        run: Rscript benchmarks/validate_vs_bio3d.R 6VXX benchmarks/output/validation-6vxx.csv
+      - name: Benchmark multi-chain viral protein
+        run: Rscript benchmarks/run.R 6VXX 3 original benchmarks/output/benchmark-6vxx.csv
       - name: Archive numerical results and R session details
         if: always()
         uses: actions/upload-artifact@v4

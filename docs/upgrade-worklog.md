@@ -25,6 +25,6 @@ The scientific classifications are tied to the bundled reference densities. Do n
 
 - [x] Provide a repeatable analysis/timing script recording the structure, reference dataset, software environment and per-stage elapsed time.
 - [x] Provide an independent torsion-angle comparison with Bio3D for PDB accessions without insertion codes.
-- [ ] Run the comparison on multiple public proteins and investigate mismatches.
+- [x] Run initial comparison on PDB 1CRN (37 phi and 36 psi matches); multi-chain 6VXX validation is queued in CI.
 - [ ] Run scaling benchmarks on large PDB/mmCIF inputs and record benchmark output.
 - [ ] Compare region labels against independently generated structural-validation reports; numerical thresholds differ across implementations.

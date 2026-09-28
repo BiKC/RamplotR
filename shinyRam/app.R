@@ -676,7 +676,8 @@ server <- function(input, output, session) {
           prediction$confidence_file <- afdb_files$pae_source
         if (!is.null(prediction) && is_upload && !is.null(input$predictionJson))
           prediction$confidence_file <- input$predictionJson$name
-        if (!is.null(prediction) && is.finite(file.info(confidence_file)$size)) {
+        if (!is.null(prediction) && !is.null(confidence_file) &&
+            nzchar(confidence_file) && file.exists(confidence_file)) {
           prediction$confidence_md5 <- unname(tools::md5sum(confidence_file))
         }
         if (!is.null(prediction) && length(prediction$notes))

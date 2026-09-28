@@ -26,6 +26,12 @@ message(sprintf("Residue IDs: RamplotR %d total, %d without insertion codes; Bio
 if (anyNA(reference_index)) {
   message("Example unmatched RamplotR keys: ",
           paste(utils::head(unique(key[is.na(reference_index)])), collapse = ", "))
+  message("Example Bio3D row names: ",
+          paste(utils::head(rownames(reference), 18L), collapse = ", "))
+  message("Example RamplotR row keys: ",
+          paste(utils::head(key, 18L), collapse = ", "))
+  message("Bio3D and RamplotR residue keys use identical formatting: ",
+          any(key %in% rownames(reference)))
 }
 angle_difference <- function(a, b) abs(((a - b + 180) %% 360) - 180)
 

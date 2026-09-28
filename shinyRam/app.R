@@ -1177,6 +1177,7 @@ server <- function(input, output, session) {
       metric("Cis peptide bonds",sum(data$omega_status=="Cis",na.rm=TRUE)),
       metric("Twisted peptide bonds",sum(data$omega_status=="Twisted",na.rm=TRUE)),
       metric("Measured χ1 angles",sum(is.finite(data$chi1))),
+      metric("Measured Cβ bonds",sum(is.finite(data$cb_ca_distance))),
       metric("Missing ω",sum(!is.finite(data$omega)))
     )
   })

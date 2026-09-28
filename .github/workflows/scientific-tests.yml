@@ -36,7 +36,7 @@ jobs:
           node tests/prediction-ui.test.cjs
         shell: bash
       - name: Install optional official wwPDB XML parser
-        run: Rscript -e 'install.packages("xml2")'
+        run: Rscript -e 'install.packages("xml2", repos="https://cloud.r-project.org")'
         shell: bash
       - name: Verify Phase C geometry, ensembles and offline CLI
         run: |

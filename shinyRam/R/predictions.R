@@ -141,7 +141,9 @@ ram_prediction_json <- function(json, torsions, atoms = NULL,
     }
     keys <- ram_prediction_key(chains, residue_ids)
     torsion_keys <- ram_prediction_key(torsions$chain, torsions$resi)
-    if (anyDuplicated(torsion_keys)) {
+    if (anyDuplicated(torsion_keys) ||
+        any(!is.na(torsions$insertion_code) &
+            nzchar(torsions$insertion_code))) {
       result$notes <- c(result$notes,
                         "PAE omitted: insertion codes need explicit token mapping.")
       return(result)

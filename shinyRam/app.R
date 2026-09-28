@@ -339,8 +339,10 @@ ui <- fluidPage(
                           "Surface" = "surface"),
                         selected = "cartoon", inline = TRUE)
                     ),
-                    tags$details(class = "ram-viewer-details",
-                      tags$summary("Layers & motion"),
+                    tags$div(class = "ram-viewer-layers",
+                      tags$div(class = "ram-viewer-control-heading ram-layer-heading",
+                        tags$span("Layers & motion")
+                      ),
                       tags$div(class = "ram-toggles",
                         checkboxInput("ligands", "Ligands"),
                         checkboxInput("dna", "DNA"),

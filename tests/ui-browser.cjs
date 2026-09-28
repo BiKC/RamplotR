@@ -89,7 +89,15 @@ const assert = require("node:assert/strict");
     });
 
     await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
-    await new Promise(resolve => setTimeout(resolve, 400));
+    await page.waitForFunction(() => {
+      const p = document.getElementById("plotly");
+      if (!p || !p._fullLayout) return false;
+      const width = p.clientWidth;
+      const targetHeight = Math.max(285, Math.min(690, Math.round(width + 35)));
+      return Math.abs(p._fullLayout.height - targetHeight) <= 3 &&
+             p._fullLayout.xaxis._length >= 0.45 * width &&
+             p._fullLayout.yaxis._length >= 0.45 * width;
+    }, { timeout: 15000 });
     const dimensions = await page.evaluate(() => ({
       viewport: document.documentElement.clientWidth,
       body: document.body.scrollWidth,

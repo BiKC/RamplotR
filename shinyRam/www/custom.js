@@ -11,6 +11,132 @@
   const plot = document.getElementById("plotly");
   const empty = document.getElementById("plot-empty");
   const currentStructure = document.getElementById("ram-current-structure");
+  let selectedResidue = null;
+  let selectedCoordinates = new Map();
+  let selectionTrace = -1;
+  let boundStage = null;
+  let boundPickHandler = null;
+  let focusedKey = "";
+  let focusedStage = null;
+
+  // A residue identity is made of chain, sequence position and insertion
+  // code. Do not focus an arbitrary selector received from a browser event.
+  function nglSelection(item) {
+    if (!item || item.chain == null || item.resi == null) return null;
+    const chain = String(item.chain);
+    const ins = String(item.insertion_code || "");
+    const resi = Number(item.resi);
+    if (!Number.isInteger(resi) || !/^[A-Za-z0-9_-]*$/.test(chain) ||
+        !/^[A-Za-z0-9]*$/.test(ins)) return null;
+    return String(resi) + (ins ? "^" + ins : "") +
+      (chain ? ":" + chain : "");
+  }
+
+  function syncNglSelection(zoom) {
+    if (typeof window.getNGLStage !== "function" ||
+        typeof window.getNGLStructure !== "function") return false;
+    const stage = window.getNGLStage("NGL");
+    const structures = window.getNGLStructure("NGL");
+    if (!stage || !structures || !structures.length ||
+        typeof stage.getRepresentationsByName !== "function") return false;
+    const highlight = stage.getRepresentationsByName("ram-highlight");
+    if (!highlight || !highlight.list || !highlight.list.length) return false;
+    if (stage !== focusedStage) {
+      focusedStage = stage;
+      focusedKey = "";
+    }
+    const sele = nglSelection(selectedResidue);
+    // Update the already-created orange ball-and-stick representation rather
+    // than adding a new representation for every residue click.
+    highlight.setSelection(sele || "none");
+
+    const key = sele ? selectionKey(selectedResidue) : "";
+    if (sele && zoom && key !== focusedKey) {
+      const component = structures.find(function (item) {
+        return item && item.structure && typeof item.autoView === "function";
+      });
+      if (component) {
+        // Pause animations before an animated camera move so the selected
+        // side chain stays centered while it is being inspected.
+        if (typeof stage.setRock === "function") stage.setRock(false);
+        if (typeof stage.setSpin === "function") stage.setSpin(false);
+        component.autoView(sele, 650);
+        focusedKey = key;
+      }
+    } else if (!sele && focusedKey) {
+      // Clearing a selection restores the whole-structure overview.
+      if (typeof stage.autoView === "function") stage.autoView(450);
+      focusedKey = "";
+    }
+    return true;
+  }
+
+  function selectionKey(item) {
+    if (!item || item.chain == null || item.resi == null) return "";
+    return [String(item.chain), String(item.resi),
+            String(item.insertion_code || "")].join("\\r");
+  }
+
+  function selectionTraceData() {
+    const point = selectedCoordinates.get(selectionKey(selectedResidue));
+    return point && selectedResidue ? {
+      x: [point.phi], y: [point.psi]
+    } : { x: [], y: [] };
+  }
+
+  function refreshSelection() {
+    if (!plot || !window.Plotly || selectionTrace < 0 ||
+        !plot.classList.contains("js-plotly-plot")) return;
+    const point = selectionTraceData();
+    window.Plotly.restyle(plot, { x: [point.x], y: [point.y] },
+                        [selectionTrace]);
+  }
+
+  function onPlotClick(event) {
+    if (!event || !event.points || !event.points.length) return;
+    const point = event.points[0];
+    const detail = point.customdata ||
+      (point.data && point.data.customdata && point.data.customdata[point.pointNumber]);
+    if (!Array.isArray(detail) || detail.length < 3) return;
+    const pick = {
+      chain: String(detail[0]), resi: Number(detail[1]),
+      insertion_code: String(detail[2] || "")
+    };
+    if (!Number.isInteger(pick.resi)) return;
+    selectedResidue = pick;
+    refreshSelection();
+    if (window.Shiny && window.Shiny.setInputValue)
+      window.Shiny.setInputValue("ramPlotPick", pick, { priority: "event" });
+  }
+
+  function bindNglPick() {
+    if (typeof window.getNGLStage !== "function") return false;
+    const stage = window.getNGLStage("NGL");
+    if (!stage || !stage.signals || !stage.signals.clicked) return false;
+    if (stage === boundStage) return true;
+    if (boundStage && boundPickHandler &&
+        boundStage.signals && boundStage.signals.clicked) {
+      boundStage.signals.clicked.remove(boundPickHandler);
+    }
+    boundStage = stage;
+    boundPickHandler = function (proxy) {
+      const atom = proxy && (proxy.atom || proxy.closestBondAtom);
+      if (!atom || atom.resno == null) return;
+      const pick = {
+        chain: String(atom.chainname || atom.chainid || ""),
+        resi: Number(atom.resno),
+        insertion_code: String(atom.inscode || "")
+      };
+      if (!Number.isInteger(pick.resi)) return;
+      if (window.Shiny && window.Shiny.setInputValue)
+        window.Shiny.setInputValue("ramNglPick", pick, { priority: "event" });
+    };
+    stage.signals.clicked.add(boundPickHandler);
+    // A selection can be made before NGL finishes loading. Once the widget
+    // announces it is ready, apply both the stick representation and focus.
+    syncNglSelection(true);
+    return true;
+  }
 
   function safeColor(value, fallback) {
     return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value)
@@ -93,6 +219,7 @@
     // The plot container starts hidden while empty. Measure its actual width
     // only after showing it, otherwise the first Plotly layout becomes tiny.
     plot.style.display = "block";
+    plot.style.height = plotHeight() + "px";
 
     const background = [
       safeColor(shades[0], "#F1EEF6"),
@@ -112,6 +239,8 @@
     const chains = array(df.chain);
     const amino = array(df.resn);
     const residueIds = array(df.resi);
+    const insertionCodes = array(df.insertion_code);
+    selectedCoordinates = new Map();
     const phis = array(df.phi);
     const psis = array(df.psi);
     const uniqueChains = [...new Set(chains.map(String))];
@@ -119,7 +248,7 @@
     let totalPoints = 0;
 
     uniqueChains.forEach(function (chain, index) {
-      const x = [], y = [], label = [];
+      const x = [], y = [], label = [], customdata = [];
       chains.forEach(function (name, row) {
         if (String(name) !== chain) return;
         const phi = phis[row];
@@ -129,6 +258,13 @@
             !Number.isFinite(phi) || !Number.isFinite(psi)) return;
         x.push(phi);
         y.push(psi);
+        const detail = [chain, residueIds[row], insertionCodes[row] || "",
+                        amino[row]];
+        customdata.push(detail);
+        selectedCoordinates.set(selectionKey({
+          chain: chain, resi: residueIds[row],
+          insertion_code: insertionCodes[row] || ""
+        }), { phi: phi, psi: psi });
         label.push(
           "<b>Chain " + escapeText(chain || "unassigned") + "</b><br>" +
           escapeText(amino[row]) + " " + escapeText(residueIds[row]) + "<br>" +
@@ -141,7 +277,7 @@
         type: x.length > 2500 ? "scattergl" : "scatter",
         mode: "markers",
         x: x, y: y,
-        text: label,
+        text: label, customdata: customdata,
         hovertemplate: "%{text}<extra></extra>",
         name: "Chain " + (chain || "unassigned"),
         // Large assemblies can contain hundreds of chains; avoid a legend
@@ -157,7 +293,22 @@
       });
     });
 
+    // Keep a dedicated overlay trace for linked selection instead of
+    // mutating the original chain markers or the scientific density layers.
+    const active = selectionTraceData();
+    traces.push({
+      type: "scatter", mode: "markers",
+      x: active.x, y: active.y,
+      showlegend: false, hoverinfo: "skip",
+      marker: {
+        size: 17, color: "rgba(255,160,48,0.65)",
+        line: { color: "#142b35", width: 2 }
+      }
+    });
+    selectionTrace = traces.length - 1;
+
     const narrow = plot.clientWidth < 540;
+    plot.style.height = plotHeight() + "px";
     const axis = {
       range: [-180, 180],
       tickvals: [-180, -90, 0, 90, 180],
@@ -175,7 +326,10 @@
       automargin: true
     };
     const layout = {
-      autosize: true,
+      // Explicit dimensions prevent Plotly's built-in resize handler from
+      // replacing the requested height with CSS min-height on narrow screens.
+      autosize: false,
+      width: plot.clientWidth,
       height: plotHeight(),
       paper_bgcolor: "#ffffff",
       plot_bgcolor: "#fafcfc",
@@ -212,7 +366,9 @@
       uirevision: "ramplotr-geometry"
     };
     const config = {
-      responsive: true,
+      // The dedicated ResizeObserver sets both dimensions. Plotly's built-in
+      // responsive listener races with it and restores the old desktop SVG.
+      responsive: false,
       displaylogo: false,
       toImageButtonOptions: {
         format: "png",
@@ -228,6 +384,12 @@
         totalPoints.toLocaleString() + " plotted residues";
     }
     Promise.resolve(window.Plotly.react(plot, traces, layout, config))
+      .then(function () {
+        if (typeof plot.on === "function" && !plot.__ramPickBound) {
+          plot.on("plotly_click", onPlotClick);
+          plot.__ramPickBound = true;
+        }
+      })
       .catch(function () {
         plot.style.display = "none";
         if (empty) {
@@ -241,6 +403,16 @@
 
   if (window.Shiny) {
     window.Shiny.addCustomMessageHandler("process", drawPlot);
+    window.Shiny.addCustomMessageHandler("ram-selection", function (choice) {
+      selectedResidue = choice && !choice.clear ? choice : null;
+      refreshSelection();
+      syncNglSelection(true);
+    });
+    // Shiny requires every custom message handler to declare one argument.
+    window.Shiny.addCustomMessageHandler("ram-bind-ngl", function (_message) {
+      bindNglPick();
+      syncNglSelection(true);
+    });
   }
 
   // Resize Plotly if the sidebar or viewport changes size. Do not recreate
@@ -251,15 +423,40 @@
     const width = plot.clientWidth;
     if (!width) return;
     const height = plotHeight();
-    // Plotly can retain both the original desktop SVG width and height.
-    // Update both dimensions to keep the full -180°..180° square visible.
+    // Give the host element a definite height. Plotly's responsive resize
+    // otherwise remeasures CSS min-height (270px on mobile) and silently
+    // undoes the intended square-plot dimensions.
+    plot.style.height = height + "px";
+    // Relayout both dimensions ourselves. Calling Plots.resize afterward
+    // overrides the explicit height with the CSS minimum (270 px on mobile)
+    // and collapses the scientific plotting area.
     if (Math.abs((plot._fullLayout && plot._fullLayout.height || 0) - height) >= 2 ||
         Math.abs((plot._fullLayout && plot._fullLayout.width || 0) - width) >= 2) {
-      window.Plotly.relayout(plot, { width: width, height: height }).then(function () {
-        window.Plotly.Plots.resize(plot);
+      window.Plotly.relayout(plot, {
+        autosize: false, width: width, height: height
+      });
+    }
+  }
+
+  // Both a window resize and a change in the plotting card can affect plot
+  // geometry. Resize after layout has settled to avoid racing browser reflow
+  // or the NGL widget's own resize handler.
+  let pendingResize = null;
+  function scheduleResize() {
+    if (typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(function () {
+        window.requestAnimationFrame(resizePlot);
       });
     } else {
-      window.Plotly.Plots.resize(plot);
+      resizePlot();
+    }
+    if (typeof window.setTimeout === "function") {
+      if (pendingResize !== null && typeof window.clearTimeout === "function")
+        window.clearTimeout(pendingResize);
+      pendingResize = window.setTimeout(function () {
+        pendingResize = null;
+        resizePlot();
+      }, 160);
     }
   }
 
@@ -267,18 +464,40 @@
     let previousWidth = 0;
     const observer = new ResizeObserver(function () {
       const width = plot.clientWidth;
-      if (!width || Math.abs(width - previousWidth) < 5 ||
-          !plot.classList.contains("js-plotly-plot")) return;
-      previousWidth = width;
-      resizePlot();
+      if (!width || !plot.classList.contains("js-plotly-plot")) return;
+      if (Math.abs(width - previousWidth) >= 2 ||
+          !plot._fullLayout ||
+          Math.abs(plot._fullLayout.width - width) >= 2) {
+        previousWidth = width;
+        scheduleResize();
+      }
     });
-    observer.observe(plot.parentElement || plot);
+    observer.observe(plot);
+    if (plot.parentElement) observer.observe(plot.parentElement);
+  }
+  if (typeof window.addEventListener === "function")
+    window.addEventListener("resize", scheduleResize);
+
+  // When the viewport changes while the plot tab is hidden, the window
+  // resize listener correctly skips its zero-width plot. Bootstrap can then
+  // activate the tab without another resize event. Watch the pane itself so
+  // the square plot is always measured again after it becomes visible.
+  if (plot && typeof plot.closest === "function" &&
+      typeof window.MutationObserver === "function") {
+    const pane = plot.closest(".tab-pane");
+    if (pane) {
+      const tabObserver = new window.MutationObserver(function () {
+        if (pane.classList.contains("active")) scheduleResize();
+      });
+      tabObserver.observe(pane, {
+        attributes: true, attributeFilter: ["class"]
+      });
+    }
   }
 
-  // Bootstrap 3 dispatches tab events through jQuery, not DOM EventTarget.
-  if (window.jQuery) {
-    window.jQuery(document).on("shown.bs.tab", function () {
-      resizePlot();
-    });
-  }
+  // Support both Bootstrap's jQuery event and native tab events.
+  document.addEventListener("shown.bs.tab", scheduleResize);
+  if (window.jQuery)
+    window.jQuery(document).on("shown.bs.tab", scheduleResize);
+
 })();

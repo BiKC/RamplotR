@@ -27,6 +27,26 @@ No new R package is required. Styles are local to
 shinyRam/www/styles.css and the plotting code is in
 shinyRam/www/custom.js.
 
+## Linked residue inspection
+
+After choosing a structure, reference and residue filters redraw the 2D plot
+automatically without recomputing backbone torsions or reloading the PDB/mmCIF
+coordinates. Click a residue in the Ramachandran plot, residue table or 3D
+viewer to highlight the corresponding entry in the other views.
+
+The molecular viewer retains its chain-coloured cartoon and temporarily
+overlays the selected residue as orange **ball-and-stick**, while the camera
+animates to that residue. Selecting a new residue moves the highlight and
+camera; clicking **Clear selection** removes the sticks and restores the
+whole-structure view. Rocking and spinning stop while inspecting a residue,
+and the corresponding checkboxes are updated.
+
+Residue identities include chain, sequence number and insertion code so
+alternate insertions at the same position are not confused. If a selected
+residue is removed by a filter, the linked selection is cleared. Residues with
+missing phi or psi coordinates can be inspected in the table and 3D viewer,
+although they have no meaningful point to highlight on the 2D plot.
+
 ## Checks
 
 The scientific regression workflow parses app.R, checks the original Shiny

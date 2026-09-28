@@ -225,9 +225,9 @@ const assert = require("node:assert/strict");
                                    e => e.textContent);
     // A single page.$ returns only the first row; find and actually click a
     // different visible residue so the table -> NGL path is exercised.
-    // Compute the alternate row and click it in the same browser task:
-    // DT may replace its tbody between separate Puppeteer round trips.
-    const other = await page.evaluate(first => {
+    // DT listens to actual pointer clicks on table cells. Calling tr.click()
+    // dispatches an artificial row event that DT does not report to Shiny.
+    const targetHandle = await page.evaluateHandle(first => {
       const rows = Array.from(document.querySelectorAll("#regions table tbody tr"));
       const row = rows.find(candidate => {
         const cells = candidate.querySelectorAll("td");
@@ -236,17 +236,20 @@ const assert = require("node:assert/strict");
            Number(cells[1].textContent.trim()) !== Number(first[1]) ||
            cells[2].textContent.trim() !== String(first[2] || ""));
       });
-      if (!row) return null;
-      const cells = row.querySelectorAll("td");
+      return row ? row.querySelector("td") : null;
+    }, firstPoint);
+    const targetCell = targetHandle.asElement();
+    assert.ok(targetCell, "Need at least two different visible residues.");
+    const other = await page.evaluate(cell => {
+      const cells = cell.closest("tr").querySelectorAll("td");
       const chain = cells[0].textContent.trim();
       const resi = cells[1].textContent.trim();
       const insertion = cells[2].textContent.trim();
-      const sele = resi + (insertion ? "^" + insertion : "") +
-        (chain ? ":" + chain : "");
-      row.click();
-      return { sele };
-    }, firstPoint);
-    assert.ok(other, "Need at least two different visible residues.");
+      return { sele: resi + (insertion ? "^" + insertion : "") +
+                      (chain ? ":" + chain : "") };
+    }, targetCell);
+    await targetCell.click();
+    await targetHandle.dispose();
     try {
       await page.waitForFunction(({ before, sele }) =>
         document.querySelector("#selectedResidueInfo strong") &&

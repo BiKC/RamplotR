@@ -95,10 +95,28 @@ const assert = require("node:assert/strict");
     // Changing presentation controls must update the displayed plot without
     // another click on Analyze, and without loading another structure.
     await page.select("#colorscheme", "PDBSum");
-    await page.waitForFunction(() => {
-      const p = document.getElementById("plotly");
-      return p && p.data && p.data[0].fillcolor === "#F3F300";
-    }, { timeout: 18000 });
+    try {
+      await page.waitForFunction(() => {
+        const p = document.getElementById("plotly");
+        return p && p.data && p.data[0].fillcolor === "#F3F300";
+      }, { timeout: 18000 });
+    } catch (e) {
+      console.error("Palette diagnostics:", JSON.stringify(
+        await page.evaluate(() => ({
+          selected: document.querySelector("#colorscheme").value,
+          pickerColors: ["bg1", "bg2", "bg3", "bg4"].map(id => {
+            const el = document.getElementById(id);
+            return el ? el.value : null;
+          }),
+          actualPlotColor: document.getElementById("plotly").data[0].fillcolor,
+          currentStructure: document.getElementById("ram-current-structure").textContent
+        }))
+      ));
+      await page.screenshot({
+        path: "benchmarks/output/ui-preview/palette-debug.png", fullPage: true
+      });
+      throw e;
+    }
     const fullCount = await page.evaluate(() => {
       const p = document.getElementById("plotly");
       return p.data.filter(trace => trace.customdata)

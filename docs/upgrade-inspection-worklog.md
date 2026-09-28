@@ -4,7 +4,7 @@ Branch: upgrade/inspection-visualization-reporting. Preserve v0.1.0-legacy and a
 
 ## Work packages
 - [ ] Fix DT header/body alignment after a hidden tab becomes visible, improve columns and filtered CSV exports.
-- [ ] Shared residue inspector across tabs, outlier navigation, missing-angle inspection, sequence navigation and Show in plot.
+- [x] Shared inspector, review navigation and a collapsible all-chain sequence navigator beneath the main plot/3D viewer. The overview uses bounded position-based mini-maps, preserving isolated outliers and missing angles when compressed. Expanded chains are independently scrollable and share residue selection with every other view.
 - [ ] Publication-quality RamplotR default palette, preserving Rampage, PDBSum and custom settings.
 - [ ] Accessible modern NGL viewer switches and cartoon, sticks, ball+stick and surface representations.
 - [ ] PNG/SVG and metadata-rich report export.

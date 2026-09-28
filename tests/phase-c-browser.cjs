@@ -73,7 +73,18 @@ const puppeteer=require("puppeteer-core");
       stage.removeComponent=()=>window.__ramDensityChecks.removed++;
     });
     await page.click(".ram-density-panel summary");
+    await page.waitForSelector("#ram-density-file",{timeout:15000});
+    const browserLocal=await page.$eval("#ram-density-file",input=>
+      !input.classList.contains("shiny-bound-input") &&
+      !input.closest(".shiny-input-container"));
+    assert.equal(browserLocal,true,
+      "CCP4/MRC map files must remain in the browser and never enter Shiny's upload bindings.");
     await (await page.$("#ram-density-file")).uploadFile(map);
+    await page.waitForFunction(()=>{
+      const picker=document.getElementById("ram-density-file");
+      return picker&&picker.files&&picker.files.length===1 &&
+        document.getElementById("ram-density-status").textContent.includes("Selected ");
+    });
     await page.click("#ram-density-load");
     try {
       await page.waitForFunction(()=>document.getElementById("ram-density-status")

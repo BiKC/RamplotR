@@ -1074,7 +1074,8 @@ server <- function(input, output, session) {
           "pLDDT estimates local prediction confidence. PAE estimates uncertainty in relative residue placement. Neither replaces experimental or stereochemical validation."),
         tags$div(class = "ram-confidence-metrics",
           metric("pTM", prediction$ptm),
-          metric("ipTM", prediction$iptm)),
+          metric("ipTM", prediction$iptm),
+          uiOutput("predictionReviewMetrics")),
         if (!is.null(prediction$pae)) tagList(
           tags$div(class = "ram-confidence-map-title",
             tags$strong("Predicted aligned error (PAE)"),
@@ -1088,6 +1089,22 @@ server <- function(input, output, session) {
           class = "ram-confidence-warning",
           paste(prediction$notes, collapse = " "))
       )
+    )
+  })
+  output$predictionReviewMetrics <- renderUI({
+    if (is.null(req(loaded())$prediction) || current_model() != 1L)
+      return(NULL)
+    data <- classified()
+    if (!"plddt" %in% names(data)) return(NULL)
+    high_outliers <- sum(is.finite(data$plddt) & data$plddt >= 90 &
+      !is.na(data$region) & data$region == "Not allowed")
+    lower_inrange <- sum(is.finite(data$plddt) & data$plddt < 70 &
+      !is.na(data$region) & data$region != "Not allowed")
+    tagList(
+      tags$span(class = "ram-confidence-metric ram-review-high",
+        paste(high_outliers, "high-confidence Ramachandran outliers")),
+      tags$span(class = "ram-confidence-metric",
+        paste(lower_inrange, "lower-confidence residues with in-range geometry"))
     )
   })
   observe({

@@ -23,6 +23,7 @@ library(plyr)
 
 source(file.path("R", "ramachandran.R"), local = TRUE)
 source(file.path("R", "backbone.R"), local = TRUE)
+source(file.path("R", "io.R"), local = TRUE)
 
 color_set <- c(
   "#7FC97F", "#BEAED4", "#FDC086", "#FFFF99",
@@ -96,10 +97,14 @@ ui <- fluidPage(
           actionButton("submit", "Apply Changes", class = "btn-primary btn-lg")
         ),
         column(6,
-          fileInput("structfile",label = "Or upload a custom file")
+          fileInput("structfile",label = "Upload a structure file",
+                    accept = c(".pdb", ".ent", ".cif", ".mmcif", ".mcif"))
         )
       ),
       
+      radioButtons("inputSource", "Use structure from",
+                   choices = c("PDB accession" = "pdb", "Uploaded file" = "upload"),
+                   selected = "pdb", inline = TRUE),
       hr(),
       h4("Background settings"),
       selectInput("validationMode", "Residue classification",
@@ -328,28 +333,28 @@ server <- function(input, output, session) {
     withProgress(message = "Making plot", value = 0, {
       inputType<-""
       isolate({
-        if (is.null(input$structfile$datapath)){
-          inputType<-"code"
-          accPDB <- input$PDB
+        inputType <- if (identical(input$inputSource, "upload")) "file" else "code"
+        if (inputType == "file" && is.null(input$structfile$datapath)) {
+          showNotification("Choose a PDB or mmCIF file first.", type = "error")
+          return(invisible(NULL))
         }
-        else {
-          inputType<-"file"
-          accPDB <- input$structfile$datapath
-        }
-        if (session$userData$previousPDB != accPDB) {
-          #print("yup")
-          incProgress(1 / 4, detail = paste("Fetching sequence"))
-          if (inputType=="file") {
-            pdb<-bio3d::read.pdb(accPDB)
-          }
-          else {
-            pdb <- tryCatch(expr = {
-              bio3d::read.cif(accPDB)
-            }, error = function(e) {
-              #print(e)
-              bio3d::read.pdb(accPDB)
-            })
-          }
+        accPDB <- if (inputType == "file") input$structfile$datapath else
+          toupper(trimws(input$PDB))
+        structure_key <- paste(inputType, accPDB, sep = ":")
+        if (!identical(session$userData$previousPDB, structure_key)) {
+          incProgress(1 / 4, detail = "Reading structure")
+          pdb <- tryCatch(
+            ram_load_structure(
+              path = if (inputType == "file") accPDB else NULL,
+              original_name = if (inputType == "file") input$structfile$name else NULL,
+              pdb_id = if (inputType == "code") accPDB else NULL
+            ),
+            error = function(e) {
+              showNotification(conditionMessage(e), type = "error", duration = 12)
+              NULL
+            }
+          )
+          if (is.null(pdb)) return(invisible(NULL))
           incProgress(1 / 4, detail = paste("Transforming data"))
           # Keep insertion codes and validate peptide connectivity before
           # classifying glycine, proline and pre-proline residues.
@@ -361,7 +366,10 @@ server <- function(input, output, session) {
 
           chains<-unique(session$userData$torsion$chain)
 
-          nglview<-NGLVieweR(data = accPDB)%>%setRock()
+          # Shiny upload paths lack an extension; identify the format explicitly.
+          viewer_format <- if (inputType == "file")
+            ram_detect_format(input$structfile$name) else NULL
+          nglview <- NGLVieweR(data = accPDB, format = viewer_format) %>% setRock()
           counter=1
           for (i in unique(chains)) {
             #print(i)
@@ -405,7 +413,7 @@ server <- function(input, output, session) {
           
           
           
-          session$userData$previousPDB <- accPDB
+          session$userData$previousPDB <- structure_key
           incProgress(1 / 4, detail = paste("Filter data"))
         } else {
           incProgress(3 / 4, detail = paste("Filter data"))

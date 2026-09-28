@@ -870,7 +870,7 @@ body > .container-fluid { max-width: none; padding: 0; }
 .ram-prediction-upload { grid-column: 1 / -1; border-top: 1px solid #dce9e5;
   padding: 12px 3px 2px; margin-top: 4px; }
 .ram-prediction-upload-fields { display:grid;
-  grid-template-columns:minmax(205px,1.25fr) repeat(2,minmax(145px,1fr));
+  grid-template-columns:minmax(215px,1fr) minmax(0,2fr);
   align-items: start; gap: 10px 15px; }
 .ram-prediction-upload-fields .shiny-input-container { width:100% !important;
   margin-bottom: 6px !important; }
@@ -941,4 +941,13 @@ body > .container-fluid { max-width: none; padding: 0; }
   .ram-source-controls,.ram-has-data .ram-source-controls {
     grid-template-columns:minmax(0,1fr); }
   #ram-pae-plot { min-height:285px; }
+}
+
+.ram-prediction-sidecars.is-hidden { display:none; }
+.ram-prediction-sidecars { display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 15px; }
+@media(max-width:880px) {
+  .ram-prediction-sidecars,.ram-prediction-upload-fields {
+    grid-template-columns:minmax(0,1fr);
+  }
 }

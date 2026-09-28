@@ -1,0 +1,4 @@
+accession,experimental_method,reference_purpose,source_pdb_url,wwpdb_validation_url
+1CRN,X-ray diffraction,small protein with defined backbone,https://files.rcsb.org/download/1CRN.cif,https://files.rcsb.org/pub/pdb/validation_reports/cr/1crn/1crn_validation.xml.gz
+1UBQ,X-ray diffraction,medium protein and mixed conformations,https://files.rcsb.org/download/1UBQ.cif,https://files.rcsb.org/pub/pdb/validation_reports/ub/1ubq/1ubq_validation.xml.gz
+6VXX,electron microscopy,multi-chain viral spike complex,https://files.rcsb.org/download/6VXX.cif,https://files.rcsb.org/pub/pdb/validation_reports/vx/6vxx/6vxx_validation.xml.gz

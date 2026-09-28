@@ -86,42 +86,36 @@ ram_extract_torsions <- function(pdb, amino_acids = c(
   atoms <- atoms[!is.na(atoms$resid) & atoms$resid %in% amino_acids, , drop = FALSE]
   if (!nrow(atoms)) return(empty)
 
-  # The ordered group index prevents accidental joins between insertion codes
-  # or chains that reuse the same residue numbering.
+  # Preserve first-observed residue order without copying a data frame per
+  # residue. The triple key also distinguishes insertion codes and chains.
   key <- paste(atoms$chain, atoms$resno, atoms$insert, sep = "\r")
-  indices <- split(seq_len(nrow(atoms)), factor(key, levels = unique(key)))
-  pick_atom <- function(record, atom_name) {
-    options <- record[record$elety == atom_name &
-                      record$alt %in% c("", "A") &
-                      is.finite(record$x) & is.finite(record$y) &
-                      is.finite(record$z), , drop = FALSE]
-    if (!nrow(options)) return(rep(NA_real_, 3L))
-    # Prefer the unlabelled conformation, followed by alternate A.
-    chosen <- if (any(options$alt == "")) {
-      options[which(options$alt == "")[1L], , drop = FALSE]
-    } else options[1L, , drop = FALSE]
-    as.numeric(unlist(chosen[1L, c("x", "y", "z")], use.names = FALSE))
-  }
-  records <- lapply(indices, function(idx) {
-    rec <- atoms[idx, , drop = FALSE]
-    list(
-      resi = rec$resno[1L], insertion_code = rec$insert[1L],
-      chain = rec$chain[1L], resn = rec$resid[1L],
-      N = pick_atom(rec, "N"), CA = pick_atom(rec, "CA"),
-      C = pick_atom(rec, "C")
+  residue_index <- match(key, unique(key))
+  n <- max(residue_index)
+  first_rows <- match(seq_len(n), residue_index)
+  chains <- as.character(atoms$chain[first_rows])
+  residue_names <- as.character(atoms$resid[first_rows])
+
+  # Gather N, CA and C into XYZ matrices with a single scan of the atom table.
+  # Empty alternate locations take precedence over alternate A. Others are
+  # ignored, matching the previous per-residue atom-selection behaviour.
+  pick_coords <- function(atom_name) {
+    out <- matrix(NA_real_, nrow = n, ncol = 3L)
+    candidates <- which(
+      atoms$elety == atom_name & atoms$alt %in% c("", "A") &
+      is.finite(atoms$x) & is.finite(atoms$y) & is.finite(atoms$z)
     )
-  })
-  n <- length(records)
-  # Matrix operations avoid thousands of tiny R calls for large assemblies.
-  coords <- function(atom_name) {
-    do.call(rbind, lapply(records, function(rec) rec[[atom_name]]))
+    if (!length(candidates)) return(out)
+    ordered <- candidates[order(
+      residue_index[candidates], atoms$alt[candidates] != "", candidates
+    )]
+    selected <- ordered[!duplicated(residue_index[ordered])]
+    out[residue_index[selected], ] <- as.matrix(atoms[selected,
+      c("x", "y", "z"), drop = FALSE])
+    out
   }
-  nxyz <- coords("N")
-  caxyz <- coords("CA")
-  cxyz <- coords("C")
-  chains <- vapply(records, function(rec) as.character(rec$chain), character(1))
-  residue_names <- vapply(records, function(rec) as.character(rec$resn),
-                          character(1))
+  nxyz <- pick_coords("N")
+  caxyz <- pick_coords("CA")
+  cxyz <- pick_coords("C")
 
   bonded_to_next <- rep(FALSE, n)
   next_resn <- rep(NA_character_, n)
@@ -134,6 +128,7 @@ ram_extract_torsions <- function(pdb, amino_acids = c(
       dist >= min_peptide_bond & dist <= max_peptide_bond
     next_resn[i[bonded_to_next[i]]] <- residue_names[j[bonded_to_next[i]]]
   }
+
   valid_backbone <- complete.cases(cbind(nxyz, caxyz, cxyz))
   phi <- rep(NA_real_, n)
   psi <- rep(NA_real_, n)
@@ -158,9 +153,8 @@ ram_extract_torsions <- function(pdb, amino_acids = c(
     }
   }
   data.frame(
-    resi = vapply(records, function(rec) as.integer(rec$resi), integer(1)),
-    insertion_code = vapply(records, function(rec) as.character(rec$insertion_code),
-                            character(1)),
+    resi = as.integer(atoms$resno[first_rows]),
+    insertion_code = as.character(atoms$insert[first_rows]),
     chain = chains, resn = residue_names,
     phi = phi, psi = psi, next_resn = next_resn,
     bonded_to_next = bonded_to_next, stringsAsFactors = FALSE

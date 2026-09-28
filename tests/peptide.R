@@ -63,3 +63,18 @@ assert(length(ram_dihedral_batch(matrix(numeric(), ncol = 3),
                                  matrix(numeric(), ncol = 3))) == 0L,
        "An empty dihedral batch should be supported")
 message("Vectorized dihedral tests passed")
+
+# Alternate-location B atoms must not displace blank or A coordinates.
+with_alt <- rbind(make_atoms("A", 1L, "", "ALA", 0),
+                  make_atoms("A", 2L, "", "PRO", 2.5))
+expected <- ram_extract_torsions(list(atom = with_alt))
+noise <- with_alt[with_alt$elety == "CA" & with_alt$resno == 1L, , drop = FALSE]
+noise$alt <- "B"
+noise$x <- 900
+observed <- ram_extract_torsions(list(atom = rbind(noise, with_alt)))
+assert(identical(expected$resn, observed$resn),
+       "Alternate coordinates must not create an extra residue")
+assert(isTRUE(all.equal(expected$phi, observed$phi)) &&
+       isTRUE(all.equal(expected$psi, observed$psi)),
+       "Alternate B must not change backbone angles")
+message("Atom-matrix extraction regression tests passed")

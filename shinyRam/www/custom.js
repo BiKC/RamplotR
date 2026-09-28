@@ -248,11 +248,14 @@
   function resizePlot() {
     if (!plot || !window.Plotly ||
         !plot.classList.contains("js-plotly-plot")) return;
+    const width = plot.clientWidth;
+    if (!width) return;
     const height = plotHeight();
-    // Plotly.Plots.resize alone preserves the original desktop layout height,
-    // which makes the angular plot crop or collapse on narrow screens.
-    if (Math.abs((plot._fullLayout && plot._fullLayout.height || 0) - height) >= 2) {
-      window.Plotly.relayout(plot, { height: height }).then(function () {
+    // Plotly can retain both the original desktop SVG width and height.
+    // Update both dimensions to keep the full -180°..180° square visible.
+    if (Math.abs((plot._fullLayout && plot._fullLayout.height || 0) - height) >= 2 ||
+        Math.abs((plot._fullLayout && plot._fullLayout.width || 0) - width) >= 2) {
+      window.Plotly.relayout(plot, { width: width, height: height }).then(function () {
         window.Plotly.Plots.resize(plot);
       });
     } else {

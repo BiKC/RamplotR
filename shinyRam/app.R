@@ -789,14 +789,17 @@ server <- function(input, output, session) {
     ram_extract_torsions(ram_model_at(data$pdb, model))
   })
   classified <- reactive({
-    req(loaded(), input$validationMode, input$bgtype)
-    ram_classify_torsions(
+    structure <- req(loaded(), input$validationMode, input$bgtype)
+    result <- ram_classify_torsions(
       model_torsions(),
       reference_dir = file.path("static", input$bgtype),
       selected_reference = plot_reference(),
       mode = input$validationMode,
       threshold_fn = ram_density_thresholds
     )
+    if (current_model() == 1L)
+      result <- ram_apply_prediction(result, structure$prediction)
+    result
   })
   displayed <- reactive({
     data <- classified()

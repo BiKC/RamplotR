@@ -978,3 +978,53 @@ body > .container-fluid { max-width: none; padding: 0; }
     padding:2px 0; font-size:10px; line-height:1.2;
   }
 }
+
+
+/* Phase C diagnostics and optional experimental evidence keep the primary
+   2D/3D workspace uncluttered until explicitly expanded. */
+.ram-phase-c-attach {
+  display:flex; align-items:flex-end; flex-wrap:wrap;
+  gap:8px 12px; margin:14px 0 8px;
+}
+.ram-phase-c-attach > .form-group {
+  min-width:min(100%,260px); max-width:370px; flex:1 1 260px;
+  margin:0;
+}
+.ram-phase-c-attach .btn { min-height:36px; white-space:nowrap; }
+.ram-official-summary {
+  background:#f3faf7; border-left:3px solid #39988d;
+  padding:11px 13px; border-radius:5px;
+  margin-top:10px; font-size:12px;
+}
+.ram-official-summary strong { color:#165d60; font-size:13px; }
+.ram-official-summary p { margin:5px 0; line-height:1.5; }
+.ram-ensemble-actions { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
+.ram-ensemble-panel .ram-residue-table { width:100%; max-width:100%; overflow-x:auto; }
+.ram-density-panel {
+  border-top:1px solid #e0eae9; margin-top:12px; padding-top:10px;
+  font-size:12px; color:#244653;
+}
+.ram-density-panel > summary {
+  font-size:12px; font-weight:750; color:#1b6570;
+  cursor:pointer; padding:5px 2px;
+}
+.ram-density-panel[open] { padding-bottom:10px; }
+.ram-density-panel input[type=file] {
+  display:block; border:1px dashed #a4c8c5;
+  background:#f9fcfb; border-radius:8px; width:100%;
+  max-width:420px; padding:9px; font-size:11px;
+  margin:9px 0;
+}
+.ram-density-level { display:flex; gap:10px; align-items:center;
+  max-width:430px; margin:10px 0; }
+.ram-density-level label { flex:0 0 auto; font-size:11px; font-weight:700; }
+.ram-density-level input[type=range] { flex:1 1 auto; accent-color:#16868c; }
+.ram-density-level span { min-width:45px; font-variant-numeric:tabular-nums; }
+.ram-density-buttons { display:flex; flex-wrap:wrap; gap:8px; }
+#ram-density-status { font-size:11px; line-height:1.5; margin:9px 0 0; color:#4d7377; }
+@media(max-width:580px) {
+  .ram-phase-c-attach { display:grid; grid-template-columns:1fr 1fr; }
+  .ram-phase-c-attach .form-group { grid-column:1/-1; min-width:0; }
+  .ram-density-level { gap:6px; flex-wrap:wrap; }
+  .ram-density-level input[type=range] { min-width:130px; }
+}

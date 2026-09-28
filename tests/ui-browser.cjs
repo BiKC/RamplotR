@@ -114,6 +114,39 @@ const assert = require("node:assert/strict");
       const p = document.getElementById("plotly");
       return p.data[p.data.length - 1].x.length === 0;
     }, { timeout: 10000 });
+    // Simulate the documented NGLVieweR click payload. A 3D-picked residue
+    // must activate the same linked selection in the 2D graph.
+    await page.evaluate(() => {
+      const p = document.getElementById("plotly");
+      const residue = p.data.find(t => t.customdata && t.customdata.length).customdata[0];
+      window.Shiny.setInputValue(
+        "NGL_selection",
+        "[" + residue.resn + "]" + residue.resi +
+          (residue.insertion_code ? "^" + residue.insertion_code : "") +
+          ":" + residue.chain + ".CA",
+        { priority: "event" }
+      );
+    });
+    await page.waitForFunction(() => {
+      const p = document.getElementById("plotly");
+      return p.data[p.data.length - 1].x.length === 1 &&
+        document.getElementById("ram-selected-residue").textContent.includes("Selected:");
+    }, { timeout: 15000 });
+    await page.click("#clearSelection");
+    await page.waitForFunction(() =>
+      document.getElementById("plotly").data.slice(-1)[0].x.length === 0,
+      { timeout: 10000 });
+
+    // DT single-row selection must update the same linked residue state.
+    await page.click('a[data-value="residues"]');
+    await page.waitForSelector("#regions table tbody tr");
+    await page.click("#regions table tbody tr:first-child");
+    await page.waitForFunction(() => {
+      const p = document.getElementById("plotly");
+      return p.data[p.data.length - 1].x.length === 1;
+    }, { timeout: 15000 });
+    await page.click('a[data-value="plot"]');
+
 
     // NGL loads and paints asynchronously after the Plotly response.
     // Give the viewer a moment to render before taking the desktop preview.

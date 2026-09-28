@@ -247,12 +247,34 @@ const assert = require("node:assert/strict");
       return { sele };
     }, firstPoint);
     assert.ok(other, "Need at least two different visible residues.");
-    await page.waitForFunction(({ before, sele }) =>
-      document.querySelector("#selectedResidueInfo strong") &&
-      document.querySelector("#selectedResidueInfo strong").textContent !== before &&
-      window.__ramStickSelections.includes(sele) &&
-      window.__ramZoomCalls.some(call => call.sele === sele),
-      { timeout: 20000 }, { before, sele: other.sele });
+    try {
+      await page.waitForFunction(({ before, sele }) =>
+        document.querySelector("#selectedResidueInfo strong") &&
+        document.querySelector("#selectedResidueInfo strong").textContent !== before &&
+        window.__ramStickSelections.includes(sele) &&
+        window.__ramZoomCalls.some(call => call.sele === sele),
+        { timeout: 20000 }, { before, sele: other.sele });
+    } catch (error) {
+      const diagnostic = await page.evaluate(({before, expected}) => ({
+        before: before,
+        expected: expected,
+        selectedInfo: document.querySelector("#selectedResidueInfo")?.innerText,
+        chosenRows: Array.from(document.querySelectorAll("#regions tbody tr.selected"))
+          .map(row => row.innerText),
+        dtLastClicked: window.Shiny?.shinyapp?.$inputValues?.["regions_row_last_clicked"],
+        dtRowsSelected: window.Shiny?.shinyapp?.$inputValues?.["regions_rows_selected"],
+        zoomCalls: window.__ramZoomCalls,
+        stickSelections: window.__ramStickSelections,
+        selectionOutput: document.getElementById("ram-current-structure")?.innerText
+      }), {before, expected:other.sele});
+      console.error("Table-to-NGL diagnostics:", JSON.stringify(diagnostic));
+      console.error("Browser page errors:", errors);
+      await page.screenshot({
+        path: "benchmarks/output/ui-preview/table-selection-debug.png",
+        fullPage: true
+      });
+      throw error;
+    }
     await page.click('.nav-tabs a[data-value="plot"]');
     await page.click("#clearResidue");
     try {

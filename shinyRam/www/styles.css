@@ -783,7 +783,13 @@ body > .container-fluid { max-width: none; padding: 0; }
   display:flex; flex-wrap:wrap; gap:6px; margin:0 0 13px;
 }
 .ram-sequence-detail .ram-swatch { font-size:10px; padding:4px 8px; }
-.ram-sequence-chains { display:grid; gap:13px; }
+/* Keep hundreds of chains navigable without turning the main analysis into
+   a very long page. Every chain is retained within this scrollable region. */
+.ram-sequence-chains {
+  display:grid; gap:10px; max-height:min(44vh, 395px);
+  overflow-y:auto; overscroll-behavior:contain; padding-right:4px;
+  scrollbar-width:thin;
+}
 .ram-sequence-chain {
   min-width:0; background:#fff; border:1px solid #e1ebe8;
   border-radius:8px; padding:9px 11px 10px;

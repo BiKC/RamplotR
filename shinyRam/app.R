@@ -690,6 +690,15 @@ server <- function(input, output, session) {
   })
   observeEvent(input$clearResidue, selected_residue(NULL))
 
+  # Pause viewer motion when the user starts inspecting a particular
+  # residue; keep the 3D control checkboxes in sync with that camera state.
+  observeEvent(selected_residue(), {
+    if (isTRUE(isolate(input$rocking)))
+      updateCheckboxInput(session, "rocking", value = FALSE)
+    if (isTRUE(isolate(input$spinning)))
+      updateCheckboxInput(session, "spinning", value = FALSE)
+  }, ignoreNULL = TRUE)
+
   # Selection is a single source of truth for the plot, table and 3D viewer.
   selected_row <- reactive({
     selected <- selected_residue()

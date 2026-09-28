@@ -460,3 +460,11 @@ body > .container-fluid { max-width: none; padding: 0; }
   .ram-viewer-options .ram-toggles input[type="checkbox"],
   .ram-viewer-options .ram-toggles input[type="checkbox"]::before { transition:none; }
 }
+
+
+.ram-export-panel { margin-top:26px; max-width:780px; padding-top:16px; }
+.ram-export-panel summary { font-size:13px; }
+.ram-export-actions { display:flex; flex-wrap:wrap; gap:10px; margin:13px 0 8px; }
+.ram-export-actions .btn { padding:10px 13px; border:1px solid #bad9d3;
+  border-radius:8px; color:#125e66; background:#eff8f6; font-weight:700; }
+.ram-export-actions .btn:hover { background:#ddf0ec; border-color:#73aea7; }

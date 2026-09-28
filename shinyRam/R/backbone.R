@@ -21,6 +21,36 @@ ram_dihedral <- function(p0, p1, p2, p3) {
   atan2(sum(ram_cross(b1, v) * w), sum(v * w)) * 180 / pi
 }
 
+
+# Compute many dihedral angles at once. Rows of each argument are XYZ points.
+ram_dihedral_batch <- function(p0, p1, p2, p3) {
+  n <- nrow(p0)
+  stopifnot(is.matrix(p0), all(dim(p0) == c(n, 3L)),
+            identical(dim(p0), dim(p1)), identical(dim(p0), dim(p2)),
+            identical(dim(p0), dim(p3)))
+  if (n == 0L) return(numeric())
+  b0 <- p0 - p1
+  b1 <- p2 - p1
+  b2 <- p3 - p2
+  len <- sqrt(rowSums(b1^2))
+  u <- b1 / pmax(len, 1e-10)
+  v <- b0 - u * rowSums(b0 * u)
+  w <- b2 - u * rowSums(b2 * u)
+  good <- complete.cases(cbind(p0, p1, p2, p3)) &
+    len > 1e-10 & sqrt(rowSums(v^2)) > 1e-10 &
+    sqrt(rowSums(w^2)) > 1e-10
+  out <- rep(NA_real_, n)
+  if (!any(good)) return(out)
+  uv <- cbind(
+    u[, 2L] * v[, 3L] - u[, 3L] * v[, 2L],
+    u[, 3L] * v[, 1L] - u[, 1L] * v[, 3L],
+    u[, 1L] * v[, 2L] - u[, 2L] * v[, 1L]
+  )
+  out[good] <- atan2(rowSums((uv * w)[good, , drop = FALSE]),
+                     rowSums((v * w)[good, , drop = FALSE])) * 180 / pi
+  out
+}
+
 ram_extract_torsions <- function(pdb, amino_acids = c(
   "ALA", "ARG", "ASN", "ASP", "CYS", "GLU", "GLN", "GLY", "HIS",
   "ILE", "LEU", "LYS", "MET", "PHE", "PRO", "SER", "THR",
@@ -81,47 +111,57 @@ ram_extract_torsions <- function(pdb, amino_acids = c(
     )
   })
   n <- length(records)
-  connected <- function(i, j) {
-    if (i < 1L || j > n || records[[i]]$chain != records[[j]]$chain) {
-      return(FALSE)
-    }
-    c_atom <- records[[i]]$C
-    n_atom <- records[[j]]$N
-    if (anyNA(c_atom) || anyNA(n_atom)) return(FALSE)
-    distance <- sqrt(sum((c_atom - n_atom)^2))
-    is.finite(distance) && distance >= min_peptide_bond &&
-      distance <= max_peptide_bond
+  # Matrix operations avoid thousands of tiny R calls for large assemblies.
+  coords <- function(atom_name) {
+    do.call(rbind, lapply(records, function(rec) rec[[atom_name]]))
   }
-  # Allocate output once. Appending rows to a data frame for each residue
-  # repeatedly copies the growing table on large structures.
-  phi <- rep(NA_real_, n)
-  psi <- rep(NA_real_, n)
+  nxyz <- coords("N")
+  caxyz <- coords("CA")
+  cxyz <- coords("C")
+  chains <- vapply(records, function(rec) as.character(rec$chain), character(1))
+  residue_names <- vapply(records, function(rec) as.character(rec$resn),
+                          character(1))
+
   bonded_to_next <- rep(FALSE, n)
   next_resn <- rep(NA_character_, n)
   if (n > 1L) {
-    for (i in seq_len(n - 1L)) {
-      bonded_to_next[[i]] <- connected(i, i + 1L)
-      if (bonded_to_next[[i]]) next_resn[[i]] <- records[[i + 1L]]$resn
-    }
+    i <- seq_len(n - 1L)
+    j <- i + 1L
+    offset <- cxyz[i, , drop = FALSE] - nxyz[j, , drop = FALSE]
+    dist <- sqrt(rowSums(offset^2))
+    bonded_to_next[i] <- chains[i] == chains[j] & is.finite(dist) &
+      dist >= min_peptide_bond & dist <= max_peptide_bond
+    next_resn[i[bonded_to_next[i]]] <- residue_names[j[bonded_to_next[i]]]
   }
-  for (i in seq_len(n)) {
-    rec <- records[[i]]
-    if (anyNA(c(rec$N, rec$CA, rec$C))) next
-    if (i > 1L && bonded_to_next[[i - 1L]]) {
-      phi[[i]] <- ram_dihedral(records[[i - 1L]]$C, rec$N, rec$CA, rec$C)
+  valid_backbone <- complete.cases(cbind(nxyz, caxyz, cxyz))
+  phi <- rep(NA_real_, n)
+  psi <- rep(NA_real_, n)
+  if (n > 1L) {
+    i_phi <- which(bonded_to_next[seq_len(n - 1L)] &
+                     valid_backbone[2L:n]) + 1L
+    if (length(i_phi)) {
+      phi[i_phi] <- ram_dihedral_batch(
+        cxyz[i_phi - 1L, , drop = FALSE],
+        nxyz[i_phi, , drop = FALSE],
+        caxyz[i_phi, , drop = FALSE],
+        cxyz[i_phi, , drop = FALSE])
     }
-    if (bonded_to_next[[i]]) {
-      psi[[i]] <- ram_dihedral(rec$N, rec$CA, rec$C, records[[i + 1L]]$N)
+    i_psi <- which(bonded_to_next[seq_len(n - 1L)] &
+                     valid_backbone[seq_len(n - 1L)])
+    if (length(i_psi)) {
+      psi[i_psi] <- ram_dihedral_batch(
+        nxyz[i_psi, , drop = FALSE],
+        caxyz[i_psi, , drop = FALSE],
+        cxyz[i_psi, , drop = FALSE],
+        nxyz[i_psi + 1L, , drop = FALSE])
     }
   }
   data.frame(
     resi = vapply(records, function(rec) as.integer(rec$resi), integer(1)),
     insertion_code = vapply(records, function(rec) as.character(rec$insertion_code),
                             character(1)),
-    chain = vapply(records, function(rec) as.character(rec$chain), character(1)),
-    resn = vapply(records, function(rec) as.character(rec$resn), character(1)),
+    chain = chains, resn = residue_names,
     phi = phi, psi = psi, next_resn = next_resn,
-    bonded_to_next = bonded_to_next,
-    stringsAsFactors = FALSE
+    bonded_to_next = bonded_to_next, stringsAsFactors = FALSE
   )
 }

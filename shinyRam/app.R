@@ -22,6 +22,7 @@ library(NGLVieweR)
 library(plyr)
 
 source(file.path("R", "ramachandran.R"), local = TRUE)
+source(file.path("R", "backbone.R"), local = TRUE)
 
 color_set <- c(
   "#7FC97F", "#BEAED4", "#FDC086", "#FFFF99",
@@ -350,41 +351,10 @@ server <- function(input, output, session) {
             })
           }
           incProgress(1 / 4, detail = paste("Transforming data"))
-          pdb<<-pdb
-          # Get the list of unique chains
-          chains <- unique(pdb$atom[,"chain"])
-
-          # Initialize an empty data frame to store the results
-          torsion <- data.frame()
-
-          # Loop over each chain
-          for (chain in chains) {
-
-            print(chain)
-            # Subset the pdb data for the current chain
-            pdb_chain <- trim.pdb(pdb, chain = chain)
-            # Identify the residue numbers that correspond to the residue names in allAA
-            resno_allAA <- unique(pdb_chain$atom[pdb_chain$atom[,"resid"] %in% allAA, "resno"])
-
-            # Subset the pdb_chain object to only include those residue numbers
-            pdb_chain <- trim.pdb(pdb_chain, resno = resno_allAA)
-            
-            # if there is no data for the current chain, skip it
-            if (nrow(pdb_chain$atom) == 0) {
-              next
-            }
-            # Calculate the torsion angles for the current chain
-            torsion_chain <- torsion.pdb(pdb_chain)
-            
-            # Add the chain information to the torsion angles data frame
-            tortab_chain <- torsion_chain[["tbl"]][, c("phi", "psi")]
-            spltor_chain <- strsplit(rownames(tortab_chain), split = ".", fixed = T)
-            torsion_chain <- cbind(tortab_chain, as.data.frame(do.call(rbind, spltor_chain)))
-            torsion_chain <- rename(torsion_chain, c("V1" = "resi", "V2" = "chain", "V3" = "resn"))
-            
-            # Combine the results row wise
-            torsion <- rbind(torsion, torsion_chain)
-          }
+          # Keep insertion codes and validate peptide connectivity before
+          # classifying glycine, proline and pre-proline residues.
+          torsion <- ram_extract_torsions(pdb)
+          chains <- unique(torsion$chain)
           print(torsion)
           # Store the results in the user data
           session$userData$torsion <- torsion
@@ -444,11 +414,9 @@ server <- function(input, output, session) {
           matrix <- ram_read_reference(file.path("static", input$bgtype, "preProline"))
           # get a subset of only those amino acids that precede a proline
           torsionsubset <- data.frame()
-          for (i in 1:length(session$userData$torsion$resn) - 1) {
-            if (session$userData$torsion$resn[i + 1] == "PRO") {
-              torsionsubset <- rbind(torsionsubset, session$userData$torsion[i, ])
-            }
-          }
+          torsionsubset <- subset(session$userData$torsion,
+                                 bonded_to_next & !is.na(next_resn) &
+                                   next_resn == "PRO")
           torsionsubset <- subset(torsionsubset, resn %in% input$AA)
           # also subset for chains
           # since chainselection is added as uiOutput, it is not available in the beginning, so check if it exists, otherwise subset for all chains

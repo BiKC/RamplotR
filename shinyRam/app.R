@@ -22,11 +22,17 @@ library(NGLVieweR)
 source(file.path("R", "ramachandran.R"), local = TRUE)
 source(file.path("R", "backbone.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
+source(file.path("R", "inspection.R"), local = TRUE)
+source(file.path("R", "reports.R"), local = TRUE)
 
+# Chain colours and contour colours are designed together for a recognisable
+# RamplotR publication identity. Region meaning is encoded by ordered contrast,
+# not by hue alone; legacy presets remain available.
 color_set <- c(
-  "#137C79", "#8662A8", "#C47B36", "#4E86B3",
-  "#648E5E", "#B95873", "#9C7545", "#62798D"
+  "#CE6A4D", "#317E9A", "#8065A3", "#B68A3E",
+  "#498777", "#B65B7A", "#5070A0", "#826B4B"
 )
+ramplotr_palette <- c("#FFF8ED", "#D4ECE7", "#7DB9B5", "#126E74")
 
 rampage<-c("#F1EEF6","#BDC9E1","#74A9CF","#0570B0")
 pdbsum<-c("#FEFFB2","#F3F300","#C37800","#F30100")
@@ -148,6 +154,16 @@ ui <- fluidPage(
           "Classification uses the selected reference dataset; the plotted background can be changed independently."
         )
       ),
+      tags$section(
+        class = "ram-global-inspector", "aria-label" = "Selected residue",
+        tags$div(class = "ram-inspector-copy", uiOutput("selectedResidueInfo")),
+        tags$div(class = "ram-inspector-actions",
+          actionButton("prevReview", "Previous issue", class = "btn-default btn-sm"),
+          actionButton("nextReview", "Next issue", class = "btn-default btn-sm"),
+          actionButton("showInPlot", "Show in plot", class = "btn-primary btn-sm"),
+          actionButton("clearResidue", "Clear", class = "btn-default btn-sm")
+        )
+      ),
       tags$div(
         class = "ram-workspace",
         tags$aside(
@@ -202,13 +218,14 @@ ui <- fluidPage(
               class = "ram-section-heading",
               tags$div(
                 tags$h3("Appearance"),
-                tags$p("Keep the default palette or customize the contours.")
+                tags$p("The RamplotR palette is designed for consistent, identifiable publication figures.")
               )
             ),
             selectInput(
               "colorscheme", "Contour palette",
-              choices = c("Rampage", "PDBSum", "custom"),
-              selected = "Rampage"
+              choices = c("RamplotR" = "RamplotR", "Rampage" = "Rampage",
+                          "PDBsum" = "PDBSum", "Custom colours" = "custom"),
+              selected = "RamplotR"
             ),
             tags$details(
               class = "ram-details",
@@ -217,10 +234,10 @@ ui <- fluidPage(
                      "Select Custom as your contour palette to use these colours."),
               tags$div(
                 class = "ram-details-body ram-appearance-controls",
-                colourpicker::colourInput("bg1", "Not allowed", value = "#F1EEF6"),
-                colourpicker::colourInput("bg2", "Generously allowed", value = "#BDC9E1"),
-                colourpicker::colourInput("bg3", "Allowed", value = "#74A9CF"),
-                colourpicker::colourInput("bg4", "Favoured", value = "#0570B0")
+                colourpicker::colourInput("bg1", "Not allowed", value = "#FFF8ED"),
+                colourpicker::colourInput("bg2", "Generously allowed", value = "#D4ECE7"),
+                colourpicker::colourInput("bg3", "Allowed", value = "#7DB9B5"),
+                colourpicker::colourInput("bg4", "Favoured", value = "#126E74")
               )
             ),
             tags$div(class = "ram-panel-divider"),
@@ -246,11 +263,6 @@ ui <- fluidPage(
                   tags$span(id = "ram-current-structure",
                             class = "ram-status", "No structure loaded")
                 )
-              ),
-              tags$div(
-                class = "ram-selected-residue",
-                uiOutput("selectedResidueInfo"),
-                actionButton("clearResidue", "Clear selection", class = "btn-default btn-sm")
               ),
               tags$div(
                 class = "ram-charts",
@@ -302,13 +314,41 @@ ui <- fluidPage(
                     tags$p("Filter results by region and search individual residues.")
                   )
                 ),
-                selectInput(
-                  "regionselect", "Region",
-                  c("All", "Not allowed", "Generously allowed",
-                    "Allowed", "Favoured"),
-                  selected = "All"
+                tags$div(class = "ram-table-toolbar",
+                  selectInput(
+                    "regionselect", "Region",
+                    c("All", "Not allowed", "Generously allowed",
+                      "Allowed", "Favoured"), selected = "All"
+                  ),
+                  selectInput("reviewFilter", "Review",
+                    c("All residues" = "All", "Outliers" = "Outlier",
+                      "Missing angles" = "Missing angles",
+                      "Near a contour boundary" = "Near boundary"),
+                    selected = "All"
+                  ),
+                  downloadButton("downloadResidues", "Export filtered CSV")
                 ),
-                DT::DTOutput("regions")
+                tags$p(class = "ram-table-hint",
+                  "Click any residue to inspect it. Your selection remains available above every tab."),
+                tags$div(class = "ram-residue-table", DT::DTOutput("regions"))
+              )
+            ),
+            tabPanel(
+              title = "Sequence", value = "sequence",
+              tags$div(class = "ram-subtab-content",
+                tags$div(class = "ram-result-head",
+                  tags$div(tags$h2("Sequence navigator"),
+                    tags$p("Select any amino acid to inspect its backbone geometry in 2D and 3D."))
+                ),
+                selectInput("sequenceChain", "Protein chain", choices = character(0)),
+                tags$div(class = "ram-sequence-legend",
+                  tags$span(class="ram-swatch ram-sw-favoured", "Favoured"),
+                  tags$span(class="ram-swatch ram-sw-allowed", "Allowed"),
+                  tags$span(class="ram-swatch ram-sw-generously-allowed", "Generously allowed"),
+                  tags$span(class="ram-swatch ram-sw-outlier", "Outlier"),
+                  tags$span(class="ram-swatch ram-sw-missing", "Missing angles")
+                ),
+                uiOutput("sequenceView")
               )
             ),
             tabPanel(
@@ -391,15 +431,16 @@ server <- function(input, output, session) {
   # presentation-only. Custom colours apply when Custom is selected, avoiding
   # circular observers that used to undo a preset during asynchronous updates.
   active_palette <- reactive({
+    if (identical(input$colorscheme, "RamplotR")) return(unname(ramplotr_palette))
     if (identical(input$colorscheme, "Rampage")) return(unname(rampage))
     if (identical(input$colorscheme, "PDBSum")) return(unname(pdbsum))
     values <- c(input$bg1, input$bg2, input$bg3, input$bg4)
-    if (length(values) != 4L || anyNA(values)) return(unname(rampage))
+    if (length(values) != 4L || anyNA(values)) return(unname(ramplotr_palette))
     unname(values)
   })
   observeEvent(input$colorscheme, {
-    colors <- switch(input$colorscheme, Rampage = rampage,
-                     PDBSum = pdbsum, NULL)
+    colors <- switch(input$colorscheme, RamplotR = ramplotr_palette,
+                     Rampage = rampage, PDBSum = pdbsum, NULL)
     if (!is.null(colors)) update_color_inputs(colors)
   })
   observeEvent(input$background, {
@@ -493,6 +534,8 @@ server <- function(input, output, session) {
         )
       })
       loaded(list(key = key, name = name, torsions = torsions, chains = chains))
+      updateSelectInput(session, "sequenceChain",
+                        choices = chains, selected = chains[[1L]])
       incProgress(0.25, detail = "Preparing interactive views")
     })
   }, ignoreInit = TRUE)
@@ -528,38 +571,94 @@ server <- function(input, output, session) {
                    , drop = FALSE]
     data
   })
+  review_queue <- reactive({
+    queue <- ram_review_queue(displayed())
+    queue[queue$review_status != "Other", , drop = FALSE]
+  })
   table_rows <- reactive({
     data <- displayed()
     region <- input$regionselect
     if (!is.null(region) && !identical(region, "All"))
       data <- data[!is.na(data$region) & data$region == region, , drop = FALSE]
+    review <- input$reviewFilter
+    if (!is.null(review) && !identical(review, "All")) {
+      data <- ram_review_queue(data)
+      data <- data[data$review_status == review, , drop = FALSE]
+    }
     data
   })
 
   output$regions <- DT::renderDT({
     data <- table_rows()
-    # Keep a previous plot or 3D pick highlighted when the table tab is
-    # opened for the first time, before its DT proxy has been initialized.
-    selected <- selected_residue()
+    # The proxy handles selection without rebuilding DT while a user clicks.
+    selected <- isolate(selected_residue())
     marked <- if (is.null(selected)) integer(0) else which(
       data$chain == selected$chain & data$resi == selected$resi &
       data$insertion_code == selected$insertion_code
     )
     columns <- c("chain", "resi", "insertion_code", "resn",
                  "phi", "psi", "region", "density")
-    DT::datatable(
-      data[, columns, drop = FALSE],
-      rownames = FALSE,
+    shown <- data[, columns, drop = FALSE]
+    shown$phi <- round(shown$phi, 1L)
+    shown$psi <- round(shown$psi, 1L)
+    shown$density <- round(shown$density, 1L)
+    widget <- DT::datatable(
+      shown, rownames = FALSE,
+      colnames = c("Chain", "Residue", "Ins.", "AA", "Phi (°)", "Psi (°)",
+                   "Region", "Percentile"),
       selection = list(mode = "single",
                        selected = if (length(marked)) marked[[1L]] else integer(0)),
       options = list(
-        pageLength = 12, scrollX = TRUE, autoWidth = TRUE,
+        pageLength = 15, scrollX = FALSE, autoWidth = FALSE,
         dom = "ftip", order = list(list(0, "asc"), list(1, "asc")),
-        language = list(emptyTable = "No residues match the current filters.")
+        language = list(emptyTable = "No residues match the selected filters.")
       ),
       class = "compact stripe hover"
     )
+    DT::formatStyle(widget, "region",
+      backgroundColor = DT::styleEqual(
+        c("Favoured", "Allowed", "Generously allowed", "Not allowed"),
+        c("#D4ECE7", "#E8F3F1", "#FFF5E1", "#FCE5DD")
+      ),
+      fontWeight = "600"
+    )
   }, server = FALSE)
+  output$downloadResidues <- downloadHandler(
+    filename = function() {
+      name <- if (is.null(loaded())) "RamplotR" else loaded()$name
+      paste0(gsub("[^A-Za-z0-9_-]", "_", name), "_filtered_residues.csv")
+    },
+    content = function(file) {
+      utils::write.csv(isolate(table_rows()), file, row.names = FALSE, na = "")
+    }
+  )
+  output$sequenceView <- renderUI({
+    req(loaded(), input$sequenceChain)
+    data <- ram_sequence_data(displayed())
+    data <- data[data$chain == input$sequenceChain, , drop = FALSE]
+    if (!nrow(data)) return(tags$p("No residues match these filters."))
+    tags$div(class = "ram-sequence-grid", role = "group",
+      "aria-label" = paste("Protein chain", input$sequenceChain),
+      lapply(seq_len(nrow(data)), function(i) {
+        residue <- data[i, , drop = FALSE]
+        status <- if (is.na(residue$region)) "missing" else
+          switch(residue$region,
+            Favoured = "favoured", Allowed = "allowed",
+            "Generously allowed" = "generously-allowed",
+            "Not allowed" = "outlier", "missing")
+        tags$button(type = "button",
+          class = paste("ram-seq-res", paste0("ram-seq-", status)),
+          "data-chain" = residue$chain[[1L]],
+          "data-resi" = residue$resi[[1L]],
+          "data-insertion" = residue$insertion_code[[1L]],
+          title = sprintf("%s %s%d%s · %s",
+            residue$resn[[1L]], residue$chain[[1L]], residue$resi[[1L]],
+            residue$insertion_code[[1L]],
+            if (is.na(residue$region)) "Missing angles" else residue$region),
+          residue$letter[[1L]])
+      })
+    )
+  })
 
   output$summary <- renderUI({
     data <- displayed()
@@ -688,6 +787,29 @@ server <- function(input, output, session) {
     select_from(list(chain = row$chain[[1L]], resi = row$resi[[1L]],
                      insertion_code = row$insertion_code[[1L]]))
   })
+  observeEvent(input$ramSeqPick, select_from(input$ramSeqPick))
+  observeEvent(input$showInPlot, {
+    updateTabsetPanel(session, "analysisTabs", selected = "plot")
+  })
+  advance_review <- function(direction) {
+    queue <- isolate(review_queue())
+    if (!nrow(queue)) {
+      showNotification("No residues need review in the current selection.", type="message")
+      return()
+    }
+    current <- isolate(selected_residue())
+    index <- if (is.null(current)) integer(0) else which(
+      queue$chain == current$chain & queue$resi == current$resi &
+      queue$insertion_code == current$insertion_code
+    )
+    next_index <- if (!length(index)) 1L else
+      ((index[[1L]] - 1L + direction + nrow(queue)) %% nrow(queue)) + 1L
+    row <- queue[next_index, , drop = FALSE]
+    selected_residue(list(chain = row$chain[[1L]], resi = row$resi[[1L]],
+                         insertion_code = row$insertion_code[[1L]]))
+  }
+  observeEvent(input$nextReview, advance_review(1L))
+  observeEvent(input$prevReview, advance_review(-1L))
   observeEvent(input$clearResidue, selected_residue(NULL))
 
   # Pause viewer motion when the user starts inspecting a particular
@@ -715,13 +837,22 @@ server <- function(input, output, session) {
   })
   output$selectedResidueInfo <- renderUI({
     row <- selected_row()
-    if (is.null(row)) return(tags$span("Click a residue in any view to inspect it."))
-    tags$strong(
-      sprintf("%s %d%s · %s · %s",
+    if (is.null(row)) return(tags$span(class = "ram-inspector-empty",
+      "Select a residue in the plot, table, sequence or 3D model. Review controls navigate to the next issue."))
+    angle <- function(value) if (is.finite(value)) sprintf("%.1f°", value) else "Unavailable"
+    tags$div(class = "ram-inspector-data",
+      tags$div(tags$strong(sprintf("%s %d%s · %s",
         if (nzchar(row$chain[[1L]])) paste("Chain", row$chain[[1L]]) else "Chain",
         as.integer(row$resi[[1L]]), row$insertion_code[[1L]],
-        row$resn[[1L]],
-        if (is.na(row$region[[1L]])) "Angles unavailable" else row$region[[1L]])
+        row$resn[[1L]])),
+        tags$span(class = "ram-inspector-classification",
+          if (is.na(row$region[[1L]])) "Missing angles" else row$region[[1L]])),
+      tags$div(class = "ram-inspector-angles",
+        tags$span(paste("φ", angle(row$phi[[1L]]))),
+        tags$span(paste("ψ", angle(row$psi[[1L]]))),
+        tags$span(if (is.finite(row$density[[1L]]))
+          sprintf("Density percentile %.1f", row$density[[1L]]) else "")
+      )
     )
   })
   # Keep the shared selection label current while the plot tab is hidden

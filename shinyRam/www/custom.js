@@ -11,6 +11,75 @@
   const plot = document.getElementById("plotly");
   const empty = document.getElementById("plot-empty");
   const currentStructure = document.getElementById("ram-current-structure");
+  let selectedResidue = null;
+  let selectedCoordinates = new Map();
+  let selectionTrace = -1;
+  let boundStage = null;
+  let boundPickHandler = null;
+
+  function selectionKey(item) {
+    if (!item || item.chain == null || item.resi == null) return "";
+    return [String(item.chain), String(item.resi),
+            String(item.insertion_code || "")].join("\\r");
+  }
+
+  function selectionTraceData() {
+    const point = selectedCoordinates.get(selectionKey(selectedResidue));
+    return point && selectedResidue ? {
+      x: [point.phi], y: [point.psi]
+    } : { x: [], y: [] };
+  }
+
+  function refreshSelection() {
+    if (!plot || !window.Plotly || selectionTrace < 0 ||
+        !plot.classList.contains("js-plotly-plot")) return;
+    const point = selectionTraceData();
+    window.Plotly.restyle(plot, { x: [point.x], y: [point.y] },
+                        [selectionTrace]);
+  }
+
+  function onPlotClick(event) {
+    if (!event || !event.points || !event.points.length) return;
+    const point = event.points[0];
+    const detail = point.customdata ||
+      (point.data && point.data.customdata && point.data.customdata[point.pointNumber]);
+    if (!Array.isArray(detail) || detail.length < 3) return;
+    const pick = {
+      chain: String(detail[0]), resi: Number(detail[1]),
+      insertion_code: String(detail[2] || "")
+    };
+    if (!Number.isInteger(pick.resi)) return;
+    selectedResidue = pick;
+    refreshSelection();
+    if (window.Shiny && window.Shiny.setInputValue)
+      window.Shiny.setInputValue("ramPlotPick", pick, { priority: "event" });
+  }
+
+  function bindNglPick() {
+    if (typeof window.getNGLStage !== "function") return false;
+    const stage = window.getNGLStage("NGL");
+    if (!stage || !stage.signals || !stage.signals.clicked) return false;
+    if (stage === boundStage) return true;
+    if (boundStage && boundPickHandler &&
+        boundStage.signals && boundStage.signals.clicked) {
+      boundStage.signals.clicked.remove(boundPickHandler);
+    }
+    boundStage = stage;
+    boundPickHandler = function (proxy) {
+      const atom = proxy && (proxy.atom || proxy.closestBondAtom);
+      if (!atom || atom.resno == null) return;
+      const pick = {
+        chain: String(atom.chainname || atom.chainid || ""),
+        resi: Number(atom.resno),
+        insertion_code: String(atom.inscode || "")
+      };
+      if (!Number.isInteger(pick.resi)) return;
+      if (window.Shiny && window.Shiny.setInputValue)
+        window.Shiny.setInputValue("ramNglPick", pick, { priority: "event" });
+    };
+    stage.signals.clicked.add(boundPickHandler);
+    return true;
+  }
 
   function safeColor(value, fallback) {
     return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value)
@@ -112,6 +181,8 @@
     const chains = array(df.chain);
     const amino = array(df.resn);
     const residueIds = array(df.resi);
+    const insertionCodes = array(df.insertion_code);
+    selectedCoordinates = new Map();
     const phis = array(df.phi);
     const psis = array(df.psi);
     const uniqueChains = [...new Set(chains.map(String))];
@@ -119,7 +190,7 @@
     let totalPoints = 0;
 
     uniqueChains.forEach(function (chain, index) {
-      const x = [], y = [], label = [];
+      const x = [], y = [], label = [], customdata = [];
       chains.forEach(function (name, row) {
         if (String(name) !== chain) return;
         const phi = phis[row];
@@ -129,6 +200,13 @@
             !Number.isFinite(phi) || !Number.isFinite(psi)) return;
         x.push(phi);
         y.push(psi);
+        const detail = [chain, residueIds[row], insertionCodes[row] || "",
+                        amino[row]];
+        customdata.push(detail);
+        selectedCoordinates.set(selectionKey({
+          chain: chain, resi: residueIds[row],
+          insertion_code: insertionCodes[row] || ""
+        }), { phi: phi, psi: psi });
         label.push(
           "<b>Chain " + escapeText(chain || "unassigned") + "</b><br>" +
           escapeText(amino[row]) + " " + escapeText(residueIds[row]) + "<br>" +
@@ -141,7 +219,7 @@
         type: x.length > 2500 ? "scattergl" : "scatter",
         mode: "markers",
         x: x, y: y,
-        text: label,
+        text: label, customdata: customdata,
         hovertemplate: "%{text}<extra></extra>",
         name: "Chain " + (chain || "unassigned"),
         // Large assemblies can contain hundreds of chains; avoid a legend
@@ -156,6 +234,20 @@
         }
       });
     });
+
+    // Keep a dedicated overlay trace for linked selection instead of
+    // mutating the original chain markers or the scientific density layers.
+    const active = selectionTraceData();
+    traces.push({
+      type: "scatter", mode: "markers",
+      x: active.x, y: active.y,
+      showlegend: false, hoverinfo: "skip",
+      marker: {
+        size: 17, color: "rgba(255,160,48,0.65)",
+        line: { color: "#142b35", width: 2 }
+      }
+    });
+    selectionTrace = traces.length - 1;
 
     const narrow = plot.clientWidth < 540;
     const axis = {
@@ -228,6 +320,12 @@
         totalPoints.toLocaleString() + " plotted residues";
     }
     Promise.resolve(window.Plotly.react(plot, traces, layout, config))
+      .then(function () {
+        if (typeof plot.on === "function" && !plot.__ramPickBound) {
+          plot.on("plotly_click", onPlotClick);
+          plot.__ramPickBound = true;
+        }
+      })
       .catch(function () {
         plot.style.display = "none";
         if (empty) {
@@ -241,6 +339,13 @@
 
   if (window.Shiny) {
     window.Shiny.addCustomMessageHandler("process", drawPlot);
+    window.Shiny.addCustomMessageHandler("ram-selection", function (choice) {
+      selectedResidue = choice || null;
+      refreshSelection();
+    });
+    window.Shiny.addCustomMessageHandler("ram-bind-ngl", function () {
+      bindNglPick();
+    });
   }
 
   // Resize Plotly if the sidebar or viewport changes size. Do not recreate

@@ -28,7 +28,9 @@ do not assert MolProbity equivalence based on agreement percentages.
 ## Public, reproducible corpus
 
 The committed `validation/manifest.csv` identifies 1CRN and 1UBQ
-(X-ray crystallography) and 6VXX (cryo-EM viral spike complex). The dedicated
+(X-ray crystallography), 6VXX (cryo-EM viral spike complex), 2DQ4
+(a challenging crystallographic example with reported Ramachandran outliers),
+and 1D3Z (solution-NMR ensemble, model one). The dedicated
 CI job downloads each original RCSB mmCIF and the separately generated
 wwPDB validation XML. Each run preserves both source files, their SHA256
 hashes, exact download URLs, git commit and R package versions.

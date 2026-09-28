@@ -307,7 +307,7 @@ ui <- fluidPage(
                   selected = "All"
                 ),
                 tags$p(class = "ram-field-hint", "Click a row to highlight that residue in the plot and molecular viewer."),
-                dataTableOutput("regions")
+                DT::DTOutput("regions")
               )
             ),
             tabPanel(
@@ -518,7 +518,7 @@ server <- function(input, output, session) {
         rows$region == input$regionselect, , drop = FALSE]
     rows
   })
-  output$regions <- renderDataTable({
+  output$regions <- DT::renderDT({
     rows <- region_rows()
     data.frame(
       Chain = rows$chain, Residue = rows$resi,

@@ -91,14 +91,20 @@ const puppeteer=require("puppeteer-core");
     await (await page.$("#structfile")).uploadFile(nmr);
     await new Promise(resolve=>setTimeout(resolve,1400));
     await page.click("#submit");
-    await page.waitForFunction(()=>document.querySelector("#ram-ensemble-panel"),
-                               {timeout:90000});
+    await page.waitForFunction(()=>{
+      const status=document.querySelector("#ram-current-structure");
+      return status && status.textContent.includes("1D3Z");
+    },{timeout:90000});
+    // Shiny intentionally suspends outputs in hidden tabs, so activate
+    // Summary before waiting for the lazily generated ensemble panel.
     await page.evaluate(()=>{
       const anchor=[...document.querySelectorAll(".nav-tabs a")]
         .find(x=>x.textContent.trim()==="Summary");
       if(!anchor)throw Error("Summary tab unavailable.");
       anchor.click();
     });
+    await page.waitForFunction(()=>document.querySelector("#ram-ensemble-panel"),
+                               {timeout:30000});
     await page.click("#ram-ensemble-panel summary");
     await page.click("#calculateEnsemble");
     await page.waitForFunction(()=>{

@@ -225,33 +225,28 @@ const assert = require("node:assert/strict");
                                    e => e.textContent);
     // A single page.$ returns only the first row; find and actually click a
     // different visible residue so the table -> NGL path is exercised.
+    // Compute the alternate row and click it in the same browser task:
+    // DT may replace its tbody between separate Puppeteer round trips.
     const other = await page.evaluate(first => {
-      const rows = Array.from(document.querySelectorAll("#regions tbody tr"));
-      const index = rows.findIndex(row => {
-        const cells = row.querySelectorAll("td");
+      const rows = Array.from(document.querySelectorAll("#regions table tbody tr"));
+      const row = rows.find(candidate => {
+        const cells = candidate.querySelectorAll("td");
         return cells.length >= 3 &&
           (cells[0].textContent.trim() !== String(first[0]) ||
            Number(cells[1].textContent.trim()) !== Number(first[1]) ||
            cells[2].textContent.trim() !== String(first[2] || ""));
       });
-      if (index < 0) return null;
-      const cells = rows[index].querySelectorAll("td");
+      if (!row) return null;
+      const cells = row.querySelectorAll("td");
       const chain = cells[0].textContent.trim();
       const resi = cells[1].textContent.trim();
       const insertion = cells[2].textContent.trim();
-      return {
-        index: index,
-        sele: resi + (insertion ? "^" + insertion : "") +
-          (chain ? ":" + chain : "")
-      };
+      const sele = resi + (insertion ? "^" + insertion : "") +
+        (chain ? ":" + chain : "");
+      row.click();
+      return { sele };
     }, firstPoint);
     assert.ok(other, "Need at least two different visible residues.");
-    await page.evaluate(index => {
-      const rows = document.querySelectorAll("#regions table tbody tr");
-      const row = rows[index];
-      if (!row) throw new Error("The selected DT row is no longer present.");
-      row.click();
-    }, other.index);
     await page.waitForFunction(({ before, sele }) =>
       document.querySelector("#selectedResidueInfo strong") &&
       document.querySelector("#selectedResidueInfo strong").textContent !== before &&

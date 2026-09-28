@@ -486,6 +486,7 @@ ui <- fluidPage(
                   )
                 ),
                 htmlOutput("summary"),
+                uiOutput("ensemblePanel"),
                 tags$details(class = "ram-details ram-export-panel",
                   tags$summary("Export figures and a reproducible report"),
                   tags$p(class = "ram-field-hint",
@@ -522,6 +523,7 @@ server <- function(input, output, session) {
   loaded <- reactiveVal(NULL)
   comparison_loaded <- reactiveVal(NULL)
   external_validation <- reactiveVal(NULL)
+  ensemble_results <- reactiveVal(NULL)
   selected_residue <- reactiveVal(NULL)
   viewer_ready <- reactiveVal(FALSE)
   current_model <- reactive({
@@ -1343,6 +1345,114 @@ server <- function(input, output, session) {
       sele_reference=paste0(":",input$compareChainA),
       sele_target=paste0(":",input$compareChainB))
   })
+
+  output$ensemblePanel <- renderUI({
+    structure <- req(loaded())
+    if(structure$nmodels<=1L) return(NULL)
+    tags$details(id="ram-ensemble-panel",class="ram-confidence-panel",
+      tags$summary(
+        tags$span(class="ram-confidence-title","Ensemble analysis"),
+        tags$span(class="ram-confidence-subtitle",
+          paste(structure$nmodels,"structural models · circular φ/ψ variation and region consistency"))
+      ),
+      tags$div(class="ram-confidence-body",
+        tags$p(class="ram-confidence-explainer",
+          "Model variation is matched by chain, residue and insertion code. Circular statistics correctly handle the -180°/180° boundary; models with missing coordinates contribute only observed angles."),
+        tags$div(class="ram-ensemble-actions",
+          actionButton("calculateEnsemble","Analyse ensemble",
+                       class="btn-primary btn-sm"),
+          downloadButton("downloadEnsemble","Export ensemble CSV")
+        ),
+        uiOutput("ensembleResultSummary"),
+        tags$div(class="ram-residue-table",DT::DTOutput("ensembleRows"))
+      )
+    )
+  })
+  ensemble_matches <- reactive({
+    value <- ensemble_results()
+    if(is.null(value)) return(NULL)
+    if(!identical(value$key,req(loaded())$key) ||
+       !identical(value$mode,input$validationMode) ||
+       !identical(value$reference,input$bgtype) ||
+       !identical(value$background,input$background)) return(NULL)
+    value$result
+  })
+  observeEvent(input$calculateEnsemble, {
+    structure <- req(loaded())
+    if(structure$nmodels<=1L) return()
+    withProgress(message="Analysing compatible ensemble models",value=0.2,{
+      result <- tryCatch(
+        ram_ensemble_analyze(structure$pdb,max_models=min(30L,structure$nmodels),
+          classifier=function(torsions)
+            ram_classify_torsions(torsions,
+              reference_dir=file.path("static",input$bgtype),
+              selected_reference=plot_reference(),mode=input$validationMode,
+              threshold_fn=ram_density_thresholds)),
+        error=function(e) {
+          showNotification(conditionMessage(e),type="error",duration=12)
+          NULL
+        })
+      if(!is.null(result))
+        ensemble_results(list(key=structure$key,mode=input$validationMode,
+          reference=input$bgtype,background=input$background,result=result))
+      incProgress(0.8)
+    })
+  },ignoreInit=TRUE)
+  output$ensembleResultSummary <- renderUI({
+    result <- ensemble_matches()
+    if(is.null(result)) return(tags$p(class="ram-field-hint",
+      "Run the ensemble analysis. Results are recalculated on request after changing the reference or classification settings."))
+    data <- result$summary
+    tags$div(class="ram-confidence-metrics",
+      tags$span(class="ram-confidence-metric",
+        sprintf("%s of %s models analysed",result$analyzed_models,
+                result$available_models)),
+      tags$span(class="ram-confidence-metric",
+        sprintf("%s residues with classification changes",
+                sum(data$changes_class,na.rm=TRUE))),
+      tags$span(class="ram-confidence-metric",
+        sprintf("%s residues with ≥20° angular spread",
+                sum(pmax(data$phi_sd,data$psi_sd,na.rm=TRUE)>=20,
+                    na.rm=TRUE))),
+      if(result$limited)
+        tags$span(class="ram-confidence-warning",
+          "Only the first 30 models are included; export records this limit.")
+    )
+  })
+  output$ensembleRows <- DT::renderDT({
+    result <- ensemble_matches()
+    req(result)
+    data <- result$summary
+    if(!nrow(data)) return(DT::datatable(data,rownames=FALSE))
+    fields <- c("chain","resi","insertion_code","resn",
+      "phi_mean","phi_sd","psi_mean","psi_sd","models_present",
+      "class_consistency","changes_class")
+    shown <- data[,fields,drop=FALSE]
+    for(field in c("phi_mean","phi_sd","psi_mean","psi_sd"))
+      shown[[field]] <- round(shown[[field]],1L)
+    shown$class_consistency <- round(shown$class_consistency*100,1L)
+    shown$changes_class <- ifelse(shown$changes_class,"Changed","Stable")
+    DT::datatable(shown,rownames=FALSE,selection="single",
+      colnames=c("Chain","Residue","Ins.","AA","φ mean","φ SD",
+        "ψ mean","ψ SD","Models","Class agreement (%)","Class"),
+      options=list(pageLength=12,autoWidth=FALSE,scrollX=TRUE,
+                   dom="ftip",order=list(list(10,"asc"))),
+      class="compact stripe hover")
+  },server=FALSE)
+  observeEvent(input$ensembleRows_rows_selected, {
+    data <- req(ensemble_matches())$summary
+    ix <- input$ensembleRows_rows_selected[[1L]]
+    if(!is.finite(ix) || ix<1L || ix>nrow(data)) return()
+    row <- data[ix,,drop=FALSE]
+    selected_residue(list(chain=as.character(row$chain[[1L]]),
+      resi=as.integer(row$resi[[1L]]),
+      insertion_code=as.character(row$insertion_code[[1L]])))
+  })
+  output$downloadEnsemble <- downloadHandler(
+    filename=function() safe_filename("ensemble.csv"),
+    content=function(file) utils::write.csv(req(ensemble_matches())$summary,
+                                               file,row.names=FALSE,na="")
+  )
 
   output$summary <- renderUI({
     data <- displayed()

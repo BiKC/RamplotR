@@ -16,7 +16,7 @@ This log records the main changes and their verification status. Work happens in
 - [x] Add targeted tests for classification with synthetic reference grids and edge cases.
 - [x] Detect local PDB versus mmCIF input based on its original uploaded filename.
 - [x] Add clear upload errors and an explicit PDB-versus-upload source choice.
-- [ ] Update installation instructions and dependency manifest.
+- [x] Update installation instructions and list direct R dependencies; a reproducible renv lockfile is pending a real R environment.
 - [ ] Record independent scientific comparison and benchmark results before the preprint.
 
 The scientific classifications are tied to the bundled reference densities. Do not claim MolProbity-equivalent outlier percentages without a separate benchmark. New methods and reference datasets will be versioned.

@@ -10,7 +10,6 @@
 
 # shiny related packages
 library(shiny)
-library(shinycssloaders)
 library(shinyWidgets)
 library(colourpicker)
 
@@ -19,7 +18,6 @@ library(bio3d)
 library(NGLVieweR)
 
 # Used for processing data
-library(plyr)
 
 source(file.path("R", "ramachandran.R"), local = TRUE)
 source(file.path("R", "backbone.R"), local = TRUE)
@@ -80,7 +78,6 @@ ui <- fluidPage(
   # Application title
   titlePanel("RamplotR"),
   tags$head(
-    tags$script(src = "https://cdn.rawgit.com/arose/ngl/v0.10.4-1/dist/ngl.js"),
     tags$script(src = "https://cdn.plot.ly/plotly-2.14.0.min.js")
   ),
   # Sidebar with a slider input for number of bins
@@ -222,7 +219,6 @@ server <- function(input, output, session) {
   output$dummy <- reactive(FALSE)
   outputOptions(output, "dummy", suspendWhenHidden = FALSE)
   # session$onSessionEnded(stopApp)
-  options(warn = -1)
   session$userData$previousPDB <- ""
   # reactive(bio3d::write.pdb(pdb = pdb(), file = paste0(accPDB(), '.pdb')))
 
@@ -360,7 +356,6 @@ server <- function(input, output, session) {
           # classifying glycine, proline and pre-proline residues.
           torsion <- ram_extract_torsions(pdb)
           chains <- unique(torsion$chain)
-          print(torsion)
           # Store the results in the user data
           session$userData$torsion <- torsion
 
@@ -380,20 +375,14 @@ server <- function(input, output, session) {
           
           output$chainColors <- renderUI({
             isolate({
-              x <- vector("list", length(chains))
-              c <- 1
-              for (i in chains) {
-                col<-color_set[((c - 1) %% length(color_set)) + 1]
-                x[[i]] <-
-                  list(colourpicker::colourInput(
-                    paste0("chain", i),
-                    label = paste("Chain", i),
-                    value = col
-                  ))
-                c <- c + 1
-              }
-
-              dropdown(x, label = "Chain color settings")
+              widgets <- lapply(seq_along(chains), function(k) {
+                colourpicker::colourInput(
+                  paste0("chain", chains[[k]]),
+                  label = paste("Chain", chains[[k]]),
+                  value = color_set[((k - 1L) %% length(color_set)) + 1L]
+                )
+              })
+              dropdown(widgets, label = "Chain color settings")
             })
           })
 
@@ -446,7 +435,6 @@ server <- function(input, output, session) {
           #updatePickerInput(session, "AA", selected = input$background)
           torsionsubset <- subset(session$userData$torsion, resn %in% input$AA)
           # also subset for chains
-          print(input$chainselection)
           if (!is.null(input$chainselection)) {
             torsionsubset <- subset(torsionsubset, chain %in% input$chainselection)
           }
@@ -454,11 +442,6 @@ server <- function(input, output, session) {
         incProgress(1 / 4, detail = paste("Creating plot"))
         # session$sendCustomMessage("updateFig", input$PDB)
         # get input chain colors from ui
-        chain_colors <- vector("list", length(unique(torsionsubset$chain)))
-        for (i in unique(torsionsubset$chain)) {
-          chain_colors[[i]] <- input[[paste0("chain", i)]]
-        }
-
         ttab <- reactive({
           ram_classify_torsions(
             session$userData$torsion,

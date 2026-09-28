@@ -78,10 +78,21 @@ const assert = require("node:assert/strict");
     const dimensions = await page.evaluate(() => ({
       viewport: document.documentElement.clientWidth,
       body: document.body.scrollWidth,
-      main: document.querySelector(".ram-main").getBoundingClientRect().width
+      main: document.querySelector(".ram-main").getBoundingClientRect().width,
+      resultsTop: document.querySelector(".ram-main").getBoundingClientRect().top,
+      settingsTop: document.querySelector(".ram-sidebar").getBoundingClientRect().top,
+      settingsLinkVisible: document.querySelector(".ram-mobile-settings-link")
+        .getBoundingClientRect().width > 0,
+      viewerControlCount: document.querySelectorAll(".ram-viewer-options input[type=checkbox]").length
     }));
     assert.ok(dimensions.body <= dimensions.viewport + 3,
               "The mobile UI should not scroll horizontally.");
+    assert.ok(dimensions.resultsTop < dimensions.settingsTop,
+              "Analysis results must appear before settings on mobile.");
+    assert.ok(dimensions.settingsLinkVisible,
+              "The mobile results should link to analysis settings.");
+    assert.equal(dimensions.viewerControlCount, 5,
+                 "All 3D controls must stay beside the viewer.");
     await page.screenshot({
       path: "benchmarks/output/ui-preview/mobile-loaded.png", fullPage: true
     });

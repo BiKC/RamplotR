@@ -6,6 +6,8 @@ on:
       - "shinyRam/app.R"
       - "shinyRam/www/**"
       - "tests/ui-browser.cjs"
+      - "tests/reports.R"
+      - "shinyRam/R/**"
       - ".github/workflows/ui-preview.yml"
   workflow_dispatch:
 
@@ -24,6 +26,8 @@ jobs:
       - name: Install the application's R dependencies
         run: |
           Rscript -e 'install.packages(c("shiny", "shinyWidgets", "colourpicker", "bio3d", "NGLVieweR", "DT"))'
+      - name: Validate publication figure and report exports
+        run: Rscript tests/reports.R
       - name: Install headless-browser controller
         run: npm install --no-save --no-package-lock puppeteer-core@24
       - name: Prepare a small local PDB for upload

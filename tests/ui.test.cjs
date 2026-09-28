@@ -184,9 +184,9 @@ setImmediate(() => {
     chain: "A", resi: 2, insertion_code: "A",
     multipleModels: true, modelIndex: 2
   });
-  assert.ok(selectionEvents.includes("2^A:A and /1"),
+  assert.ok(stickSelections.includes("2^A:A and /1"),
             "A multi-model selection must target its own model in NGL.");
-  assert.ok(zoomCalls.some(call => call.sele === "2^A:A and /1"),
+  assert.ok(cameraMoves.some(call => call.sele === "2^A:A and /1"),
             "Switching models should refocus the same residue.");
   handlers["ram-selection"]({clear: true});
   assert.equal(restyles.at(-1).change.x[0].length, 0,

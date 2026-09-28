@@ -118,7 +118,10 @@ ui <- fluidPage(
         tags$div(
           class = "ram-section-heading",
           tags$div(
-            tags$h2("Load a structure"),
+            tags$h2(
+              tags$span(class = "ram-heading-full", "Load a structure"),
+              tags$span(class = "ram-heading-compact", "Structure")
+            ),
             tags$p("Enter a PDB accession or use a local PDB/mmCIF file.")
           )
         ),
@@ -247,6 +250,13 @@ ui <- fluidPage(
         ),
         tags$main(
           class = "ram-main",
+          tags$div(class = "ram-workspace-toolbar",
+            tags$button(id = "ram-toggle-settings", type = "button",
+                        class = "ram-settings-toggle",
+                        "Hide settings", "aria-controls" = "ram-settings",
+                        "aria-expanded" = "true",
+                        title = "Expand the plots by hiding the settings sidebar")
+          ),
           tabsetPanel(
             id = "analysisTabs",
             tabPanel(

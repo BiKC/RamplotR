@@ -78,7 +78,7 @@ ram_density_thresholds <- function(reference, percentages = c(85, 98, 99.95)) {
 ram_read_reference <- local({
   cache <- new.env(parent = emptyenv())
   function(path) {
-    ram_ensure_reference(path)
+    if (exists("ram_ensure_reference", mode = "function")) ram_ensure_reference(path)
     key <- normalizePath(path, mustWork = TRUE)
     if (!exists(key, envir = cache, inherits = FALSE)) {
       assign(key, readRDS(key), envir = cache)

@@ -23,7 +23,15 @@ jobs:
         with:
           use-public-rspm: true
       - name: Check source syntax
-        run: Rscript -e 'for (p in c("shinyRam/app.R", list.files("shinyRam/R", full.names=TRUE))) parse(file=p)'
+        run: Rscript -e 'for (p in c("shinyRam/app.R", "scripts/export-shinylive.R", list.files("shinyRam/R", full.names=TRUE))) parse(file=p)'
+        shell: bash
+      - name: Check scoped one.com deployment templates
+        run: |
+          test -s config/onecom/ramplotr.htaccess
+          test -s config/onecom/shinylive.htaccess
+          test -s config/onecom/reference-data.htaccess
+          grep -q 'shinylive.htaccess' scripts/export-shinylive.R
+          grep -q 'reference-data.htaccess' scripts/export-shinylive.R
         shell: bash
       - name: Check the responsive interface and preserved Shiny IDs
         run: Rscript tests/ui-contract.R

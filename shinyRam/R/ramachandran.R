@@ -92,9 +92,9 @@ ram_read_reference <- local({
 ram_reference_profile <- local({
   cache <- new.env(parent = emptyenv())
   function(path) {
+    reference <- ram_read_reference(path)
     key <- normalizePath(path, mustWork = TRUE)
     if (!exists(key, envir = cache, inherits = FALSE)) {
-      reference <- ram_read_reference(key)
       z <- as.numeric(reference$z)
       if (!length(z) || any(!is.finite(z)) || any(z < 0) || sum(z) <= 0) {
         stop("Invalid reference density grid")

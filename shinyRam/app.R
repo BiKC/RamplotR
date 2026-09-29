@@ -1150,28 +1150,57 @@ server <- function(input, output, session) {
               chain_name else paste("Chain",chain_name)),
             tags$span(sprintf("%s residues",
               format(nrow(chain),big.mark=","))),
+            tags$div(class="ram-sequence-jump",
+              tags$label("Go to", class="sr-only"),
+              tags$input(type="number", class="ram-seq-jump-input",
+                min="1", step="1", placeholder="Residue #",
+                "aria-label"=paste("Jump to residue number in",chain_name)),
+              tags$button(type="button", class="ram-seq-jump",
+                "data-chain"=if (identical(chain_name,"Unassigned")) "" else chain_name,
+                "aria-label"=paste("Go to residue in",chain_name), "Go")
+            ),
             tags$span(class="ram-sequence-scroll-hint","Scroll sideways →")
           ),
           tags$div(class="ram-sequence-grid", role="group",
             "aria-label"=paste("Select a residue in",chain_name),
-            lapply(seq_len(nrow(chain)), function(i) {
-              residue <- chain[i,,drop=FALSE]
-              tags$button(type="button",
-                class=paste("ram-seq-res",
-                  paste0("ram-seq-",statuses[[i]])),
-                disabled=if (!selectable[[i]]) "disabled" else NULL,
-                "data-chain"=residue$chain[[1L]],
-                "data-resi"=residue$resi[[1L]],
-                "data-insertion"=residue$insertion_code[[1L]],
-                title=sprintf("%s %s%d%s · %s",
-                  residue$resn[[1L]],residue$chain[[1L]],
-                  residue$resi[[1L]],residue$insertion_code[[1L]],
-                  paste0(if (is.na(residue$region[[1L]])) "Missing angles"
-                    else residue$region[[1L]],
-                    if (!selectable[[i]]) " · Hidden by current filters" else "")),
-                "aria-pressed"="false",
-                residue$letter[[1L]])
-            })
+            {
+              labels <- ram_sequence_position_labels(chain$resi, chain$insertion_code)
+              show_confidence <- any(is.finite(chain$plddt))
+              lapply(seq_len(nrow(chain)), function(i) {
+                residue <- chain[i,,drop=FALSE]
+                score <- residue$plddt[[1L]]
+                position <- paste0(residue$resi[[1L]],
+                                   residue$insertion_code[[1L]])
+                tags$div(class="ram-seq-slot",
+                  tags$span(class="ram-seq-position",
+                    if (nzchar(labels[[i]])) labels[[i]] else "\u00a0",
+                    "aria-hidden"="true"),
+                  tags$button(type="button",
+                    class=paste("ram-seq-res",
+                      paste0("ram-seq-",statuses[[i]]),
+                      if (show_confidence) "ram-seq-with-confidence" else ""),
+                    style=if (is.finite(score))
+                      paste0("--ram-plddt-color:",ram_plddt_color(score)) else NULL,
+                    disabled=if (!selectable[[i]]) "disabled" else NULL,
+                    "data-chain"=residue$chain[[1L]],
+                    "data-resi"=residue$resi[[1L]],
+                    "data-insertion"=residue$insertion_code[[1L]],
+                    title=paste0(residue$resn[[1L]], " ",
+                      residue$chain[[1L]], position, " · ",
+                      if (is.na(residue$region[[1L]])) "Missing angles"
+                      else residue$region[[1L]],
+                      if (is.finite(score)) sprintf(" · pLDDT %.1f",score)
+                      else "",
+                      if (!selectable[[i]]) " · Hidden by current filters"
+                      else ""),
+                    "aria-pressed"="false",
+                    tags$span(class="ram-seq-aa",residue$letter[[1L]]),
+                    if (show_confidence) tags$span(class="ram-seq-plddt",
+                      if (is.finite(score)) sprintf("%.0f",score) else "\u2014")
+                  )
+                )
+              })
+            }
           )
         )
       })

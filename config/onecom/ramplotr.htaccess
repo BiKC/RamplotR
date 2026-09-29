@@ -14,11 +14,11 @@
 
 <IfModule mod_headers.c>
   # App and manifest changes must be revalidated after a deployment.
-  <FilesMatch "^(index\\.html|app\\.json)$">
+  <FilesMatch "^(index\.html|app\.json)$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
   # Other local assets can be reused briefly but may change on deployment.
-  <FilesMatch "\\.(css|js|svg|png|woff2?)$">
+  <FilesMatch "\.(css|js|svg|png|woff2?)$">
     Header set Cache-Control "public, max-age=86400"
   </FilesMatch>
 </IfModule>

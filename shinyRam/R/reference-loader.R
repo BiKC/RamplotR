@@ -2,7 +2,7 @@
 # A thin export keeps an index and fetches each original RDS file only when used.
 
 ram_reference_index <- function(directory) {
-  index_file <- file.path(directory, ".reference-index.tsv")
+  index_file <- file.path(directory, "reference-index.tsv")
   if (!file.exists(index_file)) return(NULL)
   index <- utils::read.delim(index_file, colClasses = "character",
                              stringsAsFactors = FALSE, check.names = FALSE)

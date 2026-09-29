@@ -347,13 +347,21 @@ ui <- fluidPage(
                     ),
                     tags$div(class = "ram-sequence-detail",
                       tags$p(class = "ram-sequence-instruction",
-                        "Select a letter to highlight its Ramachandran point and zoom in 3D. Dimmed letters are hidden by the current filters; scroll each chain sideways for more residues."),
+                        "Permanent labels show actual PDB residue numbers every ten positions. Enter a number beside a chain to jump directly to it. The colour behind each letter shows Ramachandran classification; the separate coloured underline and number indicate pLDDT, when available."),
                       tags$div(class = "ram-sequence-legend",
                         tags$span(class="ram-swatch ram-sw-favoured", "Favoured"),
                         tags$span(class="ram-swatch ram-sw-allowed", "Allowed"),
                         tags$span(class="ram-swatch ram-sw-generously-allowed", "Generously allowed"),
                         tags$span(class="ram-swatch ram-sw-outlier", "Outlier"),
                         tags$span(class="ram-swatch ram-sw-missing", "Missing angles")
+                      ),
+                      tags$div(class="ram-sequence-confidence-key",
+                        tags$strong("Model confidence · pLDDT"),
+                        tags$span(class="ram-confidence-key-high", "≥90"),
+                        tags$span(class="ram-confidence-key-good", "70–89"),
+                        tags$span(class="ram-confidence-key-low", "50–69"),
+                        tags$span(class="ram-confidence-key-poor", "<50"),
+                        tags$span("The number below each amino acid is its pLDDT score.")
                       ),
                       uiOutput("sequenceView")
                     )
@@ -477,7 +485,41 @@ ui <- fluidPage(
                 ),
                 uiOutput("compareChainControls"),
                 tags$div(class = "ram-compare-status", uiOutput("compareSummary")),
-                tags$div(id = "comparePlot", class = "ram-compare-plot"),
+                tags$div(class = "ram-compare-toolbar",
+                  selectInput("compareJumpSide", "Locate in", c(
+                    "Primary chain" = "a", "Comparison chain" = "b")),
+                  numericInput("compareJumpResidue", "Residue number",
+                    value = NA, min = 1, step = 1, width = "135px"),
+                  actionButton("compareJump", "Find aligned pair",
+                    class = "btn-primary"),
+                  tags$p(class = "ram-compare-toolbar-hint",
+                    "Uses actual residue numbers, including alignment gaps.")
+                ),
+                tags$div(class = "ram-compare-workspace",
+                  tags$section(class = "ram-compare-card",
+                    tags$div(class = "ram-compare-card-head",
+                      tags$h3("Aligned backbone angles"),
+                      tags$p("Select either colour to inspect that aligned residue pair.")
+                    ),
+                    tags$div(id = "comparePlot", class = "ram-compare-plot")
+                  ),
+                  tags$section(class = "ram-compare-card ram-compare-viewer",
+                    tags$div(class = "ram-compare-card-head",
+                      tags$h3("3D superposition"),
+                      tags$p("Primary chain in coral, comparison chain in blue. Click either structure to inspect aligned residues.")
+                    ),
+                    tags$div(class = "ram-compare-viewer-controls",
+                      checkboxInput("showComparison3D", "Show 3D", value = TRUE),
+                      actionButton("compareResetView", "Fit both chains",
+                        class = "btn-default btn-sm")
+                    ),
+                    conditionalPanel(condition = "input.showComparison3D",
+                      tags$div(class = "ram-compare-ngl",
+                        NGLVieweR::NGLVieweROutput("NGLCompare",
+                          height = "410px")))
+                  )
+                ),
+                uiOutput("compareSelectionInfo"),
                 tags$div(class = "ram-table-toolbar",
                   selectInput("compareFilter", "Show comparison",
                     choices = c("All aligned residues" = "All",
@@ -486,16 +528,9 @@ ui <- fluidPage(
                       "Insertions / deletions" = "gaps"), selected = "All"),
                   downloadButton("downloadComparison", "Export comparison CSV")
                 ),
-                tags$div(class = "ram-residue-table", DT::DTOutput("comparison")),
-                tags$details(class = "ram-details",
-                  tags$summary("Optional 3D superposition"),
-                  tags$p(class = "ram-field-hint",
-                    "Aligns the chosen chains in NGL for a visual comparison. Large structures may render slowly."),
-                  checkboxInput("showComparison3D", "Show superposed structures",
-                    value = FALSE),
-                  conditionalPanel(condition = "input.showComparison3D",
-                    NGLVieweR::NGLVieweROutput("NGLCompare", height = "460px"))
-                )
+                tags$p(class = "ram-table-hint",
+                  "Select a row to highlight its corresponding residues in both 3D structures and the angle plot."),
+                tags$div(class = "ram-residue-table", DT::DTOutput("comparison"))
               )
             ),
             tabPanel(
@@ -539,6 +574,7 @@ ui <- fluidPage(
   ),
   tags$script(src = "plotly-loader.js"),
   tags$script(src = "custom.js"),
+  tags$script(src = "compare.js"),
   tags$script(src = "prediction.js"),
   tags$script(src = "density.js")
 )

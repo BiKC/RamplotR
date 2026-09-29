@@ -98,6 +98,22 @@ ramplotr_export_shinylive <- function(args) {
       stop("Failed to publish reference-data")
     }
   }
+  # Optional Apache settings for one.com. Scope rules to RamplotR and the
+  # shared Shinylive asset folder. Never touch the website root .htaccess.
+  # An existing shared .htaccess is left intact for manual merging.
+  config <- file.path("config", "onecom")
+  app_htaccess <- file.path(destination, ".htaccess")
+  if (!file.copy(file.path(config, "ramplotr.htaccess"), app_htaccess,
+                 overwrite = TRUE)) stop("Failed to include app .htaccess")
+  shared_htaccess <- file.path(target, "shinylive", ".htaccess")
+  if (!file.exists(shared_htaccess)) {
+    if (!file.copy(file.path(config, "shinylive.htaccess"),
+                   shared_htaccess)) {
+      warning("Could not include the shared Shinylive .htaccess")
+    }
+  } else {
+    message("Preserved existing shinylive/.htaccess; review it for cache rules.")
+  }
   message("Thin Shinylive export complete: ", destination)
   message("Serve reference-data from: ", base_url)
   invisible(destination)

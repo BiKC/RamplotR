@@ -6,24 +6,19 @@ but moves the original, unchanged RDS files out of the initial app.json.
 
 ## Build
 
-From the repository root, with shinylive installed:
+From the repository root, install `shinylive` and run the optimized export:
 
-```r
-system2("Rscript", c("scripts/export-shinylive.R", "bikc.be",
-  "https://bikc.be/RamplotR/reference-data"))
+```bash
+Rscript scripts/export-shinylive.R bikc.be https://bikc.be/RamplotR/reference-data
 ```
 
-On Windows in an R session you can also use:
+On Windows, use `Rscript.exe` from your R installation if it is not on
+`PATH`. The second argument must be the public URL of the deployed
+reference-data directory. The ordinary `shinylive::export()` command
+still creates a full package containing every bundled RDS file, so use the
+repository script for the smaller browser deployment.
 
-```r
-source("scripts/export-shinylive.R", echo = TRUE)
-```
-
-The sourced form needs `commandArgs(trailingOnly = TRUE)`, so the
-Rscript invocation above is the supported approach. For a custom hostname
-or path, pass its actual absolute reference-data URL instead.
-
-Upload the entire generated `bikc.be` directory to the site root. This
+Upload the **contents** of the generated `bikc.be` directory to the site document root. This
 includes `RamplotR/reference-data`, `RamplotR/app.json`, the assets in
 `shinylive`, and the static HTML entry point. The data must be available
 at exactly the URL passed during export. Same-origin hosting is preferred.
@@ -106,3 +101,50 @@ no-cache` for the generated `index.html` so deployments refresh.
 Do not give mutable `app.json` or `reference-data` long immutable caching
 unless the deployment uses a versioned URL, since a stale manifest paired
 with new RDS files will correctly fail checksum verification.
+
+## one.com hosting
+
+one.com supports Apache `.htaccess` files but restricts some directives.
+The export includes three optional, scoped configurations. They **do not**
+change the website root `.htaccess` or the setup of other apps:
+
+| Generated file | Effect |
+| --- | --- |
+| `RamplotR/.htaccess` | Enables Brotli or gzip for the browser app's HTML, JSON, JS and CSS if the matching Apache module is available. Revalidates `index.html` and `app.json`; caches local assets for one day. |
+| `RamplotR/reference-data/.htaccess` | Revalidates the RDS files between deployments. They are already gzip-compressed R objects and should not be recompressed. |
+| `shinylive/.htaccess` | Optionally compresses shared webR and WASM assets and caches static assets for one day, but revalidates metadata. An existing shared `.htaccess` is **not overwritten**. If one exists, review and merge the template under `config/onecom/` manually. |
+
+The files are in `config/onecom/` if you need to inspect or adjust them.
+One.com may not allow every `mod_brotli`, `mod_deflate` or `mod_headers`
+directive. Conditional module blocks mean missing modules are skipped, but
+they do not bypass one.com's hosting restrictions. If you get a 500 error
+after uploading, remove the generated `.htaccess` files and ask one.com
+support whether those directives are permitted on your hosting plan.
+Your Shiny app does not require these rules to function.
+
+Do not enable the WordPress-specific Performance Cache plugin as a
+requirement for this static app. It is separate from ordinary HTTP caching.
+
+### Confirm HTTP compression and caching
+
+In a terminal, inspect response headers (use `curl.exe` on Windows if
+PowerShell's `curl` alias is active):
+
+```bash
+curl -I -H "Accept-Encoding: br,gzip" https://bikc.be/RamplotR/app.json
+curl -I -H "Accept-Encoding: br,gzip" https://bikc.be/RamplotR/favicon.svg
+```
+
+The `app.json` request should show `Cache-Control: no-cache` when `mod_headers`
+is enabled. For text resources, `Content-Encoding: br` or `gzip` indicates
+compression is active. No such header means the host is not compressing
+that response or the requested file is not found; check with the browser
+Network panel using the correct asset URL from the generated page.
+For WASM and other webR assets, inspect the actual paths reported in the
+Network panel rather than assuming their locations.
+
+To assess a first visit, disable browser cache and record network transfers
+separately from webR startup and R-package initialization. Then reload
+with caching enabled. A long download points to hosting and network costs;
+slow initialization after all downloads points to webR/package startup
+or device CPU. This is useful before making further application changes.

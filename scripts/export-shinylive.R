@@ -105,6 +105,12 @@ ramplotr_export_shinylive <- function(args) {
   app_htaccess <- file.path(destination, ".htaccess")
   if (!file.copy(file.path(config, "ramplotr.htaccess"), app_htaccess,
                  overwrite = TRUE)) stop("Failed to include app .htaccess")
+  # Reference files lack extensions; give this subdirectory its own explicit
+  # revalidation policy so the per-build manifest cannot become stale.
+  if (!file.copy(file.path(config, "reference-data.htaccess"),
+                 file.path(external, ".htaccess"), overwrite = TRUE)) {
+    stop("Failed to include reference-data .htaccess")
+  }
   shared_htaccess <- file.path(target, "shinylive", ".htaccess")
   if (!file.exists(shared_htaccess)) {
     if (!file.copy(file.path(config, "shinylive.htaccess"),

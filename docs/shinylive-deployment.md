@@ -69,3 +69,40 @@ warning. Test the XML attachment feature specifically in the exported
 browser app. If no compatible webR binary exists, keep that feature in
 the regular Shiny version and explain its browser limitation rather than
 silently disabling it.
+
+## First-load performance
+
+Shinylive runs webR and Shiny entirely in the browser. A cold visitor must
+download and initialize webR and the required R WebAssembly packages before
+interacting with the app. The reference-data split reduces `app.json`,
+but does not remove the webR boot cost.
+
+The app no longer downloads and parses the full Plotly JavaScript bundle
+before displaying the input form. Selecting **Analyse** begins fetching
+Plotly while R parses the selected structure. Plot rendering waits for this
+download when necessary; a prediction-only PAE heatmap can also request it.
+The full bundle remains intentional: RamplotR's comparison view uses
+`scattergl` for large structures, and Plotly's smaller Cartesian partial
+bundle does not include this trace type.
+
+The generated Shinylive index page uses the same small SVG favicon as the
+Shiny app's embedded page.
+
+### Measure your deployment
+
+1. Open browser Developer Tools, Network, disable cache, and reload the
+   published RamplotR page. Record the transferred size and time for
+   `app.json`, `webr` assets and the downloaded `*.wasm` / R package files.
+2. Without loading a structure, verify Plotly is absent in Network. Click
+   **Analyse** and check that the Plotly request begins at the click.
+3. Repeat with the browser cache enabled. A faster second visit points to
+   downloadable webR/assets and HTTP caching as the cold-start cost. Compare
+   with a locally hosted normal Shiny app if CPU startup remains slow.
+
+On the static web server, enable Brotli or gzip for HTML, JSON, JavaScript
+and other text assets, and provide sensible caching for the webR runtime,
+WASM packages and unchanged reference files. Prefer `Cache-Control:
+no-cache` for the generated `index.html` so deployments refresh.
+Do not give mutable `app.json` or `reference-data` long immutable caching
+unless the deployment uses a versioned URL, since a stale manifest paired
+with new RDS files will correctly fail checksum verification.

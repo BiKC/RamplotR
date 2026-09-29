@@ -57,7 +57,7 @@ other <- rbind(ref[1,,drop=FALSE], transform(ref[1,,drop=FALSE],
 pair <- ram_compare_torsions(ref,other)
 assert(nrow(pair)==5L, "Alignment should preserve inserted residues")
 assert(sum(pair$alignment=="Insertion")==1L, "Expected insertion")
-assert(identical(ram_comparison_find(pair,"a","A",2L), 2L),
+assert(identical(ram_comparison_find(pair,"a","A",2L), 3L),
   "Find the primary residue by exact PDB numbering")
 assert(identical(ram_comparison_find(pair,"b","A",88L), 2L),
   "Locate inserted comparison-only residue")

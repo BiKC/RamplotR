@@ -89,7 +89,7 @@
     if (!box || !stage.animationControls ||
         typeof stage.animationControls.zoomMove !== "function" ||
         typeof stage.getZoomForBox !== "function") return false;
-    const center = box.getCenter(new window.NGL.Vector3());
+    const center = box.getCenter(stage.getCenter());
     const zoom = stage.getZoomForBox(box);
     if (!Number.isFinite(zoom)) return false;
     stage.animationControls.zoomMove(center, zoom * padding, duration);
@@ -204,7 +204,7 @@
     const button = event.target && event.target.closest &&
       event.target.closest("#compareResetView");
     if (!button) return;
-    selected = null; // Just fit the view; server selection remains unchanged.
+    // Preserve the selected pair/highlights while fitting both chains.
     fitBoth();
   });
 

@@ -181,6 +181,50 @@
       window.Shiny.setInputValue("ramSeqPick", pick, { priority: "event" });
   });
 
+  // Jump to an actual residue number without counting hundreds of letters.
+  // The alignment may contain gaps and structures may use non-1 numbering.
+  document.addEventListener("click", function (event) {
+    const trigger = event.target && event.target.closest &&
+      event.target.closest(".ram-seq-jump");
+    if (!trigger || !trigger.closest) return;
+    const chain = trigger.closest(".ram-sequence-chain");
+    if (!chain || !chain.querySelector) return;
+    const field = chain.querySelector(".ram-seq-jump-input");
+    const note = chain.querySelector(".ram-seq-current");
+    const number = field && Number(field.value);
+    if (!field || field.value.trim() === "" || !Number.isInteger(number)) {
+      if (note) note.textContent = "Enter a residue number.";
+      return;
+    }
+    const buttons = Array.from(chain.querySelectorAll(".ram-seq-res"));
+    const button = buttons.find(item => Number(item.dataset.resi) === number &&
+      item.dataset.chain === trigger.dataset.chain) || null;
+    if (!button) {
+      if (note) note.textContent = "Residue " + number + " is not in this chain.";
+      return;
+    }
+    const strip = button.closest(".ram-sequence-grid");
+    if (strip) strip.scrollLeft = Math.max(0, button.offsetLeft -
+      strip.offsetLeft - strip.clientWidth / 2);
+    if (button.disabled) {
+      if (note) note.textContent = "Residue " + number +
+        " is hidden by the current plot filters.";
+    } else if (typeof button.click === "function") {
+      button.click();
+    }
+  });
+  document.addEventListener("keydown", function (event) {
+    const input = event.target;
+    if (event.key !== "Enter" || !input || !input.matches ||
+        !input.matches(".ram-seq-jump-input")) return;
+    const chain = input.closest(".ram-sequence-chain");
+    const button = chain && chain.querySelector(".ram-seq-jump");
+    if (button && typeof button.click === "function") {
+      event.preventDefault();
+      button.click();
+    }
+  });
+
   let lastSequenceScrollKey = "";
   function markSequenceSelection() {
     if (typeof document.querySelectorAll !== "function") return;
@@ -194,6 +238,16 @@
       const active = !!selected && selected === key;
       button.setAttribute("aria-pressed", String(active));
       if (active) activeButton = button;
+    });
+    document.querySelectorAll(".ram-sequence-chain").forEach(function (chain) {
+      const note = chain.querySelector && chain.querySelector(".ram-seq-current");
+      const active = chain.querySelector &&
+        chain.querySelector('.ram-seq-res[aria-pressed="true"]');
+      if (!note) return;
+      note.textContent = active ?
+        "Selected " + active.dataset.resi + (active.dataset.insertion || "") +
+        (active.dataset.plddt ? " · pLDDT " + active.dataset.plddt : "") :
+        "Select a residue";
     });
     // With all chains present, keep the selected letter in view only within
     // its own horizontal sequence row. Do not scroll the entire page.
@@ -557,8 +611,14 @@
     if (!comparePlot || !window.Plotly || !comparePlot.data ||
         comparePlot.data.length < 4) return;
     const a = compareSelectedPoint("a"), b = compareSelectedPoint("b");
-    window.Plotly.restyle(comparePlot, { x: [a.x], y: [a.y] }, [2]);
-    window.Plotly.restyle(comparePlot, { x: [b.x], y: [b.y] }, [3]);
+    window.Plotly.restyle(comparePlot, {
+      x: [a.x], y: [a.y],
+      customdata: [a.x.length ? [[Number(comparisonSelectedId), "a"]] : []]
+    }, [2]);
+    window.Plotly.restyle(comparePlot, {
+      x: [b.x], y: [b.y],
+      customdata: [b.x.length ? [[Number(comparisonSelectedId), "b"]] : []]
+    }, [3]);
   }
 
   function onComparePlotClick(event) {

@@ -536,7 +536,7 @@ const assert = require("node:assert/strict");
               "Sequence must be integrated into the plot tab and initially collapsed.");
     await page.click("#ram-sequence-panel > summary");
     await page.waitForSelector("#sequenceView .ram-seq-res", {timeout:18000});
-    const numbered = await page.$eval(".ram-seq-position",
+    const numbered = await page.$$eval(".ram-seq-position",
       elements => elements.some(node => node.textContent.trim() === "10"));
     assert.ok(numbered, "Sequence navigator must show permanent PDB numbers.");
     const sequencePick = await page.evaluate(first => {

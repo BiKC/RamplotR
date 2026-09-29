@@ -155,6 +155,46 @@ ram_sequence_status <- function(region) {
   out
 }
 
+# Confidence is an independent per-residue signal: never use its colours to
+# replace the Ramachandran classification background.
+ram_plddt_color <- function(score) {
+  vapply(as.numeric(score), function(value) {
+    if (!is.finite(value)) "#cbd7db" else if (value < 50) "#d75e56"
+    else if (value < 70) "#d6ac52" else if (value < 90) "#7bbcb1"
+    else "#126e74"
+  }, character(1))
+}
+
+# Permanent position labels mark every tenth *PDB residue number*, not every
+# tenth item in the sequence. Keep insertion codes on labelled residues.
+ram_sequence_position_labels <- function(resi, insertion_code = rep("", length(resi))) {
+  stopifnot(length(resi) == length(insertion_code))
+  if (!length(resi)) return(character())
+  index <- seq_along(resi)
+  label <- index == 1L | index == length(resi) |
+    (!is.na(resi) & resi %% 10L == 0L)
+  out <- rep("", length(resi))
+  out[label] <- paste0(resi[label], ifelse(is.na(insertion_code[label]), "",
+                                                insertion_code[label]))
+  out
+}
+
+# Map an NGL/sequence residue to its pair using chain, PDB numbering and
+# insertion code. The displayed amino-acid order may contain alignment gaps.
+ram_comparison_find <- function(data, side, chain, resi, insertion_code = "") {
+  stopifnot(side %in% c("a", "b"))
+  if (!nrow(data) || length(chain) != 1L || length(resi) != 1L ||
+      length(insertion_code) != 1L || is.na(chain) || is.na(resi) ||
+      is.na(insertion_code)) return(NA_integer_)
+  number <- suppressWarnings(as.integer(resi))
+  if (is.na(number)) return(NA_integer_)
+  ix <- which(!is.na(data[[paste0("residue_", side)]]) &
+    data[[paste0("chain_", side)]] == as.character(chain) &
+    data[[paste0("residue_", side)]] == number &
+    data[[paste0("insertion_", side)]] == as.character(insertion_code))
+  if (!length(ix)) NA_integer_ else as.integer(ix[[1L]])
+}
+
 # Small overview strips represent *positions*, not aggregate percentages.
 # For long chains each strip cell represents a consecutive residue bin.
 # A bin takes the highest-priority review state so isolated outliers remain

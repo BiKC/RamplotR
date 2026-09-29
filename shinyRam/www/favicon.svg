@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">RamplotR: phi psi</title>
+  <rect width="64" height="64" rx="15" fill="#102732"/>
+  <g fill="none" stroke="#d4ece7" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="21" cy="31" r="8"/>
+    <path d="M21 15v33"/>
+    <path d="M39 19v11c0 5 3 8 8 8s8-3 8-8V19M47 38v10"/>
+  </g>
+  <circle cx="52" cy="49" r="3" fill="#7db9b5"/>
+</svg>

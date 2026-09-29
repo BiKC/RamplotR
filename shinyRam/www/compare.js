@@ -12,6 +12,9 @@
   let needsFit = true;
   let retry = 0;
   let fitScheduled = false;
+  let framedComponents = null;
+  let highlightedComponents = null;
+  let highlightKey = "";
 
   function ready() {
     if (typeof window.getNGLStage !== "function" ||
@@ -93,6 +96,7 @@
     const zoom = stage.getZoomForBox(box);
     if (!Number.isFinite(zoom)) return false;
     stage.animationControls.zoomMove(center, zoom * padding, duration);
+    framedComponents = components;
     needsFit = false;
     return true;
   }
@@ -120,10 +124,17 @@
 
   function paintSelection(zoom) {
     if (!ready()) return false;
-    setHighlight("ram-compare-highlight-a",
-                 residueSelection(selected && selected.a));
-    setHighlight("ram-compare-highlight-b",
-                 residueSelection(selected && selected.b));
+    const a = residueSelection(selected && selected.a);
+    const b = residueSelection(selected && selected.b);
+    const key = (a || "none") + "|" + (b || "none");
+    // setSelection may rebuild WebGL representations and emit NGL_rendering.
+    // Do not set identical highlights after every readiness notification.
+    if (components !== highlightedComponents || key !== highlightKey) {
+      setHighlight("ram-compare-highlight-a", a);
+      setHighlight("ram-compare-highlight-b", b);
+      highlightedComponents = components;
+      highlightKey = key;
+    }
     if (zoom) return focusPair();
     return true;
   }
@@ -189,7 +200,11 @@
       scheduleFit();
     });
     window.Shiny.addCustomMessageHandler("ram-compare-ready", function (_value) {
-      needsFit = true;
+      const loaded = typeof window.getNGLStructure === "function" ?
+        window.getNGLStructure("NGLCompare") : null;
+      // Rendering and highlight changes can both emit readiness. Reframe
+      // only for new structure components or an explicitly pending focus.
+      if (!loaded || loaded !== framedComponents) needsFit = true;
       retry = 0;
       scheduleFit();
     });

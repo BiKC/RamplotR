@@ -23,6 +23,7 @@ options(shiny.maxRequestSize = 40 * 1024^2)
 
 # Used for processing data
 
+source(file.path("R", "reference-loader.R"), local = TRUE)
 source(file.path("R", "ramachandran.R"), local = TRUE)
 source(file.path("R", "backbone.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
@@ -584,7 +585,7 @@ server <- function(input, output, session) {
 
   observeEvent(input$bgtype, {
     req(input$bgtype)
-    files <- list.files(file.path("static", input$bgtype))
+    files <- ram_reference_choices(file.path("static", input$bgtype))
     if (!length(files)) return()
     choices <- list(
       "Commonly used" = files[!files %in% allAA],

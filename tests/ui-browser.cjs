@@ -28,6 +28,9 @@ const assert = require("node:assert/strict");
       waitUntil: "networkidle2", timeout: 60000
     });
     await page.waitForSelector(".ram-workspace");
+    assert.equal(await page.evaluate(() => !!window.Plotly), false,
+      "Opening the input form must not download Plotly yet.");
+    assert.ok(await page.$('link[rel="icon"][href="favicon.svg"]'));
     assert.ok(await page.$("#ram-pdb-wrap"));
     assert.ok(await page.$("#ram-upload-wrap"));
     assert.ok(await page.$("#NGL"));

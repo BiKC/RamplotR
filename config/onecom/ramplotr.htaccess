@@ -1,0 +1,24 @@
+# Optional one.com/Apache settings for /RamplotR/ only.
+# Keep other bikc.be applications and any root .htaccess unchanged.
+# One.com may restrict modules. If a server error appears, remove this file.
+#
+# Compress text assets when the corresponding Apache module is available.
+<IfModule mod_brotli.c>
+  AddOutputFilterByType BROTLI_COMPRESS text/html text/css text/plain text/xml image/svg+xml application/javascript text/javascript application/json
+</IfModule>
+<IfModule !mod_brotli.c>
+  <IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/plain text/xml image/svg+xml application/javascript text/javascript application/json
+  </IfModule>
+</IfModule>
+
+<IfModule mod_headers.c>
+  # App and manifest changes must be revalidated after a deployment.
+  <FilesMatch "^(index\.html|app\.json)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+  # Other local assets can be reused briefly but may change on deployment.
+  <FilesMatch "\.(css|js|svg|png|woff2?)$">
+    Header set Cache-Control "public, max-age=86400"
+  </FilesMatch>
+</IfModule>

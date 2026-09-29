@@ -6,6 +6,8 @@
   let payload = null;
   let selected = null;
   let boundPlot = null;
+  let plotlyPending = false;
+  let plotlyFailed = false;
 
   function key(value) {
     return value && [String(value.chain || ""), String(value.resi),
@@ -23,7 +25,21 @@
     const node = document.getElementById("ram-pae-plot");
     const panel = document.getElementById("ram-confidence-panel");
     if (!node || !panel || !panel.open || !payload ||
-        !Array.isArray(payload.z) || !window.Plotly) return;
+        !Array.isArray(payload.z)) return;
+    if (!window.Plotly) {
+      if (plotlyPending || plotlyFailed) return;
+      plotlyPending = true;
+      window.ramLoadPlotly().then(function () {
+        plotlyPending = false;
+        deferRender();
+      }).catch(function (error) {
+        plotlyPending = false;
+        plotlyFailed = true;
+        const note = document.getElementById("ram-pae-note");
+        if (note) note.textContent = "PAE could not be rendered: " + error.message;
+      });
+      return;
+    }
 
     const n = payload.residues.length;
     const ticks = [];

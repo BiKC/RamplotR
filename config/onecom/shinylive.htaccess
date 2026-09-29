@@ -1,0 +1,19 @@
+# Optional one.com/Apache settings for the shared /shinylive/ runtime.
+# Do not replace an existing .htaccess: merge these rules if needed.
+<IfModule mod_brotli.c>
+  AddOutputFilterByType BROTLI_COMPRESS text/html text/css text/plain text/xml image/svg+xml application/javascript text/javascript application/json application/wasm
+</IfModule>
+<IfModule !mod_brotli.c>
+  <IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/plain text/xml image/svg+xml application/javascript text/javascript application/json application/wasm
+  </IfModule>
+</IfModule>
+<IfModule mod_headers.c>
+  <FilesMatch "\.(css|js|wasm|woff2?|svg)$">
+    Header set Cache-Control "public, max-age=86400"
+  </FilesMatch>
+  # Package metadata may change after rebuilding and must be revalidated.
+  <FilesMatch "\.(json|rds)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>

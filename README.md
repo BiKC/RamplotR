@@ -8,7 +8,7 @@ RamplotR is an open-source R Shiny application that brings backbone geometry, a 
 
 *RamplotR's default publication palette. Example: PDB [1CRN](https://www.rcsb.org/structure/1CRN). [More screenshots](#screenshots).*
 
-[**Get started**](#get-started) · [**Explore the features**](#what-you-can-do) · [**Scientific interpretation**](#scientific-interpretation) · [**Documentation**](#documentation)
+[**Try the browser app**](https://bikc.be/RamplotR/) · [**Get started**](#get-started) · [**Explore the features**](#what-you-can-do) · [**Scientific interpretation**](#scientific-interpretation) · [**Documentation**](#documentation)
 
 ## What you can do
 
@@ -57,6 +57,24 @@ Enter a four-character **PDB ID** (for example, `1CRN`), **upload** your own PDB
 
 The project has also been hosted at [bioit.shinyapps.io/RamplotR](https://bioit.shinyapps.io/RamplotR/), but that deployment may not reflect the latest GitHub version. Running locally is the most reliable way to use the current implementation. Public-accession retrieval requires an internet connection; uploaded coordinates and local map files can be inspected without an external folding service.
 
+### Use the browser version
+
+[**Open RamplotR at bikc.be/RamplotR**](https://bikc.be/RamplotR/). The public version runs through **Shinylive** on static one.com hosting. R runs in your browser through webR, so no R installation is required. A first visit downloads and starts webR and its R packages; subsequent visits can reuse cached assets. Loading large structures still depends on the visitor's device.
+
+The browser build uses the same five reference datasets and original RDS distributions as the desktop/server app. To avoid including all 110 distributions in the initial `app.json`, reference files are hosted separately and downloaded on first use. Every file is checked against the export's MD5 manifest, and loaded references are cached within the session. The full Plotly library starts downloading when you click **Analyse** instead of delaying the initial form. A small φ/ψ favicon matches the app's teal colour scheme.
+
+For a reproducible deployment, run this from the repository root with the [shinylive R package](https://posit-dev.github.io/r-shinylive/) installed:
+
+```bash
+Rscript scripts/export-shinylive.R bikc.be https://bikc.be/RamplotR/reference-data
+```
+
+Upload the **contents** of the generated `bikc.be/` directory to the site's document root on one.com, including `RamplotR/reference-data/` and the shared `shinylive/` assets. The export also includes optional, directory-scoped `.htaccess` files for gzip/Brotli (when available) and cautious browser caching; these do not alter the website's root configuration. one.com restricts some Apache features, so check the HTTP response headers after deployment rather than assuming that compression is active.
+
+Ordinary PDB/mmCIF analysis does not require `xml2`. Importing official wwPDB validation XML does require it; compatibility of that optional feature should be checked in the specific exported webR build. The local/server Shiny app and the batch command remain available when a browser package is unsupported.
+
+See the [Shinylive export and one.com deployment guide](docs/shinylive-deployment.md) for hosting checks, caching rules and troubleshooting.
+
 ### Analyse many structures
 
 From the repository root, process a structure or a directory containing supported structure files:
@@ -86,6 +104,7 @@ The default RamplotR teal contour palette provides consistent, recognisable publ
 - [Geometry, official wwPDB evidence, cryo-EM overlays, ensembles and batch mode](docs/structural-verification.md)
 - [Independent wwPDB validation protocol and benchmark results](docs/wwpdb-validation.md) · [Results](docs/validation-results.md)
 - [Performance and large-structure benchmarks](docs/benchmark-results.md) · [Scaling results](docs/scaling-results.md)
+- [Shinylive browser deployment and one.com caching](docs/shinylive-deployment.md)
 
 Developers can run the pure-R scientific regression suite from the repository root with `Rscript tests/scientific.R`. Additional tests cover structure parsing, validation imports, confidence formats, geometry, ensembles and the batch CLI. GitHub Actions also exercises the application in a real browser and runs the scientific tests on Ubuntu and Windows.
 

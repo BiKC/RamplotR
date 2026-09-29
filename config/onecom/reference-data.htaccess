@@ -1,0 +1,5 @@
+# Original reference RDS distributions are already compressed on disk.
+# The MD5 manifest and the RDS payload must always come from the same export.
+<IfModule mod_headers.c>
+  Header set Cache-Control "no-cache"
+</IfModule>

@@ -19,6 +19,10 @@
   let boundPickHandler = null;
   let focusedKey = "";
   let focusedStage = null;
+  let deferredPlot = null;
+  let plotLoadPending = false;
+  let deferredComparison = null;
+  let comparisonLoadPending = false;
 
   // A residue identity is made of chain, sequence position and insertion
   // code. Do not focus an arbitrary selector received from a browser event.
@@ -310,11 +314,29 @@
   function drawPlot(obj) {
     if (!plot) return;
     if (!window.Plotly) {
+      // A structure has arrived before the plotting library. Keep only the
+      // latest reactive update; palette/filter changes may arrive meanwhile.
+      deferredPlot = obj;
       if (empty) {
         empty.hidden = false;
         const message = empty.querySelector("p");
-        if (message) message.textContent =
-          "The plotting library could not load. Check your connection and reload.";
+        if (message) message.textContent = "Loading the plot renderer…";
+      }
+      if (!plotLoadPending) {
+        plotLoadPending = true;
+        window.ramLoadPlotly().then(function () {
+          plotLoadPending = false;
+          const latest = deferredPlot;
+          deferredPlot = null;
+          if (latest) drawPlot(latest);
+        }).catch(function () {
+          plotLoadPending = false;
+          if (empty) {
+            const message = empty.querySelector("p");
+            if (message) message.textContent =
+              "The plotting library could not load. Check your connection and try again.";
+          }
+        });
       }
       return;
     }
@@ -519,7 +541,23 @@
   }
 
   function drawComparison(obj) {
-    if (!comparePlot || !window.Plotly || !obj) return;
+    if (!comparePlot || !obj) return;
+    if (!window.Plotly) {
+      deferredComparison = obj;
+      if (!comparisonLoadPending) {
+        comparisonLoadPending = true;
+        window.ramLoadPlotly().then(function () {
+          comparisonLoadPending = false;
+          const latest = deferredComparison;
+          deferredComparison = null;
+          if (latest) drawComparison(latest);
+        }).catch(function (error) {
+          comparisonLoadPending = false;
+          console.error("RamplotR comparison plot:", error);
+        });
+      }
+      return;
+    }
     const aPhi = array(obj.phiA), aPsi = array(obj.psiA);
     const bPhi = array(obj.phiB), bPsi = array(obj.psiB);
     const asPoints = function (phi, psi) {

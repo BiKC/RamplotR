@@ -97,6 +97,28 @@ const puppeteer = require("puppeteer-core");
       "ESMFold without PAE must not invent an error map");
     await page.screenshot({path:path.join(output,"prediction-esmfold.png"),
       fullPage:true});
+    await page.click("#ram-sequence-panel > summary");
+    await page.waitForFunction(() => {
+      const buttons = Array.from(document.querySelectorAll("#sequenceView .ram-seq-res"));
+      return buttons.length > 20 &&
+        buttons.some(button => button.dataset.plddt === "87.0") &&
+        buttons.some(button => button.querySelector(".ram-seq-plddt")?.textContent === "87") &&
+        document.querySelector(".ram-sequence-confidence-key");
+    },{timeout:20000});
+    const confidence = await page.$eval("#sequenceView .ram-seq-res[data-plddt]",
+      button => ({
+        label:button.querySelector(".ram-seq-plddt").textContent,
+        underline:getComputedStyle(button).boxShadow,
+        tooltip:button.title
+      }));
+    assert.equal(confidence.label,"87");
+    assert.ok(confidence.tooltip.includes("pLDDT 87.0"));
+    assert.ok(confidence.underline !== "none",
+      "Each confidence-bearing residue must have a separate colour strip");
+    await page.screenshot({
+      path:path.join(output,"prediction-sequence-confidence.png"),fullPage:true
+    });
+    await page.click("#ram-sequence-panel > summary");
 
     // Independently verify AF2 monomer PAE and UI linkage.
     await chooseSource("alphafold2");

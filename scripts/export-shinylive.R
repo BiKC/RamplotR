@@ -38,7 +38,7 @@ for (dataset in reference_dirs) {
   manifest <- data.frame(file = names, md5 = unname(tools::md5sum(from)))
   index_dir <- file.path(thin, "static", dataset)
   dir.create(index_dir)
-  utils::write.table(manifest, file.path(index_dir, ".reference-index.tsv"),
+  utils::write.table(manifest, file.path(index_dir, "reference-index.tsv"),
                      sep = "\t", row.names = FALSE, quote = FALSE)
   public_dir <- file.path(public, dataset)
   dir.create(public_dir, recursive = TRUE, showWarnings = FALSE)

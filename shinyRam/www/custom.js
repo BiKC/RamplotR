@@ -540,8 +540,44 @@
       });
   }
 
+  let comparisonRows = null;
+  let comparisonSelectedId = null;
+  function compareSelectedPoint(side) {
+    if (!comparisonRows || comparisonSelectedId == null)
+      return { x: [], y: [] };
+    const ids = array(comparisonRows.rowIds);
+    const index = ids.findIndex(id => Number(id) === Number(comparisonSelectedId));
+    if (index < 0) return { x: [], y: [] };
+    const phi = array(side === "a" ? comparisonRows.phiA : comparisonRows.phiB)[index];
+    const psi = array(side === "a" ? comparisonRows.psiA : comparisonRows.psiB)[index];
+    return Number.isFinite(phi) && Number.isFinite(psi) ?
+      { x: [phi], y: [psi] } : { x: [], y: [] };
+  }
+  function emphasizeComparison() {
+    if (!comparePlot || !window.Plotly || !comparePlot.data ||
+        comparePlot.data.length < 4) return;
+    const a = compareSelectedPoint("a"), b = compareSelectedPoint("b");
+    window.Plotly.restyle(comparePlot, { x: [a.x], y: [a.y] }, [2]);
+    window.Plotly.restyle(comparePlot, { x: [b.x], y: [b.y] }, [3]);
+  }
+
+  function onComparePlotClick(event) {
+    const item = event && event.points && event.points[0];
+    const data = item && (item.customdata ||
+      (item.data && item.data.customdata &&
+       item.data.customdata[item.pointNumber]));
+    const index = Array.isArray(data) ? Number(data[0]) : NaN;
+    if (!Number.isInteger(index) || index < 1) return;
+    comparisonSelectedId = index;
+    emphasizeComparison();
+    if (window.Shiny && window.Shiny.setInputValue)
+      window.Shiny.setInputValue("ramComparePlotPick", index,
+                                 { priority: "event" });
+  }
+
   function drawComparison(obj) {
     if (!comparePlot || !obj) return;
+    comparisonRows = obj;
     if (!window.Plotly) {
       deferredComparison = obj;
       if (!comparisonLoadPending) {
@@ -558,40 +594,86 @@
       }
       return;
     }
+    const ids = array(obj.rowIds);
     const aPhi = array(obj.phiA), aPsi = array(obj.psiA);
     const bPhi = array(obj.phiB), bPsi = array(obj.psiB);
-    const asPoints = function (phi, psi) {
-      const x=[], y=[];
-      for (let i=0; i<phi.length; i++) {
-        if (Number.isFinite(phi[i]) && Number.isFinite(psi[i])) {
-          x.push(phi[i]); y.push(psi[i]);
-        }
-      }
-      return {x,y};
+    const meta = {
+      a: {chain:array(obj.chainA),pos:array(obj.posA),
+          ins:array(obj.insA),amino:array(obj.aminoA)},
+      b: {chain:array(obj.chainB),pos:array(obj.posB),
+          ins:array(obj.insB),amino:array(obj.aminoB)}
     };
-    const a = asPoints(aPhi,aPsi), b = asPoints(bPhi,bPsi);
+    const makeTrace = function (side, phi, psi, name, color, symbol) {
+      const x = [], y = [], text = [], customdata = [];
+      const m = meta[side];
+      for (let i = 0; i < ids.length; i++) {
+        if (!Number.isFinite(phi[i]) || !Number.isFinite(psi[i])) continue;
+        const label = String(m.amino[i] || "") + " " +
+          String(m.chain[i] || "") + ":" + String(m.pos[i] || "") +
+          String(m.ins[i] || "");
+        const partner = meta[side === "a" ? "b" : "a"];
+        const other = partner.pos[i] == null ? "alignment gap" :
+          String(partner.amino[i] || "") + " " + String(partner.chain[i] || "") +
+          ":" + String(partner.pos[i]) + String(partner.ins[i] || "");
+        const dphi = array(obj.deltaPhi)[i], dpsi = array(obj.deltaPsi)[i];
+        const fmt = v => Number.isFinite(v) ? v.toFixed(1) + "°" : "N/A";
+        x.push(phi[i]); y.push(psi[i]);
+        text.push(escapeText(label) + " ↔ " + escapeText(other) +
+          "<br>φ " + fmt(phi[i]) + " · ψ " + fmt(psi[i]) +
+          "<br>Δφ " + fmt(dphi) + " · Δψ " + fmt(dpsi));
+        customdata.push([Number(ids[i]), side]);
+      }
+      return {type:"scattergl",mode:"markers",name:name,x:x,y:y,
+        text:text,customdata:customdata,
+        hovertemplate:"%{text}<extra>" + escapeText(name) + "</extra>",
+        marker:{color:color,size:8,opacity:.82,symbol:symbol}};
+    };
     const traces = [
-      {type:"scattergl",mode:"markers",name:String(obj.nameA || "Primary"),
-       x:a.x,y:a.y,marker:{color:"#CE6A4D",size:7,opacity:.77}},
-      {type:"scattergl",mode:"markers",name:String(obj.nameB || "Comparison"),
-       x:b.x,y:b.y,marker:{color:"#317E9A",size:7,opacity:.77,symbol:"diamond"}}
+      makeTrace("a",aPhi,aPsi,String(obj.nameA || "Primary"),"#CE6A4D","circle"),
+      makeTrace("b",bPhi,bPsi,String(obj.nameB || "Comparison"),"#317E9A","diamond"),
+      {type:"scattergl",mode:"markers",showlegend:false,hoverinfo:"skip",
+       x:[],y:[],marker:{color:"#ffc04a",size:17,opacity:.95,
+                           line:{color:"#623c17",width:2}}},
+      {type:"scattergl",mode:"markers",showlegend:false,hoverinfo:"skip",
+       x:[],y:[],marker:{color:"#83e6f5",size:17,opacity:.95,
+                           symbol:"diamond",line:{color:"#174958",width:2}}}
     ];
+    // Overlay markers retain the same aligned-pair identity when clicked.
+    const index = ids.findIndex(id => Number(id) === Number(comparisonSelectedId));
+    if (comparisonSelectedId != null && index >= 0) {
+      for (const [side, trace] of [["a",traces[2]],["b",traces[3]]]) {
+        const p = compareSelectedPoint(side);
+        trace.x = p.x; trace.y = p.y;
+        trace.customdata = p.x.length ? [[Number(ids[index]),side]] : [];
+      }
+    }
     const axis = {range:[-180,180],tickvals:[-180,-90,0,90,180],
       gridcolor:"#e3eeeb",zerolinecolor:"#a0bab9",constrain:"domain"};
-    comparePlot.style.minHeight = "420px";
-    window.Plotly.react(comparePlot,traces,{
+    comparePlot.style.minHeight = "410px";
+    Promise.resolve(window.Plotly.react(comparePlot,traces,{
       autosize:true,paper_bgcolor:"#ffffff",plot_bgcolor:"#fbfdfc",
-      margin:{l:63,r:20,t:35,b:55},
+      margin:{l:59,r:14,t:46,b:58},
       xaxis:Object.assign({},axis,{title:"Phi (°)"}),
       yaxis:Object.assign({},axis,{title:"Psi (°)",scaleanchor:"x",scaleratio:1}),
-      legend:{orientation:"h",y:1.12,x:0},
-      height:Math.min(660,Math.max(420,comparePlot.clientWidth+30))
-    },{responsive:true,displaylogo:false});
+      legend:{orientation:"h",y:1.13,x:0},
+      height:Math.min(650,Math.max(410,comparePlot.clientWidth+45))
+    },{responsive:true,displaylogo:false})).then(function () {
+      if (typeof comparePlot.on === "function" && !comparePlot.__ramCompareBound) {
+        comparePlot.on("plotly_click",onComparePlotClick);
+        comparePlot.__ramCompareBound = true;
+      }
+    }).catch(function (error) {
+      console.error("RamplotR comparison plot:",error);
+    });
   }
 
   if (window.Shiny) {
     window.Shiny.addCustomMessageHandler("process", drawPlot);
     window.Shiny.addCustomMessageHandler("ram-comparison", drawComparison);
+    window.Shiny.addCustomMessageHandler("ram-comparison-selected", function (choice) {
+      comparisonSelectedId = choice && !choice.clear ? Number(choice.rowId) : null;
+      emphasizeComparison();
+    });
     window.Shiny.addCustomMessageHandler("ram-selection", function (choice) {
       selectedResidue = choice && !choice.clear ? choice : null;
       const inspector = document.querySelector(".ram-global-inspector");

@@ -9,11 +9,11 @@
   </IfModule>
 </IfModule>
 <IfModule mod_headers.c>
-  <FilesMatch "\\.(css|js|wasm|woff2?|svg)$">
+  <FilesMatch "\.(css|js|wasm|woff2?|svg)$">
     Header set Cache-Control "public, max-age=86400"
   </FilesMatch>
   # Package metadata may change after rebuilding and must be revalidated.
-  <FilesMatch "\\.(json|rds)$">
+  <FilesMatch "\.(json|rds)$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
 </IfModule>

@@ -1151,6 +1151,8 @@ server <- function(input, output, session) {
               chain_name else paste("Chain",chain_name)),
             tags$span(sprintf("%s residues",
               format(nrow(chain),big.mark=","))),
+            tags$span(class="ram-seq-current", role="status",
+              "Select a residue"),
             tags$div(class="ram-sequence-jump",
               tags$label("Go to", class="sr-only"),
               tags$input(type="number", class="ram-seq-jump-input",
@@ -1186,6 +1188,8 @@ server <- function(input, output, session) {
                     "data-chain"=residue$chain[[1L]],
                     "data-resi"=residue$resi[[1L]],
                     "data-insertion"=residue$insertion_code[[1L]],
+                    "data-plddt"=if (is.finite(score))
+                      sprintf("%.1f",score) else "",
                     title=paste0(residue$resn[[1L]], " ",
                       residue$chain[[1L]], position, " · ",
                       if (is.na(residue$region[[1L]])) "Missing angles"

@@ -95,7 +95,7 @@ ui <- fluidPage(
     tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
     tags$title("RamplotR | Ramachandran analysis"),
     tags$link(rel = "stylesheet", type = "text/css", href = "styles.css"),
-    tags$script(src = "https://cdn.plot.ly/plotly-2.14.0.min.js")
+    tags$link(rel = "icon", type = "image/svg+xml", href = "favicon.svg")
   ),
   tags$div(
     class = "ram-app",
@@ -537,6 +537,7 @@ ui <- fluidPage(
       )
     )
   ),
+  tags$script(src = "plotly-loader.js"),
   tags$script(src = "custom.js"),
   tags$script(src = "prediction.js"),
   tags$script(src = "density.js")

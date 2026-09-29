@@ -1,75 +1,106 @@
-# Usage: Rscript scripts/export-shinylive.R bikc.be https://bikc.be/RamplotR/reference-data
-# Run from repository root. Source scientific files are never modified.
-args <- commandArgs(trailingOnly = TRUE)
-if (length(args) != 2L ||
-    !grepl("^https?://", args[[2L]])) {
-  stop("Usage: Rscript scripts/export-shinylive.R OUTPUT_DIR ABSOLUTE_REFERENCE_URL")
-}
-if (!requireNamespace("shinylive", quietly = TRUE)) {
-  stop("Install the shinylive R package")
-}
-target <- normalizePath(args[[1L]], mustWork = FALSE)
-base_url <- sub("/+$", "", args[[2L]])
-source_app <- normalizePath("shinyRam", mustWork = TRUE)
-reference_dirs <- c("original", "alphafold", "alphafold_filtered",
-                    "astral2.08", "custom_high_resolution")
-stage <- tempfile("ramplotr-thin-")
-dir.create(stage)
-on.exit(unlink(stage, recursive = TRUE), add = TRUE)
-thin <- file.path(stage, "shinyRam")
-dir.create(thin)
-dir.create(file.path(thin, "static"))
-# Copy all app logic and web assets, but not the large reference datasets.
-for (entry in c("app.R", "R", "www")) {
-  if (!file.copy(file.path(source_app, entry), thin, recursive = TRUE)) {
-    stop("Failed to copy ", entry)
+# Run from repository root:
+# Rscript scripts/export-shinylive.R bikc.be https://bikc.be/RamplotR/reference-data
+# Normal Shiny and the original reference files are unchanged.
+ramplotr_export_shinylive <- function(args) {
+  if (length(args) != 2L || !grepl("^https?://", args[[2L]])) {
+    stop("Usage: Rscript scripts/export-shinylive.R OUTPUT_DIR ABSOLUTE_REFERENCE_URL")
   }
-}
-# Preserve only the small manifest inside the app; the original RDS bytes
-# remain unchanged and are published alongside the static website.
-public <- file.path(target, "RamplotR", "reference-data")
-dir.create(public, recursive = TRUE, showWarnings = FALSE)
-for (dataset in reference_dirs) {
-  source_dir <- file.path(source_app, "static", dataset)
-  names <- list.files(source_dir, all.files = FALSE)
-  names <- names[file.info(file.path(source_dir, names))$isdir %in% FALSE]
-  if (!length(names)) stop("Missing reference dataset: ", dataset)
-  from <- file.path(source_dir, names)
-  manifest <- data.frame(file = names, md5 = unname(tools::md5sum(from)))
-  index_dir <- file.path(thin, "static", dataset)
-  dir.create(index_dir)
-  utils::write.table(manifest, file.path(index_dir, "reference-index.tsv"),
-                     sep = "\t", row.names = FALSE, quote = FALSE)
-  public_dir <- file.path(public, dataset)
-  dir.create(public_dir, recursive = TRUE, showWarnings = FALSE)
-  ok <- file.copy(from, public_dir, overwrite = TRUE)
-  if (!all(ok)) stop("Failed to publish reference files: ", dataset)
-  published <- file.path(public_dir, names)
-  if (!identical(unname(tools::md5sum(published)), manifest$md5)) {
-    stop("Published references differ: ", dataset)
+  if (!requireNamespace("shinylive", quietly = TRUE)) {
+    stop("Install the shinylive R package")
   }
+  target <- normalizePath(args[[1L]], mustWork = FALSE)
+  dir.create(target, recursive = TRUE, showWarnings = FALSE)
+  base_url <- sub("/+$", "", args[[2L]])
+  source_app <- normalizePath("shinyRam", mustWork = TRUE)
+  datasets <- c("original", "alphafold", "alphafold_filtered",
+                "astral2.08", "custom_high_resolution")
+  stage <- tempfile("ramplotr-thin-")
+  dir.create(stage)
+  on.exit(unlink(stage, recursive = TRUE), add = TRUE)
+  thin <- file.path(stage, "shinyRam")
+  dir.create(thin)
+  dir.create(file.path(thin, "static"))
+
+  # Keep scripts, assets and tiny reference indexes in app.json, not the RDS
+  # grids. Ordinary Shiny uses the original complete shinyRam directory.
+  for (entry in c("app.R", "R", "www")) {
+    if (!file.copy(file.path(source_app, entry), thin, recursive = TRUE)) {
+      stop("Failed to copy ", entry)
+    }
+  }
+  staging <- tempfile("ramplotr-public-data-")
+  dir.create(staging)
+  on.exit(unlink(staging, recursive = TRUE), add = TRUE)
+  public <- file.path(staging, "reference-data")
+  dir.create(public)
+
+  for (dataset in datasets) {
+    source_dir <- file.path(source_app, "static", dataset)
+    names <- list.files(source_dir)
+    names <- names[!file.info(file.path(source_dir, names))$isdir]
+    if (!length(names)) stop("Missing reference dataset: ", dataset)
+    from <- file.path(source_dir, names)
+    manifest <- data.frame(
+      file = names,
+      md5 = unname(tools::md5sum(from)),
+      stringsAsFactors = FALSE
+    )
+    dir.create(file.path(thin, "static", dataset))
+    utils::write.table(
+      manifest, file.path(thin, "static", dataset, "reference-index.tsv"),
+      sep = "\t", row.names = FALSE, quote = FALSE
+    )
+    dest_dir <- file.path(public, dataset)
+    dir.create(dest_dir)
+    if (!all(file.copy(from, dest_dir))) {
+      stop("Failed to copy reference files: ", dataset)
+    }
+    if (!identical(
+      unname(tools::md5sum(file.path(dest_dir, names))), manifest$md5
+    )) stop("Published references differ: ", dataset)
+  }
+
+  # This option is only added to the temporary app for the browser.
+  app <- file.path(thin, "app.R")
+  lines <- readLines(app, warn = FALSE)
+  lines <- append(
+    lines,
+    paste0("options(ramplotr.reference_base_url = ", deparse(base_url), ")"),
+    after = 0L
+  )
+  writeLines(lines, app)
+
+  # Replacing only RamplotR retains shared shinylive assets and any other
+  # static apps previously published beneath the same destination.
+  destination <- file.path(target, "RamplotR")
+  unlink(destination, recursive = TRUE)
+  shinylive::export(
+    thin, target, subdir = "RamplotR",
+    template_params = list(
+      title = "RamplotR | Protein structure analysis",
+      include_in_head = paste0(
+        '<link rel="icon" type="image/svg+xml" href="./favicon.svg">'
+      )
+    )
+  )
+
+  # The outer Shinylive page and Shiny's iframe both get the same favicon.
+  if (!file.copy(
+    file.path(source_app, "www", "favicon.svg"),
+    file.path(destination, "favicon.svg"),
+    overwrite = TRUE
+  )) stop("Could not publish favicon")
+  external <- file.path(destination, "reference-data")
+  if (!file.rename(public, external)) {
+    dir.create(external, recursive = TRUE, showWarnings = FALSE)
+    if (!all(file.copy(list.files(public, full.names = TRUE),
+                       external, recursive = TRUE))) {
+      stop("Failed to publish reference-data")
+    }
+  }
+  message("Thin Shinylive export complete: ", destination)
+  message("Serve reference-data from: ", base_url)
+  invisible(destination)
 }
-# Set the public base URL inside the staged app only.
-app <- file.path(thin, "app.R")
-lines <- readLines(app, warn = FALSE)
-lines <- append(lines, paste0("options(ramplotr.reference_base_url = ",
-                             deparse(base_url), ")"), after = 0L)
-writeLines(lines, app)
-# Export into a fresh directory so old packed RDS files cannot survive.
-# Keep published reference-data aside while removing an earlier app export.
-tmp_public <- tempfile("ramplotr-reference-data-")
-dir.create(tmp_public)
-if (!file.copy(public, tmp_public, recursive = TRUE)) {
-  stop("Cannot preserve reference-data during rebuild")
-}
-unlink(file.path(target, "RamplotR"), recursive = TRUE)
-shinylive::export(thin, target, subdir = "RamplotR")
-dir.create(file.path(target, "RamplotR"), recursive = TRUE,
-           showWarnings = FALSE)
-restored <- file.path(tmp_public, "reference-data")
-if (!file.copy(restored, file.path(target, "RamplotR"), recursive = TRUE)) {
-  stop("Failed to restore reference-data after export")
-}
-message("Thin Shinylive export complete: ", file.path(target, "RamplotR"))
-message("Publish the full output directory so reference-data/ is accessible at ",
-        base_url)
+
+ramplotr_export_shinylive(commandArgs(trailingOnly = TRUE))

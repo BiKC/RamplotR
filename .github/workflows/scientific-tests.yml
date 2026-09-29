@@ -33,6 +33,8 @@ jobs:
           node --check shinyRam/www/custom.js
           node --check shinyRam/www/prediction.js
           node --check shinyRam/www/density.js
+          node --check shinyRam/www/plotly-loader.js
+          node tests/plotly-loader.test.cjs
           node tests/density-ui.test.cjs
           node tests/ui.test.cjs
           node tests/prediction-ui.test.cjs
@@ -64,6 +66,9 @@ jobs:
         shell: bash
       - name: Verify cached reference profiles
         run: Rscript tests/profile.R
+        shell: bash
+      - name: Verify local and thin-manifest reference access
+        run: Rscript tests/reference-loader.R
         shell: bash
       - name: Verify structure input and reference-specific classifications
         run: |

@@ -536,6 +536,9 @@ const assert = require("node:assert/strict");
               "Sequence must be integrated into the plot tab and initially collapsed.");
     await page.click("#ram-sequence-panel > summary");
     await page.waitForSelector("#sequenceView .ram-seq-res", {timeout:18000});
+    const numbered = await page.$eval(".ram-seq-position",
+      elements => elements.some(node => node.textContent.trim() === "10"));
+    assert.ok(numbered, "Sequence navigator must show permanent PDB numbers.");
     const sequencePick = await page.evaluate(first => {
       const buttons = Array.from(document.querySelectorAll(".ram-seq-res"));
       const other = buttons.find(b =>
@@ -554,6 +557,15 @@ const assert = require("node:assert/strict");
     assert.equal(await page.$eval('.nav-tabs li.active a',
       el => el.getAttribute("data-value")), "plot",
       "Picking a residue must preserve the visible plot and NGL viewer.");
+    // Jump straight to a true PDB residue number rather than counting letters.
+    await page.$eval(".ram-seq-jump-input", input => { input.value = "12"; });
+    await page.click(".ram-seq-jump");
+    await page.waitForFunction(() => {
+      const pick = document.querySelector('.ram-seq-res[data-resi="12"]');
+      const status = document.querySelector(".ram-seq-current");
+      return pick && pick.getAttribute("aria-pressed") === "true" &&
+        status && status.textContent.includes("12");
+    }, {timeout:15000});
     await page.screenshot({
       path:"benchmarks/output/ui-preview/sequence-integrated.png", fullPage:true
     });
@@ -575,8 +587,39 @@ const assert = require("node:assert/strict");
     await page.waitForSelector("#comparison tbody tr", {timeout:25000});
     await page.waitForFunction(() => {
       const p = document.getElementById("comparePlot");
-      return p && p.data && p.data.length >= 2;
+      return p && p.data && p.data.length >= 4 &&
+        p.data[0].customdata.length > 10;
     }, {timeout:18000});
+    await page.waitForFunction(() => {
+      const s = window.getNGLStage && window.getNGLStage("NGLCompare");
+      const models = window.getNGLStructure && window.getNGLStructure("NGLCompare");
+      const node = document.getElementById("NGLCompare");
+      return s && models && models.length === 2 &&
+        node && node.clientWidth > 0 && node.clientHeight > 0 &&
+        s.getRepresentationsByName("ram-compare-highlight-a").list.length > 0;
+    }, {timeout:50000});
+    await page.$eval("#compareJumpResidue", input => {
+      input.value = "12";
+      input.dispatchEvent(new Event("input",{bubbles:true}));
+      input.dispatchEvent(new Event("change",{bubbles:true}));
+    });
+    await page.click("#compareJump");
+    await page.waitForFunction(() =>
+      document.querySelector(".ram-compare-selection-pair") &&
+      document.querySelector(".ram-compare-selection-pair").textContent.includes("12"),
+      {timeout:18000});
+    const pairState = await page.evaluate(() => {
+      const stage = window.getNGLStage("NGLCompare");
+      return {
+        a: stage.getRepresentationsByName("ram-compare-highlight-a").list.length,
+        b: stage.getRepresentationsByName("ram-compare-highlight-b").list.length,
+        panel: document.querySelector(".ram-compare-selection-pair").textContent,
+        layout: getComputedStyle(document.querySelector(".ram-compare-workspace")).display
+      };
+    });
+    assert.equal(pairState.a,1);
+    assert.equal(pairState.b,1);
+    assert.equal(pairState.layout,"grid");
     await page.screenshot({
       path:"benchmarks/output/ui-preview/compare-self.png",fullPage:true
     });

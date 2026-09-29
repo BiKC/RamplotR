@@ -347,13 +347,21 @@ ui <- fluidPage(
                     ),
                     tags$div(class = "ram-sequence-detail",
                       tags$p(class = "ram-sequence-instruction",
-                        "Select a letter to highlight its Ramachandran point and zoom in 3D. Dimmed letters are hidden by the current filters; scroll each chain sideways for more residues."),
+                        "Permanent labels show actual PDB residue numbers every ten positions. Enter a number beside a chain to jump directly to it. The colour behind each letter shows Ramachandran classification; the separate coloured underline and number indicate pLDDT, when available."),
                       tags$div(class = "ram-sequence-legend",
                         tags$span(class="ram-swatch ram-sw-favoured", "Favoured"),
                         tags$span(class="ram-swatch ram-sw-allowed", "Allowed"),
                         tags$span(class="ram-swatch ram-sw-generously-allowed", "Generously allowed"),
                         tags$span(class="ram-swatch ram-sw-outlier", "Outlier"),
                         tags$span(class="ram-swatch ram-sw-missing", "Missing angles")
+                      ),
+                      tags$div(class="ram-sequence-confidence-key",
+                        tags$strong("Model confidence · pLDDT"),
+                        tags$span(class="ram-confidence-key-high", "≥90"),
+                        tags$span(class="ram-confidence-key-good", "70–89"),
+                        tags$span(class="ram-confidence-key-low", "50–69"),
+                        tags$span(class="ram-confidence-key-poor", "<50"),
+                        tags$span("The number below each amino acid is its pLDDT score.")
                       ),
                       uiOutput("sequenceView")
                     )
@@ -477,7 +485,41 @@ ui <- fluidPage(
                 ),
                 uiOutput("compareChainControls"),
                 tags$div(class = "ram-compare-status", uiOutput("compareSummary")),
-                tags$div(id = "comparePlot", class = "ram-compare-plot"),
+                tags$div(class = "ram-compare-toolbar",
+                  selectInput("compareJumpSide", "Locate in", c(
+                    "Primary chain" = "a", "Comparison chain" = "b")),
+                  numericInput("compareJumpResidue", "Residue number",
+                    value = NA, min = 1, step = 1, width = "135px"),
+                  actionButton("compareJump", "Find aligned pair",
+                    class = "btn-primary"),
+                  tags$p(class = "ram-compare-toolbar-hint",
+                    "Uses actual residue numbers, including alignment gaps.")
+                ),
+                tags$div(class = "ram-compare-workspace",
+                  tags$section(class = "ram-compare-card",
+                    tags$div(class = "ram-compare-card-head",
+                      tags$h3("Aligned backbone angles"),
+                      tags$p("Select either colour to inspect that aligned residue pair.")
+                    ),
+                    tags$div(id = "comparePlot", class = "ram-compare-plot")
+                  ),
+                  tags$section(class = "ram-compare-card ram-compare-viewer",
+                    tags$div(class = "ram-compare-card-head",
+                      tags$h3("3D superposition"),
+                      tags$p("Primary chain in coral, comparison chain in blue. Click either structure to inspect aligned residues.")
+                    ),
+                    tags$div(class = "ram-compare-viewer-controls",
+                      checkboxInput("showComparison3D", "Show 3D", value = TRUE),
+                      actionButton("compareResetView", "Fit both chains",
+                        class = "btn-default btn-sm")
+                    ),
+                    conditionalPanel(condition = "input.showComparison3D",
+                      tags$div(class = "ram-compare-ngl",
+                        NGLVieweR::NGLVieweROutput("NGLCompare",
+                          height = "410px")))
+                  )
+                ),
+                uiOutput("compareSelectionInfo"),
                 tags$div(class = "ram-table-toolbar",
                   selectInput("compareFilter", "Show comparison",
                     choices = c("All aligned residues" = "All",
@@ -486,16 +528,9 @@ ui <- fluidPage(
                       "Insertions / deletions" = "gaps"), selected = "All"),
                   downloadButton("downloadComparison", "Export comparison CSV")
                 ),
-                tags$div(class = "ram-residue-table", DT::DTOutput("comparison")),
-                tags$details(class = "ram-details",
-                  tags$summary("Optional 3D superposition"),
-                  tags$p(class = "ram-field-hint",
-                    "Aligns the chosen chains in NGL for a visual comparison. Large structures may render slowly."),
-                  checkboxInput("showComparison3D", "Show superposed structures",
-                    value = FALSE),
-                  conditionalPanel(condition = "input.showComparison3D",
-                    NGLVieweR::NGLVieweROutput("NGLCompare", height = "460px"))
-                )
+                tags$p(class = "ram-table-hint",
+                  "Select a row to highlight its corresponding residues in both 3D structures and the angle plot."),
+                tags$div(class = "ram-residue-table", DT::DTOutput("comparison"))
               )
             ),
             tabPanel(
@@ -539,6 +574,7 @@ ui <- fluidPage(
   ),
   tags$script(src = "plotly-loader.js"),
   tags$script(src = "custom.js"),
+  tags$script(src = "compare.js"),
   tags$script(src = "prediction.js"),
   tags$script(src = "density.js")
 )
@@ -551,6 +587,7 @@ server <- function(input, output, session) {
   external_validation <- reactiveVal(NULL)
   ensemble_results <- reactiveVal(NULL)
   selected_residue <- reactiveVal(NULL)
+  selected_comparison <- reactiveVal(NULL)
   viewer_ready <- reactiveVal(FALSE)
   current_model <- reactive({
     value <- input$modelChoice
@@ -1114,28 +1151,61 @@ server <- function(input, output, session) {
               chain_name else paste("Chain",chain_name)),
             tags$span(sprintf("%s residues",
               format(nrow(chain),big.mark=","))),
+            tags$span(class="ram-seq-current", role="status",
+              "Select a residue"),
+            tags$div(class="ram-sequence-jump",
+              tags$label("Go to", class="sr-only"),
+              tags$input(type="number", class="ram-seq-jump-input",
+                min="1", step="1", placeholder="Residue #",
+                "aria-label"=paste("Jump to residue number in",chain_name)),
+              tags$button(type="button", class="ram-seq-jump",
+                "data-chain"=if (identical(chain_name,"Unassigned")) "" else chain_name,
+                "aria-label"=paste("Go to residue in",chain_name), "Go")
+            ),
             tags$span(class="ram-sequence-scroll-hint","Scroll sideways →")
           ),
           tags$div(class="ram-sequence-grid", role="group",
             "aria-label"=paste("Select a residue in",chain_name),
-            lapply(seq_len(nrow(chain)), function(i) {
-              residue <- chain[i,,drop=FALSE]
-              tags$button(type="button",
-                class=paste("ram-seq-res",
-                  paste0("ram-seq-",statuses[[i]])),
-                disabled=if (!selectable[[i]]) "disabled" else NULL,
-                "data-chain"=residue$chain[[1L]],
-                "data-resi"=residue$resi[[1L]],
-                "data-insertion"=residue$insertion_code[[1L]],
-                title=sprintf("%s %s%d%s · %s",
-                  residue$resn[[1L]],residue$chain[[1L]],
-                  residue$resi[[1L]],residue$insertion_code[[1L]],
-                  paste0(if (is.na(residue$region[[1L]])) "Missing angles"
-                    else residue$region[[1L]],
-                    if (!selectable[[i]]) " · Hidden by current filters" else "")),
-                "aria-pressed"="false",
-                residue$letter[[1L]])
-            })
+            {
+              labels <- ram_sequence_position_labels(chain$resi, chain$insertion_code)
+              show_confidence <- any(is.finite(chain$plddt))
+              lapply(seq_len(nrow(chain)), function(i) {
+                residue <- chain[i,,drop=FALSE]
+                score <- residue$plddt[[1L]]
+                position <- paste0(residue$resi[[1L]],
+                                   residue$insertion_code[[1L]])
+                tags$div(class="ram-seq-slot",
+                  tags$span(class="ram-seq-position",
+                    if (nzchar(labels[[i]])) labels[[i]] else "\u00a0",
+                    "aria-hidden"="true"),
+                  tags$button(type="button",
+                    class=paste("ram-seq-res",
+                      paste0("ram-seq-",statuses[[i]]),
+                      if (show_confidence) "ram-seq-with-confidence" else ""),
+                    style=if (is.finite(score))
+                      paste0("--ram-plddt-color:",ram_plddt_color(score)) else NULL,
+                    disabled=if (!selectable[[i]]) "disabled" else NULL,
+                    "data-chain"=residue$chain[[1L]],
+                    "data-resi"=residue$resi[[1L]],
+                    "data-insertion"=residue$insertion_code[[1L]],
+                    "data-plddt"=if (is.finite(score))
+                      sprintf("%.1f",score) else "",
+                    title=paste0(residue$resn[[1L]], " ",
+                      residue$chain[[1L]], position, " · ",
+                      if (is.na(residue$region[[1L]])) "Missing angles"
+                      else residue$region[[1L]],
+                      if (is.finite(score)) sprintf(" · pLDDT %.1f",score)
+                      else "",
+                      if (!selectable[[i]]) " · Hidden by current filters"
+                      else ""),
+                    "aria-pressed"="false",
+                    tags$span(class="ram-seq-aa",residue$letter[[1L]]),
+                    if (show_confidence) tags$span(class="ram-seq-plddt",
+                      if (is.finite(score)) sprintf("%.0f",score) else "\u2014")
+                  )
+                )
+              })
+            }
           )
         )
       })
@@ -1315,8 +1385,96 @@ server <- function(input, output, session) {
     secondary <- secondary[secondary$chain == input$compareChainB, , drop=FALSE]
     if (!nrow(original) || !nrow(secondary))
       return(data.frame())
-    ram_compare_torsions(original, secondary)
+    result <- ram_compare_torsions(original, secondary)
+    result$row_id <- seq_len(nrow(result))
+    result
   })
+  # A selection identifies a whole aligned pair, not just a numeric residue.
+  # It remains stable when the comparison table is filtered or re-ordered.
+  choose_comparison <- function(index) {
+    data <- isolate(comparison_data())
+    row_index <- suppressWarnings(as.integer(index))
+    if (length(row_index) != 1L || is.na(row_index) ||
+        row_index < 1L || row_index > nrow(data)) return(invisible(FALSE))
+    row <- data[row_index, , drop=FALSE]
+    selected_comparison(row$row_id[[1L]])
+    # Make the shared inspector and main sequence navigator follow the
+    # primary chain, without selecting residues hidden by main plot filters.
+    if (!is.na(row$residue_a[[1L]])) {
+      visible <- isolate(displayed())
+      matches <- which(visible$chain == row$chain_a[[1L]] &
+        visible$resi == row$residue_a[[1L]] &
+        visible$insertion_code == row$insertion_a[[1L]])
+      if (length(matches)) selected_residue(list(
+        chain = row$chain_a[[1L]],
+        resi = as.integer(row$residue_a[[1L]]),
+        insertion_code = row$insertion_a[[1L]]
+      ))
+    }
+    invisible(TRUE)
+  }
+  observeEvent(list(input$compareChainA, input$compareChainB,
+                    input$compareModel, comparison_loaded()), {
+    selected_comparison(NULL)
+  }, ignoreInit=TRUE)
+  observeEvent(input$ramComparePlotPick, {
+    choose_comparison(input$ramComparePlotPick)
+  }, ignoreInit=TRUE)
+  observeEvent(input$comparison_row_last_clicked, {
+    rows <- filtered_comparison()
+    i <- suppressWarnings(as.integer(input$comparison_row_last_clicked))
+    if (length(i) != 1L || is.na(i) || i < 1L || i > nrow(rows)) return()
+    choose_comparison(rows$row_id[[i]])
+  }, ignoreInit=TRUE)
+  observeEvent(input$ramCompareNglPick, {
+    item <- input$ramCompareNglPick
+    if (!is.list(item) || is.null(item$side) ||
+        !item$side %in% c("a", "b")) return()
+    data <- isolate(comparison_data())
+    index <- ram_comparison_find(data, item$side, item$chain,
+                                 item$resi, if (is.null(item$insertion_code))
+                                   "" else item$insertion_code)
+    if (!is.na(index)) choose_comparison(index)
+  }, ignoreInit=TRUE)
+  observeEvent(input$compareJump, {
+    value <- suppressWarnings(as.integer(input$compareJumpResidue))
+    if (length(value) != 1L || is.na(value)) {
+      showNotification("Enter a valid residue number.", type="warning")
+      return()
+    }
+    data <- isolate(comparison_data())
+    side <- isolate(input$compareJumpSide)
+    chain <- if (identical(side,"b")) isolate(input$compareChainB) else
+      isolate(input$compareChainA)
+    index <- ram_comparison_find(data, if (identical(side,"b")) "b" else "a",
+                                  chain, value)
+    if (is.na(index)) {
+      # A jump to 104 should also find insertion-only 104A when necessary.
+      positions <- data[[paste0("residue_", if (identical(side,"b")) "b" else "a")]]
+      candidates <- which(!is.na(positions) & positions == value &
+        data[[paste0("chain_", if (identical(side,"b")) "b" else "a")]] == chain)
+      index <- if (length(candidates)) candidates[[1L]] else NA_integer_
+    }
+    if (is.na(index)) {
+      showNotification("That number is not present in the selected chain.",
+                       type="warning")
+      return()
+    }
+    choose_comparison(index)
+  })
+  # Selecting a residue in the primary sequence/plot also locates its aligned
+  # partner when the comparison is available.
+  observeEvent(selected_residue(), {
+    item <- selected_residue()
+    if (is.null(item) || is.null(isolate(input$compareChainA)) ||
+        !identical(item$chain, isolate(input$compareChainA)) ||
+        is.null(isolate(comparison_loaded()))) return()
+    index <- ram_comparison_find(isolate(comparison_data()), "a",
+               item$chain, item$resi, item$insertion_code)
+    if (!is.na(index) &&
+        !identical(isolate(selected_comparison()), index))
+      selected_comparison(index)
+  }, ignoreNULL=TRUE)
   filtered_comparison <- reactive({
     result <- comparison_data()
     if (!nrow(result)) return(result)
@@ -1345,20 +1503,36 @@ server <- function(input, output, session) {
   })
   output$comparison <- DT::renderDT({
     result <- filtered_comparison()
-    names <- c("chain_a","residue_a","amino_a",
-      "chain_b","residue_b","amino_b","delta_phi","delta_psi",
-      "class_changed","alignment")
-    if (!all(names %in% names(result))) return(DT::datatable(data.frame()))
-    shown <- result[,names,drop=FALSE]
-    shown$delta_phi <- round(shown$delta_phi,1)
-    shown$delta_psi <- round(shown$delta_psi,1)
-    shown$class_changed <- ifelse(shown$class_changed,"Yes","No")
+    fields <- c("chain_a", "residue_a", "insertion_a", "amino_a",
+      "chain_b", "residue_b", "insertion_b", "amino_b",
+      "delta_phi", "delta_psi", "class_changed", "alignment")
+    if (!all(fields %in% names(result)))
+      return(DT::datatable(data.frame()))
+    shown <- result[, fields, drop=FALSE]
+    shown$pos_a <- ifelse(is.na(shown$residue_a), "—",
+      paste0(shown$residue_a, shown$insertion_a))
+    shown$pos_b <- ifelse(is.na(shown$residue_b), "—",
+      paste0(shown$residue_b, shown$insertion_b))
+    shown$delta_phi <- round(shown$delta_phi, 1)
+    shown$delta_psi <- round(shown$delta_psi, 1)
+    shown$class_changed <- ifelse(shown$class_changed, "Yes", "No")
+    shown <- shown[, c("chain_a", "pos_a", "amino_a",
+      "chain_b", "pos_b", "amino_b", "delta_phi", "delta_psi",
+      "class_changed", "alignment"), drop=FALSE]
     DT::datatable(shown, rownames=FALSE,
-      colnames=c("Chain A","Pos A","AA A","Chain B","Pos B","AA B",
-                 "Δφ (°)","Δψ (°)","Region changed","Alignment"),
+      colnames=c("Chain A", "Pos A", "AA A", "Chain B", "Pos B", "AA B",
+                 "Δφ (°)", "Δψ (°)", "Region changed", "Alignment"),
+      selection="single",
       options=list(pageLength=15,scrollX=FALSE,autoWidth=FALSE,dom="ftip"),
       class="compact stripe hover")
   }, server=FALSE)
+  observe({
+    rows <- req(filtered_comparison())
+    index <- selected_comparison()
+    pos <- if (is.null(index)) integer() else match(index, rows$row_id)
+    DT::selectRows(DT::dataTableProxy("comparison", session = session),
+      if (length(pos) && !is.na(pos)) pos else integer())
+  })
   output$downloadComparison <- downloadHandler(
     filename=function() "RamplotR_structure_comparison.csv",
     content=function(file) utils::write.csv(
@@ -1366,31 +1540,134 @@ server <- function(input, output, session) {
   )
   observeEvent(comparison_data(), {
     result <- comparison_data()
-    if (nrow(result))
-      session$sendCustomMessage("ram-comparison", list(
-        nameA=req(loaded())$name,
-        nameB=req(comparison_loaded())$name,
-        phiA=result$phi_a, psiA=result$psi_a,
-        phiB=result$phi_b, psiB=result$psi_b
-      ))
+    if (!nrow(result)) return()
+    session$sendCustomMessage("ram-comparison", list(
+      nameA=req(loaded())$name,
+      nameB=req(comparison_loaded())$name,
+      phiA=result$phi_a, psiA=result$psi_a,
+      phiB=result$phi_b, psiB=result$psi_b,
+      rowIds=result$row_id,
+      chainA=result$chain_a, posA=result$residue_a,
+      insA=result$insertion_a, aminoA=result$amino_a,
+      chainB=result$chain_b, posB=result$residue_b,
+      insB=result$insertion_b, aminoB=result$amino_b,
+      deltaPhi=result$delta_phi, deltaPsi=result$delta_psi,
+      alignment=result$alignment
+    ))
+    session$sendCustomMessage("ram-compare-config", list(
+      chainA=input$compareChainA, chainB=input$compareChainB,
+      modelA=current_model(), modelB=if (is.null(input$compareModel)) 1L
+        else as.integer(input$compareModel),
+      multipleA=req(loaded())$nmodels > 1L,
+      multipleB=req(comparison_loaded())$nmodels > 1L
+    ))
+  })
+  output$compareSelectionInfo <- renderUI({
+    data <- req(comparison_data())
+    id <- selected_comparison()
+    if (!length(id) || is.null(id) || !nrow(data))
+      return(tags$div(class="ram-compare-selection ram-compare-selection-empty",
+        tags$strong("Inspect an aligned pair"),
+        tags$p("Click a point, table row or residue in either 3D structure. Use the position finder for residues such as 104.")))
+    match_index <- match(id, data$row_id)
+    if (is.na(match_index)) return(NULL)
+    row <- data[match_index,,drop=FALSE]
+    label <- function(side) {
+      number <- row[[paste0("residue_",side)]][[1L]]
+      if (is.na(number)) return("Alignment gap")
+      paste0(row[[paste0("amino_",side)]][[1L]], " ",
+        row[[paste0("chain_",side)]][[1L]], ":",
+        number, row[[paste0("insertion_",side)]][[1L]])
+    }
+    angle <- function(x) if (is.finite(x)) sprintf("%.1f°",x) else "N/A"
+    tags$div(class="ram-compare-selection",
+      tags$div(class="ram-compare-selection-pair",
+        tags$span(class="ram-compare-primary",
+          tags$small("Primary"), tags$strong(label("a")),
+          tags$span(paste("φ",angle(row$phi_a[[1L]]),
+                          "· ψ",angle(row$psi_a[[1L]])))),
+        tags$span(class="ram-compare-pair-arrow", "↔", "aria-hidden"="true"),
+        tags$span(class="ram-compare-secondary",
+          tags$small("Comparison"), tags$strong(label("b")),
+          tags$span(paste("φ",angle(row$phi_b[[1L]]),
+                          "· ψ",angle(row$psi_b[[1L]]))))
+      ),
+      tags$div(class="ram-compare-selection-deltas",
+        tags$span(paste("Δφ",angle(row$delta_phi[[1L]]))),
+        tags$span(paste("Δψ",angle(row$delta_psi[[1L]]))),
+        tags$span(row$alignment[[1L]]),
+        if (isTRUE(row$class_changed[[1L]])) tags$span(
+          class="ram-compare-change", "Classification changed")
+      )
+    )
+  })
+  outputOptions(output, "compareSelectionInfo", suspendWhenHidden=FALSE)
+  observe({
+    id <- selected_comparison()
+    data <- comparison_data()
+    if (!length(id) || is.null(id) || !nrow(data)) {
+      session$sendCustomMessage("ram-comparison-selected", list(clear=TRUE))
+      session$sendCustomMessage("ram-compare-pair", list(clear=TRUE))
+      return()
+    }
+    pos <- match(id,data$row_id)
+    if (is.na(pos)) return()
+    row <- data[pos,,drop=FALSE]
+    pair <- function(side,model,multiple) {
+      number <- row[[paste0("residue_",side)]][[1L]]
+      if (is.na(number)) return(NULL)
+      list(chain=as.character(row[[paste0("chain_",side)]][[1L]]),
+        resi=as.integer(number),
+        insertion_code=as.character(row[[paste0("insertion_",side)]][[1L]]),
+        modelIndex=model, multipleModels=multiple)
+    }
+    second <- req(comparison_loaded())
+    session$sendCustomMessage("ram-comparison-selected",
+      list(rowId=id))
+    session$sendCustomMessage("ram-compare-pair", list(
+      a=pair("a",current_model(),req(loaded())$nmodels > 1L),
+      b=pair("b",if (is.null(input$compareModel)) 1L else
+                      as.integer(input$compareModel),second$nmodels > 1L)
+    ))
   })
   output$NGLCompare <- NGLVieweR::renderNGLVieweR({
     req(input$showComparison3D,input$compareChainA,input$compareChainB)
+    req(comparison_data())
     first <- req(loaded()); second <- req(comparison_loaded())
+    model_a <- if (first$nmodels > 1L)
+      paste0(" and /",current_model()-1L) else ""
+    model_b <- if (second$nmodels > 1L)
+      paste0(" and /",if (is.null(input$compareModel)) 0L else
+                     as.integer(input$compareModel)-1L) else ""
+    sel_a <- paste0(":", input$compareChainA, model_a, " and protein")
+    sel_b <- paste0(":", input$compareChainB, model_b, " and protein")
     widget <- NGLVieweR(data=first$source_id,format=first$viewer_format) %>%
       NGLVieweR::stageParameters(backgroundColor="#f7fafb") %>%
-      addRepresentation("cartoon", param=list(
-        sele=paste0(":",input$compareChainA," and protein"),
-        color="#CE6A4D",name="primary"))
+      addRepresentation("cartoon",param=list(
+        sele=sel_a,color="#CE6A4D",name="ram-compare-chain-a")) %>%
+      addRepresentation("ball+stick",param=list(
+        sele="none",color="#ffc04a",scale=1.5,name="ram-compare-highlight-a"))
     widget <- NGLVieweR::addStructure(widget, data=second$source_id,
                                      format=second$viewer_format) %>%
       addRepresentation("cartoon",param=list(
-        sele=paste0(":",input$compareChainB," and protein"),
-        color="#317E9A",name="secondary"))
+        sele=sel_b,color="#317E9A",name="ram-compare-chain-b")) %>%
+      addRepresentation("ball+stick",param=list(
+        sele="none",color="#83e6f5",scale=1.5,name="ram-compare-highlight-b"))
     NGLVieweR::setSuperpose(widget, reference=1,
-      sele_reference=paste0(":",input$compareChainA),
-      sele_target=paste0(":",input$compareChainB))
+      sele_reference=sel_a, sele_target=sel_b)
   })
+  observeEvent(input$NGLCompare_PDB, {
+    if (is.null(isolate(comparison_loaded()))) return()
+    session$sendCustomMessage("ram-compare-ready", list())
+  }, ignoreInit=TRUE)
+  observeEvent(input$NGLCompare_rendering, {
+    if (!identical(input$NGLCompare_rendering, FALSE) ||
+        is.null(isolate(comparison_loaded()))) return()
+    # Some NGL versions do not emit a changed PDB input when users switch
+    # chains of the same structure. The JS readiness guard checks both
+    # structure objects before reframing.
+    session$sendCustomMessage("ram-compare-ready", list())
+  }, ignoreInit=TRUE)
 
   output$ensemblePanel <- renderUI({
     structure <- req(loaded())

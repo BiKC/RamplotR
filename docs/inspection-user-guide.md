@@ -19,10 +19,19 @@ and missing-angle positions. Expand the navigator to reveal independently
 scrollable, one-letter residue strips for all selected chains. Clicking a
 letter updates the same inspector, Ramachandran point and NGL focus.
 
-The map always retains full biological sequence positions, even when
-amino-acid or pre-proline filters hide most plotted points. Residues excluded
-by those filters appear dimmed and cannot be selected until the filters are
-relaxed; the sequence itself is never shortened into an artificial fragment.
+The map always retains true **PDB residue numbers**, even when amino-acid
+or pre-proline filters hide most plotted points. The expanded strip labels
+every tenth PDB position (plus its first and last residue) and shows the
+currently selected number next to the chain heading. Use **Go to residue**
+beside any chain, or press Enter in its number field, to find positions
+directly, such as residue 104. A hidden residue is still located, with a
+message explaining that its selection is blocked by current plot filters.
+
+For predicted models, each residue button also shows its numerical
+**pLDDT** below the amino-acid letter. A separate coloured underline and
+legend distinguish high, confident, low and very low pLDDT from the
+Ramachandran classification fill. Positions with unavailable confidence
+show a dash, never an invented zero.
 
 ## The residue table
 
@@ -55,7 +64,24 @@ If atom records are inconsistent or the parser cannot extract complete multi-mod
 
 The optional **Compare** tab accepts a second PDB accession or PDB/mmCIF file. Choose one chain from each structure. Residues are paired by a bounded global amino-acid sequence alignment, **not by residue number**. The difference in each angle wraps correctly across ±180°. Gaps remain visible and do not receive invented dihedrals; classification differences are reported only for available classifications.
 
-The paired Ramachandran plot displays the two structures in contrasting colours. Export the aligned table as CSV. The optional 3D viewer superposes the selected chains for qualitative inspection. A large-chain comparison can exceed the alignment size limit; select shorter chains instead.
+The paired Ramachandran plot and the **3D superposition are side by side**
+on wide screens. The 3D viewer initially fits both selected chains rather
+than the complete uploaded structures, even if hidden chains are very large.
+Selecting a plotted point or aligned table row highlights both corresponding
+residues in the superposition and focuses the camera on their local
+positions. Clicking a residue in either 3D structure finds its aligned
+partner. If one structure contains an insertion/deletion at the selected
+position, only the available residue is highlighted and the missing
+partner is shown as an alignment gap.
+
+Use **Find aligned pair** to jump by the true residue number in either
+selected chain (for example 104), then inspect the primary/comparison
+amino acids, φ/ψ angles and wrapped Δφ/Δψ directly below the views.
+**Fit both chains** resets the camera without clearing the current
+selection. The shared primary-structure inspector and sequence navigator
+follow the selected primary residue when it is visible under current plot
+filters. Export the aligned table as CSV for reproducibility. A large-chain
+comparison can exceed the alignment size limit; select shorter chains instead.
 
 Identical Ramachandran coordinates do not imply identical Cartesian structure, and an angular difference alone is not evidence of a clinically meaningful change. Distinct models from the same structure are related observations, not independent experiments.
 
@@ -71,6 +97,7 @@ Record the software version, reference dataset, background, classification mode,
 - `Rscript tests/reports.R`: export real vector SVG, PNG and self-contained HTML.
 - `Rscript tests/model-integration.R`: an actual multi-model 1D3Z NMR PDB.
 - `node tests/ui.test.cjs`: JS message-handler and residue-selection contracts.
+- `node tests/compare-ui.test.cjs`: aligned 3D selection, chain-aware framing, invisible viewers and fit-both reset.
 - `node tests/ui-browser.cjs`: live Shiny browser workflow, plot-to-NGL/table/sequence selection, default palette, responsive sizing and pairwise self-comparison.
 
 Scientific tests run on Ubuntu and Windows; full-browser checks run on Ubuntu. For changes that affect validation criteria or reference grids, the scientific regression tests must remain unchanged or include explicitly reviewed new reference fixtures.

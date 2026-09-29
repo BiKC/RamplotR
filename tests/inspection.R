@@ -17,6 +17,17 @@ assert(identical(q$resn, c("GLY","THR","PRO","ALA")),
 seq <- ram_sequence_data(a)
 assert(identical(seq$letter, c("A","T","G","P")),
        "Sequence must retain amino-acid identities")
+assert(identical(unname(ram_plddt_color(c(NA,49,50,69,70,89,90,100))),
+  c("#cbd7db","#d75e56","#d6ac52","#d6ac52",
+    "#7bbcb1","#7bbcb1","#126e74","#126e74")),
+  "Confidence colour thresholds must be independent of region labels")
+assert(identical(ram_sequence_position_labels(c(98L,99L,100L,101L,104L,105L)),
+  c("98","","100","","","105")),
+  "Sequence index labels must use real residue numbering, not array positions")
+assert(identical(ram_sequence_position_labels(c(101L,101L), c("","A")),
+  c("101","101A")), "Labels retain insertion codes")
+assert(identical(ram_sequence_position_labels(integer(), character()),
+  character()), "Empty position labels are supported")
 assert(seq$insertion_code[2L]=="A", "Insertion code must be preserved")
 groups <- ram_sequence_groups(a)
 assert(identical(names(groups), c("A", "B")),
@@ -46,6 +57,14 @@ other <- rbind(ref[1,,drop=FALSE], transform(ref[1,,drop=FALSE],
 pair <- ram_compare_torsions(ref,other)
 assert(nrow(pair)==5L, "Alignment should preserve inserted residues")
 assert(sum(pair$alignment=="Insertion")==1L, "Expected insertion")
+assert(identical(ram_comparison_find(pair,"a","A",2L), 2L),
+  "Find the primary residue by exact PDB numbering")
+assert(identical(ram_comparison_find(pair,"b","A",88L), 2L),
+  "Locate inserted comparison-only residue")
+assert(is.na(ram_comparison_find(pair,"a","A",88L)),
+  "Do not assign the partner's residue number to a primary gap")
+assert(is.na(ram_comparison_find(pair,"b","A",999L)),
+  "Unknown comparison residue must not select an unrelated pair")
 deletion <- ram_compare_torsions(ref, ref[-2,,drop=FALSE])
 assert(sum(deletion$alignment=="Deletion")==1L, "Expected deletion")
 assert(any(!is.na(pair$delta_phi)), "Aligned angles should be comparable")

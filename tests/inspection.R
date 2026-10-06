@@ -52,6 +52,13 @@ assert("outlier" %in% overview && "missing" %in% overview,
 assert(isTRUE(all.equal(ram_angular_difference(179,-179), 2)),
        "Angular difference must wrap across 180 degrees")
 assert(is.na(ram_angular_difference(NA,-20)), "Missing angles must stay missing")
+shift <- ram_backbone_angular_displacement(c(3,18,30,60,NA),
+                                           c(4,0,0,0,2))
+assert(isTRUE(all.equal(shift[1:4],c(5,18,30,60))) && is.na(shift[[5]]),
+       "Backbone angular displacement changed")
+assert(identical(ram_backbone_shift_band(shift),
+  c("Small","Moderate","Large","Very large","Unavailable")),
+  "Backbone shift display bands changed")
 ref <- data.frame(
   chain="A",resi=1:4,insertion_code="",resn=c("ALA","SER","THR","GLY"),
   phi=c(-60,-75,179,-40),psi=c(-45,-30,-179,140),

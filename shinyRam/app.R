@@ -214,10 +214,15 @@ ui <- fluidPage(
                 tags$p("Choose how residues and plot regions are interpreted.")
               )
             ),
+            tags$div(class="ram-standard-validation-note",
+              tags$strong("Standard validation · Rama8000"),
+              tags$p(class="ram-field-hint",
+                "Always calculated with the current six-class cctbx/Phenix reference model. Favored, Allowed and Outlier are shown separately from RamplotR density regions.")
+            ),
             selectInput(
-              "validationMode", "Residue classification",
-              c("Residue-aware (recommended)" = "residue",
-                "Selected background (legacy)" = "legacy")
+              "validationMode", "RamplotR density classification",
+              c("Residue-aware" = "residue",
+                "Selected plotting background" = "legacy")
             ),
             uiOutput("modelControl"),
             selectInput(

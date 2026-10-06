@@ -112,4 +112,44 @@ assert(isTRUE(all.equal(seq_a$known_fraction,2/3)),
 assert(identical(ram_chain_query_sequence(seq_fixture,"B")$sequence,"V"),
        "Chain-specific counterpart sequence extraction changed.")
 
+evidence_row <- data.frame(
+  chain="A",resi=10L,insertion_code="",resn="ALA",
+  phi=-120,psi=95,region="Not allowed",density=98.4,
+  rama8000_region="Outlier",rama8000_group="general",
+  rama8000_score=0.0001,plddt=96,confidence_category="Very high",
+  omega=72,omega_status="Twisted",
+  wwpdb_rama="outlier",wwpdb_rotamer="outlier",
+  wwpdb_clashes=2,wwpdb_bond_outliers=1,wwpdb_angle_outliers=0,
+  stringsAsFactors=FALSE
+)
+ev <- ram_residue_evidence(evidence_row)
+assert(all(c(
+  "Rama8000 backbone outlier",
+  "Unusual RamplotR density position",
+  "High-confidence prediction with unusual backbone geometry",
+  "Twisted peptide bond",
+  "Official wwPDB Ramachandran outlier",
+  "Official wwPDB rotamer outlier",
+  "Official wwPDB local clash",
+  "Official covalent-geometry outlier"
+) %in% ev$title), "Residue evidence should preserve independent warning sources.")
+assert(ev$title[[1L]] %in% c(
+  "High-confidence prediction with unusual backbone geometry",
+  "Official wwPDB Ramachandran outlier","Twisted peptide bond"),
+  "High-severity residue evidence should sort before informational notes.")
+quiet_row <- evidence_row
+quiet_row$region <- "Favoured"; quiet_row$density <- 40
+quiet_row$rama8000_region <- "Favored"; quiet_row$plddt <- 95
+quiet_row$omega <- 179; quiet_row$omega_status <- "Trans"
+quiet_row$wwpdb_rama <- "favored"; quiet_row$wwpdb_rotamer <- "favored"
+quiet_row$wwpdb_clashes <- 0; quiet_row$wwpdb_bond_outliers <- 0
+quiet_row$wwpdb_angle_outliers <- 0
+assert(nrow(ram_residue_evidence(quiet_row))==0L,
+       "Unremarkable residues should not receive artificial warnings.")
+missing_row <- quiet_row
+missing_row$phi <- NA_real_
+missing_ev <- ram_residue_evidence(missing_row)
+assert("Backbone angles unavailable" %in% missing_ev$title,
+       "Missing torsions should be explained explicitly.")
+
 message("Inspection, alignment and structural model unit tests passed")

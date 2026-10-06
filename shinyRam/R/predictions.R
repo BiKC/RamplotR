@@ -193,7 +193,7 @@ ram_confidence_review <- function(data) {
   result[is.finite(data$plddt) & data$plddt < 70] <-
     "Lower-confidence prediction"
   result[is.finite(data$plddt) & data$plddt >= 90 & geometry_issue] <-
-    "High confidence · Ramachandran outlier"
+    "High confidence · RamplotR Not allowed"
   # Missing torsions are not evidence that backbone geometry is acceptable.
   result[is.finite(data$plddt) & data$plddt >= 90 &
            !is.na(data$region) & !geometry_issue] <-

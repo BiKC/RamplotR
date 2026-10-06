@@ -815,7 +815,17 @@ body > .container-fluid { max-width: none; padding: 0; }
   background:none; border:0;
 }
 .ram-sequence-chain .ram-seq-res { width:27px; height:30px; flex:0 0 27px;
-  border-radius:5px; font-size:11px; }
+  border-radius:5px; font-size:11px; position:relative; }
+.ram-sequence-chain .ram-seq-res::before {
+  content:""; position:absolute; top:2px; right:2px;
+  width:5px; height:5px; border-radius:50%;
+  border:1px solid rgba(255,255,255,.9);
+  box-shadow:0 0 0 1px rgba(30,65,70,.10);
+}
+.ram-seq-standard-favored::before { background:#26847c; }
+.ram-seq-standard-allowed::before { background:#d49b2f; }
+.ram-seq-standard-outlier::before { background:#c94d3f; }
+.ram-seq-standard-missing::before { background:#aab8ba; }
 .ram-sequence-chain .ram-seq-res[aria-pressed="true"] {
   border:2px solid #134f55; outline:2px solid #8fcfc4;
   outline-offset:1px; box-shadow:none;
@@ -1116,8 +1126,22 @@ body > .container-fluid { max-width: none; padding: 0; }
   border-radius:6px; color:#145e64; background:#edf7f4;
   font-size:11px; font-weight:750; padding:4px 8px; }
 .ram-seq-jump:hover { background:#dbeee9; border-color:#80b4aa; }
+.ram-sequence-standard-key,
 .ram-sequence-confidence-key { display:flex; align-items:center;
-  gap:6px; flex-wrap:wrap; margin:0 0 12px; font-size:10px; color:#637b81; }
+  gap:6px; flex-wrap:wrap; margin:0 0 8px; font-size:10px; color:#637b81; }
+.ram-sequence-standard-key strong,
+.ram-sequence-standard-key span:not(:last-child) {
+  position:relative; display:inline-block; padding:3px 7px 3px 16px;
+  border:1px solid #dce9e6; border-radius:5px; color:#244b53; font-weight:700;
+}
+.ram-sequence-standard-key span:not(:last-child)::before {
+  content:""; position:absolute; left:6px; top:50%; transform:translateY(-50%);
+  width:6px; height:6px; border-radius:50%;
+}
+.ram-standard-key-favored::before { background:#26847c; }
+.ram-standard-key-allowed::before { background:#d49b2f; }
+.ram-standard-key-outlier::before { background:#c94d3f; }
+.ram-sequence-confidence-key { margin-bottom:12px; }
 .ram-sequence-confidence-key strong { font-size:10px; color:#2c626a; margin-right:3px; }
 .ram-sequence-confidence-key span:not(:last-child) { display:inline-block;
   font-variant-numeric:tabular-nums; padding:3px 7px;

@@ -94,6 +94,10 @@ ram_save_html_report <- function(path, data, metadata, svg_path,
   }
   tally <- vapply(c("Favoured","Allowed","Generously allowed","Not allowed"),
     function(region) sum(data$region==region,na.rm=TRUE),integer(1))
+  standard_tally <- if ("rama8000_region" %in% names(data))
+    vapply(c("Favored","Allowed","Outlier"),
+      function(region) sum(data$rama8000_region==region,na.rm=TRUE),integer(1))
+    else NULL
   counts <- lapply(names(tally),function(label) h(label,tally[[label]]))
   counts <- c(counts,list(
     h("Missing angles",sum(is.na(data$phi)|is.na(data$psi))),
@@ -102,10 +106,12 @@ ram_save_html_report <- function(path, data, metadata, svg_path,
     h(gsub("_"," ",name),metadata[[name]]))
   shown <- utils::head(data[,intersect(c(
     "chain","resi","insertion_code","resn","phi","psi","region",
-    "density","omega","omega_status","chi1","cb_ca_distance",
+    "density","rama8000_region","rama8000_group","rama8000_score",
+    "omega","omega_status","chi1","cb_ca_distance",
     "cb_signed_volume","plddt","confidence_category"),
     names(data)),drop=FALSE],max_report_rows)
-  for(field in intersect(c("phi","psi","density","omega","chi1","cb_ca_distance",
+  for(field in intersect(c("phi","psi","density","rama8000_score",
+                       "omega","chi1","cb_ca_distance",
                        "cb_signed_volume","plddt"),
                          names(shown)))
     shown[[field]] <- round(shown[[field]],2L)
@@ -139,11 +145,22 @@ ram_save_html_report <- function(path, data, metadata, svg_path,
       htmltools::tags$p(class="note",
         "Portable report: figure, counts, geometry and provenance. Native and independent results are reported separately."),
       htmltools::tags$section(htmltools::tags$h2("Ramachandran plot"),chart),
-      htmltools::tags$section(htmltools::tags$h2("RamplotR region counts"),
+      htmltools::tags$section(htmltools::tags$h2("RamplotR density regions"),
+        htmltools::tags$p(class="note",
+          "Native RamplotR density regions. Not allowed is not a MolProbity/wwPDB outlier label."),
         table_for(data.frame(
           Region=c(names(tally),"Missing angles","All selected residues"),
           Residues=c(as.integer(tally),
             sum(is.na(data$phi)|is.na(data$psi)),nrow(data))))),
+      if(!is.null(standard_tally))
+        htmltools::tags$section(
+          htmltools::tags$h2("Rama8000 standard validation"),
+          htmltools::tags$p(class="note",
+            "Independent six-class Rama8000 evaluation using the current cctbx/Phenix reference tables and Favored/Allowed/Outlier thresholds."),
+          table_for(data.frame(
+            Region=names(standard_tally),
+            Residues=as.integer(standard_tally)
+          ))),
       if("omega_status" %in% names(data))
         htmltools::tags$section(
           htmltools::tags$h2("Additional descriptive geometry"),

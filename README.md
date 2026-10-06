@@ -14,12 +14,12 @@ RamplotR is an open-source R Shiny application that brings backbone geometry, a 
 
 | Workflow | Capabilities |
 | --- | --- |
-| **Explore a structure** | Interactive φ/ψ plots with several reference-density datasets, residue-aware classification and instant amino-acid/chain filtering. |
-| **Inspect residues in context** | Synchronized Ramachandran plot, searchable residue table, all-chain sequence navigator and NGL 3D viewer. Selected residues are highlighted and brought into focus; an issue queue helps navigate outliers and missing angles. |
+| **Explore a structure** | Interactive φ/ψ plots with several reference-density datasets, native RamplotR density regions and a parallel six-class Rama8000 standard validation that matches the current cctbx/Phenix categories. |
+| **Inspect residues in context** | Synchronized Ramachandran plot, searchable residue table, all-chain sequence navigator and NGL 3D viewer. The issue queue distinguishes Rama8000 outliers from native RamplotR `Not allowed` regions and missing angles. |
 | **Work with predicted models** | Import AlphaFold DB models by UniProt accession or upload AlphaFold 2/3, ColabFold and ESMFold structures. Examine pLDDT, and view a linked PAE heatmap when compatible confidence data are available. |
 | **Examine structural geometry** | Explore peptide ω, side-chain χ1 and descriptive Cβ measurements. Optionally attach the matching deposited structure's official wwPDB validation report for independent rotamer, clash and geometry annotations. |
 | **Inspect experimental evidence** | Overlay a local CCP4/MRC cryo-EM map in the 3D viewer as a qualitative aid, without uploading the map to a separate service. |
-| **Compare models** | Sequence-align chains from two structures; inspect wrapped angular differences and changes in classification. For compatible multi-model structures, calculate circular φ/ψ variability and classification consistency. |
+| **Compare models** | Sequence-align chains from two structures; inspect wrapped angular differences, native density-region changes and Rama8000 category changes/outliers. For compatible multi-model structures, calculate circular φ/ψ variability and classification consistency. |
 | **Publish or automate** | Export SVG and high-resolution PNG figures, filtered CSV tables and standalone HTML reports. Run the offline R command-line tool on individual files or a directory of structures. |
 
 Advanced analysis stays in collapsible panels or dedicated comparison/summary views, keeping the everyday 2D/3D inspection screen uncluttered.
@@ -89,9 +89,11 @@ See the [batch-analysis instructions](docs/structural-verification.md#offline-ba
 
 ## Scientific interpretation
 
-RamplotR's **residue-aware mode** evaluates general residues, glycine, proline and pre-proline against their corresponding bundled reference distributions. The selected plotting background is independent of those residue-specific classification calculations. The original density references trace back to the distributions discussed by [Lovell et al. (2003)](https://pubmed.ncbi.nlm.nih.gov/12557186/); other bundled reference datasets can also be selected.
+RamplotR reports two deliberately separate views of backbone geometry. Its **native density regions** evaluate general, glycine, proline and pre-proline residues against the selected bundled RamplotR reference dataset and retain the labels Favoured, Allowed, Generously allowed and Not allowed. The selected plotting background is independent of those residue-specific calculations.
 
-**RamplotR region labels are not interchangeable with MolProbity or wwPDB classifications.** They use different reference populations, residue treatments and region definitions. Our [independent validation results](docs/validation-results.md), [reproducible protocol](docs/wwpdb-validation.md) and [pinned experimental-structure corpus](validation/manifest.csv) document agreement in calculated angles as well as differences in classification. For deposited experimental structures, attach the official report for the **same structure and model** when making independent quality assessments.
+For standard structure validation, RamplotR also evaluates every residue with the current **Rama8000 six-class model** used by cctbx/Phenix: General, Gly, cis-Pro, trans-Pro, pre-Pro and Ile/Val, with Favored/Allowed/Outlier thresholds taken from the same reference score tables. This result is independent of the native RamplotR display background. In the pinned five-structure corpus, **all 3,718 comparable residues receive exactly the same Rama8000 category as the official wwPDB validation reports**, while the calculated φ/ψ angles agree to within 0.055°. See the [Rama8000 implementation and validation](docs/rama8000-validation.md).
+
+Native RamplotR `Not allowed` and Rama8000/wwPDB `Outlier` therefore remain separate concepts in the interface and exports. For deposited experimental structures, an official wwPDB report for the **same structure and model** can additionally be attached as independent evidence.
 
 For predictions, pLDDT and PAE describe model confidence rather than experimental verification. ESMFold normally provides pLDDT but not PAE; experimental thermal B-factors are **never** automatically interpreted as prediction confidence. The native ω, χ1 and Cβ measurements are descriptive, and visualising a density map is not a quantitative map–model fit measurement.
 
@@ -102,7 +104,8 @@ The default RamplotR teal contour palette provides consistent, recognisable publ
 - [Interactive inspection, colours, comparisons and exports](docs/inspection-user-guide.md)
 - [AlphaFold, ColabFold and ESMFold confidence analysis](docs/prediction-confidence.md)
 - [Geometry, official wwPDB evidence, cryo-EM overlays, ensembles and batch mode](docs/structural-verification.md)
-- [Independent wwPDB validation protocol and benchmark results](docs/wwpdb-validation.md) · [Results](docs/validation-results.md)
+- [Rama8000 standard validation and direct wwPDB comparison](docs/rama8000-validation.md)
+- [Independent wwPDB angle-validation protocol](docs/wwpdb-validation.md) · [Results](docs/validation-results.md)
 - [Performance and large-structure benchmarks](docs/benchmark-results.md) · [Scaling results](docs/scaling-results.md)
 - [Shinylive browser deployment and one.com caching](docs/shinylive-deployment.md)
 

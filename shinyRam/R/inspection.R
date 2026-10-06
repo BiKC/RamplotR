@@ -4,17 +4,23 @@
 ram_review_queue <- function(data, boundary_margin = 2) {
   if (!nrow(data)) return(data)
   missing <- is.na(data$phi) | is.na(data$psi) | is.na(data$region)
-  outlier <- !missing & data$region == "Not allowed"
+  not_allowed <- !missing & data$region == "Not allowed"
+  standard_outlier <- if ("rama8000_region" %in% names(data))
+    !missing & !is.na(data$rama8000_region) & data$rama8000_region == "Outlier"
+    else rep(FALSE, nrow(data))
   # The density percentile is cumulative mass above the residue's density.
-  # Closeness to any original contour probability is a review hint only.
+  # Closeness to any RamplotR contour probability is a review hint only.
   near <- !missing & !is.na(data$density) &
     vapply(data$density, function(value) {
       any(abs(value - c(85, 98, 99.95)) <= boundary_margin)
     }, logical(1))
   data$review_status <- ifelse(missing, "Missing angles",
-    ifelse(outlier, "Outlier", ifelse(near, "Near boundary", "Other")))
+    ifelse(standard_outlier, "Rama8000 outlier",
+      ifelse(not_allowed, "Not allowed",
+        ifelse(near, "Near boundary", "Other"))))
   priority <- match(data$review_status,
-                    c("Outlier", "Missing angles", "Near boundary", "Other"))
+                    c("Rama8000 outlier", "Not allowed", "Missing angles",
+                      "Near boundary", "Other"))
   data[order(priority, data$chain, data$resi, data$insertion_code), ,
        drop = FALSE]
 }
@@ -28,7 +34,9 @@ ram_amino_acid_letters <- c(
 ram_sequence_data <- function(data) {
   if (!nrow(data)) return(data.frame(
     chain=character(), resi=integer(), insertion_code=character(),
-    resn=character(), letter=character(), region=character(), plddt=numeric(),
+    resn=character(), letter=character(), region=character(),
+    rama8000_region=character(), rama8000_group=character(),
+    rama8000_score=numeric(), plddt=numeric(),
     stringsAsFactors=FALSE))
   key <- paste(data$chain, data$resi, data$insertion_code, sep="\r")
   data <- data[!duplicated(key), , drop=FALSE]
@@ -39,6 +47,12 @@ ram_sequence_data <- function(data) {
     resn=as.character(data$resn),
     letter=unname(ram_amino_acid_letters[data$resn]),
     region=as.character(data$region),
+    rama8000_region=if ("rama8000_region" %in% names(data))
+      as.character(data$rama8000_region) else rep(NA_character_,nrow(data)),
+    rama8000_group=if ("rama8000_group" %in% names(data))
+      as.character(data$rama8000_group) else rep(NA_character_,nrow(data)),
+    rama8000_score=if ("rama8000_score" %in% names(data))
+      as.numeric(data$rama8000_score) else rep(NA_real_,nrow(data)),
     plddt=if ("plddt" %in% names(data)) as.numeric(data$plddt) else
       rep(NA_real_, nrow(data)),
     stringsAsFactors=FALSE
@@ -128,6 +142,24 @@ ram_compare_torsions <- function(a, b) {
   result$delta_psi <- ram_angular_difference(result$psi_a, result$psi_b)
   result$class_changed <- !is.na(result$region_a) &
     !is.na(result$region_b) & result$region_a != result$region_b
+  if (all(c("rama8000_region","rama8000_group","rama8000_score") %in% names(a)) &&
+      all(c("rama8000_region","rama8000_group","rama8000_score") %in% names(b))) {
+    result$rama8000_region_a <- value(
+      a, pairing$index_a, "rama8000_region", NA_character_)
+    result$rama8000_region_b <- value(
+      b, pairing$index_b, "rama8000_region", NA_character_)
+    result$rama8000_group_a <- value(
+      a, pairing$index_a, "rama8000_group", NA_character_)
+    result$rama8000_group_b <- value(
+      b, pairing$index_b, "rama8000_group", NA_character_)
+    result$rama8000_score_a <- value(
+      a, pairing$index_a, "rama8000_score", NA_real_)
+    result$rama8000_score_b <- value(
+      b, pairing$index_b, "rama8000_score", NA_real_)
+    result$rama8000_changed <- !is.na(result$rama8000_region_a) &
+      !is.na(result$rama8000_region_b) &
+      result$rama8000_region_a != result$rama8000_region_b
+  }
   result$alignment <- ifelse(is.na(pairing$index_a), "Insertion",
                       ifelse(is.na(pairing$index_b), "Deletion",
                       ifelse(result$amino_a == result$amino_b,

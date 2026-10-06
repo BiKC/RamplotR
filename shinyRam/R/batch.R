@@ -97,6 +97,8 @@ ram_batch_run <- function(options,repo_root=".") {
       backbone <- ram_extract_torsions(selected)
       classified <- ram_classify_torsions(backbone,refs,background,
         options$mode,threshold_fn=ram_density_thresholds)
+      classified <- ram_rama8000_classify(
+        classified, file.path(repo_root,"shinyRam","static","rama8000"))
       diagnostic <- ram_extra_geometry(selected,backbone)
       classified <- ram_join_geometry(classified,diagnostic)
       if(options$prediction_source!="experimental") {
@@ -112,6 +114,7 @@ ram_batch_run <- function(options,repo_root=".") {
       metadata$input_md5 <- unname(tools::md5sum(input))
       metadata$prediction_provenance <- options$prediction_source
       metadata$native_diagnostics <- "peptide omega and descriptive chi1"
+      metadata$rama8000_validation <- "six-class cctbx/Phenix-compatible evaluation"
       metadata$independent_wwpdb <- if(is.null(official)) "none" else
         basename(options$validation_xml)
       if(!is.null(official)) metadata$independent_wwpdb_md5 <-

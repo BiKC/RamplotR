@@ -20,6 +20,7 @@ if (!reference_set %in% known) stop("Unrecognized reference dataset.")
 source("shinyRam/R/io.R")
 source("shinyRam/R/backbone.R")
 source("shinyRam/R/ramachandran.R")
+source("shinyRam/R/rama8000.R")
 source("benchmarks/wwpdb_helpers.R")
 dir.create(output, recursive = TRUE, showWarnings = FALSE)
 
@@ -48,12 +49,20 @@ refdir <- file.path("shinyRam", "static", reference_set)
 classified <- ram_classify_torsions(
   torsions, refdir, NULL, "residue", threshold_fn = ram_density_thresholds
 )
+classified <- ram_rama8000_classify(
+  classified, file.path("shinyRam", "static", "rama8000")
+)
 external <- ram_read_wwpdb_report(xml_path)
 details <- ram_compare_wwpdb(classified, external, model = 1L)
+standard <- ram_compare_rama8000_wwpdb(classified, external, model = 1L)
 detail_path <- file.path(output, "residue_comparison.csv")
 write.csv(details, detail_path, row.names = FALSE, na = "")
 cross <- ram_wwpdb_contingency(details)
 write.csv(cross, file.path(output, "group_contingency.csv"), row.names = FALSE)
+write.csv(standard, file.path(output, "rama8000_comparison.csv"),
+          row.names = FALSE, na = "")
+write.csv(ram_rama8000_wwpdb_contingency(standard),
+          file.path(output, "rama8000_contingency.csv"), row.names = FALSE)
 
 # Persist source hashes and the full comparison even if a data/angle quality
 # gate fails; a disagreement in region LABELS is never a CI-failure criterion.
@@ -80,8 +89,14 @@ writeLines(c(capture.output(sessionInfo()),
 summary <- ram_wwpdb_summary(details, accession,
                              min_coverage = 0, max_angle_deviation = 180)
 write.csv(summary, file.path(output, "summary.csv"), row.names = FALSE)
+standard_summary <- ram_rama8000_wwpdb_summary(
+  standard, accession, min_coverage = 0, min_agreement = 0)
+write.csv(standard_summary, file.path(output, "rama8000-summary.csv"),
+          row.names = FALSE)
 print(summary, row.names = FALSE)
+print(standard_summary, row.names = FALSE)
 print(cross[cross$residues > 0L, , drop = FALSE], row.names = FALSE)
+print(ram_rama8000_wwpdb_contingency(standard), row.names = FALSE)
 # Independent geometry agreement must be established before making
 # interpretive claims from the classification comparison.
 gate <- tryCatch(
@@ -93,4 +108,14 @@ if (inherits(gate, "error")) {
   writeLines(conditionMessage(gate), file.path(output, "GATE_FAILURE.txt"))
   stop(conditionMessage(gate), call. = FALSE)
 }
-message("wwPDB angle/coverage gate passed; class differences are reported separately.")
+standard_gate <- tryCatch(
+  ram_rama8000_wwpdb_summary(
+    standard, accession, min_coverage = 0.90, min_agreement = 1.00),
+  error = function(e) e
+)
+if (inherits(standard_gate, "error")) {
+  writeLines(conditionMessage(standard_gate),
+             file.path(output, "RAMA8000_GATE_FAILURE.txt"))
+  stop(conditionMessage(standard_gate), call. = FALSE)
+}
+message("wwPDB angle gate and direct Rama8000 category gate passed.")

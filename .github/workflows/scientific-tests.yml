@@ -66,7 +66,9 @@ jobs:
         run: Rscript tests/inspection.R
         shell: bash
       - name: Verify residue classifications and density thresholds
-        run: Rscript tests/scientific.R
+        run: |
+          Rscript tests/scientific.R
+          Rscript tests/rama8000.R
         shell: bash
       - name: Verify peptide continuity and torsion calculations
         run: Rscript tests/peptide.R

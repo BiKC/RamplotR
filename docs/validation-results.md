@@ -1,61 +1,56 @@
-# Independent wwPDB validation: five-structure results
+# Independent wwPDB validation: current results
 
-**Date:** September 28, 2026. **Version:** original bundled reference
-distributions, residue-aware classification, model 1. All samples were
-processed in the same five-way independent workflow:
-https://github.com/BiKC/RamplotR/actions/runs/36475593015
+The current validation separates **angle correctness**, **Rama8000 standard
+validation** and **native RamplotR density regions**.
 
-The pinned output metrics are in [baseline-2026-09-28.csv](../validation/baseline-2026-09-28.csv).
-The source URLs and both official-file SHA256 checksums per sample are in
-[baseline-source-hashes-2026-09-28.csv](../validation/baseline-source-hashes-2026-09-28.csv).
-See [the method and limitations](wwpdb-validation.md) before quoting
-classification agreement.
+The five pinned structures are 1CRN, 1UBQ, 6VXX, 2DQ4 and model 1 of 1D3Z.
+Exact coordinate and official wwPDB validation-report SHA256 hashes are stored
+in [the source manifest](../validation/baseline-source-hashes-2026-09-28.csv).
 
-| Structure | Method | Independently matched finite angle pairs | Maximum circular difference | Agreement after descriptive three-way label mapping |
-|---|---|---:|---:|---:|
-| 1CRN | X-ray | 44/44 | 0.052° | 43/44 |
-| 1UBQ | X-ray | 74/74 | 0.054° | 74/74 |
-| 6VXX | cryo-EM | 2,844/2,844 | 0.055° | 2,796/2,844 |
-| 2DQ4 | X-ray, outlier-rich | 682/682 | 0.055° | 651/682 |
-| 1D3Z | NMR, model 1 | 74/74 | 0.055° | 74/74 |
+## Backbone angles
 
-All 3,718 eligible phi/psi pairs match independently reported wwPDB
-angles to within 0.055° (the report prints its angles to one decimal
-place). This is numerical validation of backbone geometry, not
-equivalence of Ramachandran classification rules.
+| Structure | Method | Matched finite phi/psi pairs | Maximum circular difference |
+| --- | --- | ---: | ---: |
+| 1CRN | X-ray | 44/44 | 0.052° |
+| 1UBQ | X-ray | 74/74 | 0.054° |
+| 6VXX | cryo-EM | 2,844/2,844 | 0.055° |
+| 2DQ4 | X-ray | 682/682 | 0.055° |
+| 1D3Z | NMR, model 1 | 74/74 | 0.055° |
 
-The classification comparisons differ at **80 of 3,718 residues** under
-the explicitly documented, explanatory four-to-three-label crosswalk.
-Of particular interest, **2DQ4 has seven official wwPDB outliers**, but
-none of those same seven residues is outlier-labelled by RamplotR's
-original density references. RamplotR independently flags one other
-residue which wwPDB does not call an outlier. We preserve the seven
-independent outlier identities in
-[2dq4-wwpdb-outlier-examples.csv](../validation/2dq4-wwpdb-outlier-examples.csv)
-for future method development. This is evidence of materially different
-outlier-detection behaviour, **not** a reason to change the benchmark
-gate to require perfect classification agreement.
+All **3,718/3,718** eligible pairs reproduce the independently reported wwPDB
+angles to within 0.055°. The official XML prints angles to one decimal place.
 
-The independent source XML and coordinate CIF are archived with every
-CI artifact, along with all joined residues, reference-group confusion
-matrices, source checksums and R session metadata. All input hashes and
-quantitative snapshots are additionally pinned in the repository;
-[tests/wwpdb-baseline.R](../tests/wwpdb-baseline.R) fails if an
-official source changes without review or if the same pinned sources
-produce different numbers.
+## Rama8000 categories
 
-## What these findings mean
+RamplotR's six-class Rama8000 implementation is compared directly with the
+official wwPDB Favored/Allowed/Outlier labels. No native RamplotR category
+mapping is used.
 
-The original RamplotR class labels cannot be cited or presented as
-MolProbity/wwPDB-equivalent. The methods have different reference
-populations, residue-type treatments and contour semantics. A future
-MolProbity-compatible mode should source its validated six-class
-reference grids, respect cis/trans proline and Ile/Val and compare its
-residue-wise classifications against these pinned independent data,
-including the seven 2DQ4 outliers.
+| Structure | Comparable residues | Exact category matches | Agreement |
+| --- | ---: | ---: | ---: |
+| 1CRN | 44 | 44 | 100% |
+| 1UBQ | 74 | 74 | 100% |
+| 6VXX | 2,844 | 2,844 | 100% |
+| 2DQ4 | 682 | 682 | 100% |
+| 1D3Z | 74 | 74 | 100% |
+| **Total** | **3,718** | **3,718** | **100%** |
 
-For existing users and publications, keep the current mode available
-for reproducibility, label its scientific provenance, and refer to
-official wwPDB/MolProbity quality validation when making outlier
-claims. The historical published release is separately preserved as
-v0.1.0-legacy.
+The exact snapshot is pinned in
+[rama8000-baseline-2026-10-06.csv](../validation/rama8000-baseline-2026-10-06.csv).
+CI requires the same pinned sources to continue reproducing every category.
+
+For 2DQ4, all seven official wwPDB Ramachandran outliers are also classified
+as **Rama8000 Outlier** by RamplotR. Their native RamplotR density regions are
+shown separately: six are Generously allowed and one is Allowed. The exact
+residue identities and both current outputs are pinned in
+[2dq4-wwpdb-outlier-examples.csv](../validation/2dq4-wwpdb-outlier-examples.csv).
+
+## Interpretation
+
+Use **Rama8000** when referring to standard Favored/Allowed/Outlier validation.
+Use **RamplotR density regions** when discussing the selected exploratory
+density reference. The native label `Not allowed` is not a synonym for
+Rama8000/wwPDB `Outlier`.
+
+See [Rama8000 standard validation](rama8000-validation.md) for the implementation
+and [the reproducible wwPDB protocol](wwpdb-validation.md) for source handling.

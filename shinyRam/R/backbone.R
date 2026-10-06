@@ -68,6 +68,7 @@ ram_extract_torsions <- function(pdb, amino_acids = c(
   empty <- data.frame(
     resi = integer(), insertion_code = character(), chain = character(),
     resn = character(), phi = numeric(), psi = numeric(),
+    omega_prev = numeric(),
     next_resn = character(), bonded_to_next = logical(),
     stringsAsFactors = FALSE
   )
@@ -132,6 +133,7 @@ ram_extract_torsions <- function(pdb, amino_acids = c(
   valid_backbone <- complete.cases(cbind(nxyz, caxyz, cxyz))
   phi <- rep(NA_real_, n)
   psi <- rep(NA_real_, n)
+  omega_prev <- rep(NA_real_, n)
   if (n > 1L) {
     i_phi <- which(bonded_to_next[seq_len(n - 1L)] &
                      valid_backbone[2L:n]) + 1L
@@ -151,12 +153,24 @@ ram_extract_torsions <- function(pdb, amino_acids = c(
         cxyz[i_psi, , drop = FALSE],
         nxyz[i_psi + 1L, , drop = FALSE])
     }
+    # Omega for the peptide bond preceding residue i. This is required to
+    # distinguish cis- and trans-proline in Rama8000/ramalyze classification.
+    i_omega <- which(bonded_to_next[seq_len(n - 1L)] &
+                       valid_backbone[seq_len(n - 1L)] &
+                       valid_backbone[2L:n]) + 1L
+    if (length(i_omega)) {
+      omega_prev[i_omega] <- ram_dihedral_batch(
+        caxyz[i_omega - 1L, , drop = FALSE],
+        cxyz[i_omega - 1L, , drop = FALSE],
+        nxyz[i_omega, , drop = FALSE],
+        caxyz[i_omega, , drop = FALSE])
+    }
   }
   data.frame(
     resi = as.integer(atoms$resno[first_rows]),
     insertion_code = as.character(atoms$insert[first_rows]),
     chain = chains, resn = residue_names,
-    phi = phi, psi = psi, next_resn = next_resn,
+    phi = phi, psi = psi, omega_prev = omega_prev, next_resn = next_resn,
     bonded_to_next = bonded_to_next, stringsAsFactors = FALSE
   )
 }

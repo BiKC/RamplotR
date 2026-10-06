@@ -19,7 +19,7 @@ help <- paste(
 required <- c("shinyRam/R/io.R","shinyRam/R/batch.R")
 if(!all(file.exists(required)))
   stop("Run this script from the RamplotR repository root.",call.=FALSE)
-for(filename in c("io","backbone","ramachandran","geometry","experimental",
+for(filename in c("io","backbone","ramachandran","rama8000","geometry","experimental",
                   "ensemble","predictions","reports","batch"))
   source(file.path("shinyRam","R",paste0(filename,".R")))
 args <- commandArgs(trailingOnly=TRUE)

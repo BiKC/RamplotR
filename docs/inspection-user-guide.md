@@ -10,6 +10,30 @@ The inspector beneath the structure input is shared across tabs. Selecting a res
 
 On a loaded screen with no selected residue, the inspector is reduced to a single review action. After selecting a residue, navigation controls become available. Representation buttons and the ligand, DNA, RNA, spin and rock switches remain visible beneath the viewer, so users can discover them without opening a settings menu.
 
+## Why inspect this residue?
+
+Selecting a residue opens a compact evidence explanation in the shared
+inspector. RamplotR keeps the underlying signals separate instead of combining
+them into an opaque quality score.
+
+Depending on the data available for that residue, the explanation can surface:
+
+- Rama8000 Allowed or Outlier status;
+- the native RamplotR `Not allowed` region or proximity to a native contour;
+- low or very low pLDDT;
+- the combination of very high pLDDT with a Rama8000 outlier;
+- cis or twisted peptide geometry;
+- an attached official wwPDB Ramachandran or rotamer outlier;
+- official local clashes or covalent-geometry outliers.
+
+Each item identifies its source and explains why it may be worth examining.
+If none of the available evidence is unusual, the panel says so explicitly
+rather than inventing a warning.
+
+This is an **inspection aid**, not a residue-quality score. A Rama8000
+classification, prediction confidence, local geometry and an official wwPDB
+annotation remain scientifically distinct observations.
+
 ## Compact multi-chain sequence map
 
 The overview directly under the Ramachandran plot shows every selected

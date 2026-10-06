@@ -110,7 +110,7 @@ if (inherits(gate, "error")) {
 }
 standard_gate <- tryCatch(
   ram_rama8000_wwpdb_summary(
-    standard, accession, min_coverage = 0.90, min_agreement = 0.99),
+    standard, accession, min_coverage = 0.90, min_agreement = 1.00),
   error = function(e) e
 )
 if (inherits(standard_gate, "error")) {

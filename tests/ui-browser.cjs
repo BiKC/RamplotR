@@ -638,8 +638,9 @@ const assert = require("node:assert/strict");
     assert.equal(pairState.layout,"grid");
     assert.ok(pairState.panel.includes("Rama8000"),
       "Aligned-pair inspector should expose the standard validation state.");
-    const compareHeaders = await page.$eval("#comparison thead th",
-      nodes => nodes.map(node => node.textContent.trim()));
+    const compareHeaders = await page.evaluate(() =>
+      Array.from(document.querySelectorAll("#comparison thead th"))
+        .map(node => node.textContent.trim()));
     assert.ok(compareHeaders.includes("Rama8000 A") &&
               compareHeaders.includes("Rama8000 B") &&
               compareHeaders.includes("Rama8000 changed"),

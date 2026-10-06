@@ -12,6 +12,10 @@ const puppeteer = require("puppeteer-core");
     ? line.slice(0,60) + " 87.00" + line.slice(66) : line).join("\n");
   const fixture = path.resolve(output,"synthetic-esmfold.pdb");
   fs.writeFileSync(fixture,pdb);
+  const pdbSeed2 = raw.split(/\r?\n/).map(line => line.startsWith("ATOM  ")
+    ? line.slice(0,60) + " 67.00" + line.slice(66) : line).join("\n");
+  const fixtureSeed2 = path.resolve(output,"synthetic-esmfold-seed2.pdb");
+  fs.writeFileSync(fixtureSeed2,pdbSeed2);
   const atomLines = pdb.split("\n").filter(line => line.startsWith("ATOM  "));
   const unique = [...new Set(atomLines.map(line =>
     line.slice(21,22) + "|" + line.slice(22,26).trim() + "|" +
@@ -167,6 +171,57 @@ const puppeteer = require("puppeteer-core");
       ".ram-confidence-metrics")?.textContent.includes("0.82"));
     await page.screenshot({path:path.join(output,"prediction-af3.png"),
       fullPage:true});
-    console.log("Live ESMFold, AlphaFold2 and AlphaFold3 prediction views passed.");
+
+    // Prediction ensemble: two separate model files, deliberately carrying
+    // different synthetic pLDDT values. This tests multi-file upload,
+    // aggregation, variability rendering and map -> residue selection.
+    await page.click('.nav-tabs a[data-value="summary"]');
+    await page.waitForSelector("#ram-ensemble-panel",{timeout:20000});
+    const ensemblePanel = await page.$("#ram-ensemble-panel");
+    if (!(await page.evaluate(el=>el.open,ensemblePanel)))
+      await page.click("#ram-ensemble-panel > summary");
+    await page.waitForSelector("#predictionEnsembleSource",{timeout:12000});
+    await page.select("#predictionEnsembleSource","esmfold");
+    const ensembleUpload = await page.$("#predictionEnsembleFiles");
+    await ensembleUpload.uploadFile(fixture,fixtureSeed2);
+    await page.waitForFunction(() => {
+      const input=document.getElementById("predictionEnsembleFiles");
+      return input && input.files && input.files.length===2;
+    },{timeout:10000});
+    await new Promise(done=>setTimeout(done,1200));
+    await page.click("#calculatePredictionEnsemble");
+    await page.waitForFunction(() => {
+      const panel=document.querySelector("#predictionEnsembleSummary");
+      return panel && panel.textContent.includes("2 models analysed") &&
+        document.querySelectorAll(".ram-ensemble-cell").length>20 &&
+        document.querySelectorAll("#predictionEnsembleRows tbody tr").length>0;
+    },{timeout:35000});
+    const ensembleState=await page.evaluate(() => {
+      const summary=document.querySelector("#predictionEnsembleSummary").textContent;
+      const rows=Array.from(document.querySelectorAll(
+        "#predictionEnsembleRows tbody tr"));
+      const first=rows[0] ? Array.from(rows[0].querySelectorAll("td"))
+        .map(td=>td.textContent.trim()) : [];
+      return {
+        summary,
+        cells:document.querySelectorAll(".ram-ensemble-cell").length,
+        first
+      };
+    });
+    const disagreement = ensembleState.summary.match(
+      /(\d+) residues with pLDDT SD ≥10/);
+    assert.ok(disagreement && Number(disagreement[1]) > 0,
+      "Synthetic 20-point pLDDT differences must produce a nonzero disagreement count.");
+    assert.ok(ensembleState.cells>20,
+      "Prediction ensemble variability map should cover the protein.");
+    await page.click(".ram-ensemble-cell");
+    await page.waitForFunction(() =>
+      document.querySelector("#selectedResidueInfo strong"),
+      {timeout:15000});
+    await page.screenshot({
+      path:path.join(output,"prediction-ensemble.png"),fullPage:true
+    });
+
+    console.log("Live ESMFold, AlphaFold2, AlphaFold3 and prediction-ensemble views passed.");
   } finally {await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

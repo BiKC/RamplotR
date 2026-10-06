@@ -16,7 +16,7 @@ RamplotR is an open-source R Shiny application that brings backbone geometry, a 
 | --- | --- |
 | **Explore a structure** | Interactive φ/ψ plots with several reference-density datasets, native RamplotR density regions and a parallel six-class Rama8000 standard validation that matches the current cctbx/Phenix categories. |
 | **Inspect residues in context** | Synchronized Ramachandran plot, searchable residue table, all-chain sequence navigator and NGL 3D viewer. The issue queue distinguishes Rama8000 outliers from native RamplotR `Not allowed` regions and missing angles. |
-| **Work with predicted models** | Import AlphaFold DB models by UniProt accession or upload AlphaFold 2/3, ColabFold and ESMFold structures. Examine pLDDT, and view a linked PAE heatmap when compatible confidence data are available. |
+| **Work with predicted models** | Import AlphaFold DB models or upload AlphaFold 2/3, ColabFold and ESMFold structures. Examine pLDDT/PAE and analyse multiple AF2/ColabFold or ESMFold seeds as a prediction ensemble with residue-level φ/ψ, Rama8000 and confidence agreement. |
 | **Examine structural geometry** | Explore peptide ω, side-chain χ1 and descriptive Cβ measurements. Optionally attach the matching deposited structure's official wwPDB validation report for independent rotamer, clash and geometry annotations. |
 | **Inspect experimental evidence** | Overlay a local CCP4/MRC cryo-EM map in the 3D viewer as a qualitative aid, without uploading the map to a separate service. |
 | **Compare models** | Sequence-align chains from two structures; use the Conformational Change Explorer to navigate residue-level wrapped φ/ψ displacement, then inspect paired residues in linked 2D/3D views alongside native and Rama8000 category changes. |
@@ -105,6 +105,7 @@ The default RamplotR teal contour palette provides consistent, recognisable publ
 - [AlphaFold, ColabFold and ESMFold confidence analysis](docs/prediction-confidence.md)
 - [Geometry, official wwPDB evidence, cryo-EM overlays, ensembles and batch mode](docs/structural-verification.md)
 - [Rama8000 standard validation and direct wwPDB comparison](docs/rama8000-validation.md)
+- [Prediction ensemble analysis](docs/prediction-ensembles.md)
 - [Independent wwPDB angle-validation protocol](docs/wwpdb-validation.md) · [Results](docs/validation-results.md)
 - [Performance and large-structure benchmarks](docs/benchmark-results.md) · [Scaling results](docs/scaling-results.md)
 - [Shinylive browser deployment and one.com caching](docs/shinylive-deployment.md)

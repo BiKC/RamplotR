@@ -1,90 +1,79 @@
 # Independent wwPDB Ramachandran validation
 
-RamplotR now supports residue-matched comparison against **official wwPDB
-validation XML**, separately from its existing independent Bio3D angle
-comparison. Unlike the synthetic unit-test fixtures, the public reports are
-independent reference assessments.
+RamplotR compares its calculations against official wwPDB validation XML using
+a pinned five-structure corpus. The workflow keeps three questions separate:
 
-## Important differences between methods
+1. are phi/psi angles calculated correctly?
+2. does RamplotR's Rama8000 implementation reproduce current standard
+   Favored/Allowed/Outlier categories?
+3. how do the optional native RamplotR density regions relate to the same
+   residues?
 
-RamplotR's existing density grids and four groups are General, GLY, PRO and
-preProline. Its four regions use cumulative-density contours of 85%, 98%
-and 99.95%. The legacy dataset descends from Lovell et al. (2003);
-other bundled datasets have separate provenance.
+Only the first two are scientific validation gates. Native density regions are
+reported independently and are never remapped into an artificial outlier class.
 
-wwPDB's MolProbity-derived validation uses three categories (Favored, Allowed,
-OUTLIER) and six backbone classes: general, Ile/Val, Gly, pre-Pro, trans-Pro
-and cis-Pro. MolProbity uses different underlying reference populations and
-density thresholds: favored about 98%, allowed/outlier approximately 99.95%.
-See https://doi.org/10.1107/S0907444909042073 and
-https://pmc.ncbi.nlm.nih.gov/articles/PMC5734394/.
+## Public reproducible corpus
 
-For a *descriptive* 3-way contingency table only, collapse RamplotR Favoured
-and Allowed into favored, Generously allowed into allowed, and Not allowed
-into outlier. This label crosswalk does NOT make the underlying methods
-scientifically interchangeable. Report disagreements by residue group, and
-do not assert MolProbity equivalence based on agreement percentages.
+The committed `validation/manifest.csv` identifies:
 
-## Public, reproducible corpus
+- 1CRN and 1UBQ — X-ray crystallography;
+- 6VXX — a large cryo-EM spike complex;
+- 2DQ4 — X-ray crystallography with seven official Ramachandran outliers;
+- 1D3Z — solution NMR, model 1.
 
-The committed `validation/manifest.csv` identifies 1CRN and 1UBQ
-(X-ray crystallography), 6VXX (cryo-EM viral spike complex), 2DQ4
-(a challenging crystallographic example with reported Ramachandran outliers),
-and 1D3Z (solution-NMR ensemble, model one). The dedicated
-CI job downloads each original RCSB mmCIF and the separately generated
-wwPDB validation XML. Each run preserves both source files, their SHA256
-hashes, exact download URLs, git commit and R package versions.
+The GitHub Actions workflow downloads each RCSB mmCIF and the corresponding
+official wwPDB validation XML. Every run preserves source files, SHA256 hashes,
+download URLs, git revision and R package versions.
 
-For every real structure the analysis produces:
+Residues are joined by model, chain, residue number, insertion code and residue
+identity. Alternate-conformation handling is conservative; ambiguous matches
+reduce coverage instead of being silently paired.
 
-- `residue_comparison.csv`: all residues, matched identifiers including chain
-  and insertion code, independent phi/psi comparisons and both class labels.
-- `group_contingency.csv`: all 3×3 class combinations per RamplotR group.
-- `summary.csv`: finite-angle coverage, maximum circular angular differences
-  and observed class agreement/disagreement counts.
-- `provenance.csv` and `r-session.txt`: exact input hashes and R environment.
+## Outputs
 
-The numerical gate requires at least 90% matching of RamplotR's finite
-phi/psi pairs and at most 1.5° absolute circular deviation. Genuine label
-differences across independent distribution families are RECORDED, not
-treated as failed tests. If source coordinates or reports are re-released,
-investigate provenance before changing tolerance thresholds.
+For each accession the workflow produces:
 
-Tests also include a plainly marked synthetic XML fixture with insertion
-codes, alternate conformations, ±180° angles, class disagreements and
-deliberate negative cases. This fixture tests parsing only and is not
-independent scientific validation.
+- `residue_comparison.csv`: independent angle comparison plus native
+  RamplotR regions;
+- `rama8000_comparison.csv`: direct Rama8000 versus wwPDB categories;
+- `rama8000_contingency.csv`: direct Favored/Allowed/Outlier contingency;
+- `summary.csv`: angle coverage and maximum circular differences;
+- `rama8000-summary.csv`: standard-validation coverage and category agreement;
+- `provenance.csv` and `r-session.txt`: exact source and software provenance.
+
+## Gates
+
+Angle validation requires at least 90% coverage of finite RamplotR phi/psi
+pairs and no circular difference above 1.5°. The pinned corpus currently has
+100% coverage and a maximum observed difference of 0.055°.
+
+Rama8000 validation requires **100% category agreement** with the official
+wwPDB report for the pinned corpus. On 6 October 2026 this is 3,718/3,718
+comparable residues.
+
+Source hashes and the quantitative snapshots are additionally checked by
+`tests/wwpdb-baseline.R`. A changed official source must be investigated and
+reviewed before any baseline is updated.
 
 ## Reproduce
-
-Run from the repository root with R installed:
 
 ~~~bash
 Rscript -e 'install.packages(c("bio3d", "xml2", "digest"))'
 Rscript tests/wwpdb.R
 Rscript benchmarks/compare_wwpdb.R 1CRN original benchmarks/output/wwpdb/1CRN
+Rscript tests/wwpdb-baseline.R 1CRN benchmarks/output/wwpdb/1CRN
 ~~~
 
-For exact replay, supply the downloaded compressed XML and mmCIF as fourth
-and fifth CLI arguments. The independent wwPDB GitHub Actions workflow
-runs all five samples. It stores full source and output artifacts for
-90 days. [Versioned baseline outputs](../validation/baseline-2026-09-28.csv),
-[exact source SHA256 hashes](../validation/baseline-source-hashes-2026-09-28.csv),
-and [independent outlier examples](../validation/2dq4-wwpdb-outlier-examples.csv)
-are pinned in the repository. Run `tests/wwpdb-baseline.R` against the
-reproduced results; it fails if source hashes, finite angles or class counts
-change without explicit review. Preserve exact source files and results in
-a versioned release or DOI-backed archive for publication.
-
-See the [initial independently measured five-structure results](validation-results.md),
-including the seven 2DQ4 wwPDB outliers not identified by the existing
-RamplotR original reference distributions.
+For exact replay, pass the pinned compressed XML and mmCIF as the fourth and
+fifth arguments to `benchmarks/compare_wwpdb.R`.
 
 ## Scope
 
-Only model 1 and unambiguous residue identities are compared. Alternate
-conformations, aliases, modified residues and missing atoms reduce
-comparable coverage rather than being silently declared matched.
-Comparative results are specific to the original RamplotR references.
-AlphaFold and ESMFold confidence provide complementary prediction evidence;
-they are not substitutes for independently measured experimental coordinates.
+The corpus is a functional validation set, not a population sample of the PDB.
+Only model 1 is used in the independent benchmark. This validates the current
+angle calculation and Rama8000 implementation; it does not make RamplotR a
+replacement for broader MolProbity/wwPDB validation of clashes, rotamers,
+covalent geometry or experimental data quality.
+
+See [the current results](validation-results.md) and
+[the Rama8000 implementation details](rama8000-validation.md).

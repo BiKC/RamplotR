@@ -134,6 +134,24 @@ ram_compare_torsions <- function(a, b) {
   result$delta_psi <- ram_angular_difference(result$psi_a, result$psi_b)
   result$class_changed <- !is.na(result$region_a) &
     !is.na(result$region_b) & result$region_a != result$region_b
+  if (all(c("rama8000_region","rama8000_group","rama8000_score") %in% names(a)) &&
+      all(c("rama8000_region","rama8000_group","rama8000_score") %in% names(b))) {
+    result$rama8000_region_a <- value(
+      a, pairing$index_a, "rama8000_region", NA_character_)
+    result$rama8000_region_b <- value(
+      b, pairing$index_b, "rama8000_region", NA_character_)
+    result$rama8000_group_a <- value(
+      a, pairing$index_a, "rama8000_group", NA_character_)
+    result$rama8000_group_b <- value(
+      b, pairing$index_b, "rama8000_group", NA_character_)
+    result$rama8000_score_a <- value(
+      a, pairing$index_a, "rama8000_score", NA_real_)
+    result$rama8000_score_b <- value(
+      b, pairing$index_b, "rama8000_score", NA_real_)
+    result$rama8000_changed <- !is.na(result$rama8000_region_a) &
+      !is.na(result$rama8000_region_b) &
+      result$rama8000_region_a != result$rama8000_region_b
+  }
   result$alignment <- ifelse(is.na(pairing$index_a), "Insertion",
                       ifelse(is.na(pairing$index_b), "Deletion",
                       ifelse(result$amino_a == result$amino_b,

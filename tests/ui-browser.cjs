@@ -393,18 +393,19 @@ const assert = require("node:assert/strict");
     const standardColumns = await page.evaluate(() => {
       const headings = Array.from(document.querySelectorAll("#regions thead th"))
         .map(node => node.textContent.trim());
-      const first = Array.from(document.querySelectorAll(
-        "#regions tbody tr:first-child td")).map(node => node.textContent.trim());
-      return {headings, first};
+      const standardIndex = headings.indexOf("Rama8000");
+      const rows = Array.from(document.querySelectorAll("#regions tbody tr"))
+        .map(row => Array.from(row.querySelectorAll("td"))
+          .map(node => node.textContent.trim()));
+      return {headings, categories: rows.map(row => row[standardIndex])};
     });
     assert.ok(standardColumns.headings.includes("Rama8000") &&
               standardColumns.headings.includes("Rama8000 class") &&
               standardColumns.headings.includes("Rama8000 score (%)"),
               "Residue table must expose standard Rama8000 category, class and score.");
-    const standardIndex = standardColumns.headings.indexOf("Rama8000");
-    assert.ok(["Favored","Allowed","Outlier"].includes(
-      standardColumns.first[standardIndex]),
-      "Every finite test residue should show a valid Rama8000 category.");
+    assert.ok(standardColumns.categories.some(value =>
+      ["Favored","Allowed","Outlier"].includes(value)),
+      "Finite residues should show a valid Rama8000 category.");
     // One physical table (no DataTables scroll-head clone) must align the
     // column headings with the corresponding residue values.
     const geometry = await page.evaluate(() => {

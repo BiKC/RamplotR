@@ -1903,7 +1903,9 @@ server <- function(input, output, session) {
             downloadButton("downloadPredictionEnsemble",
               "Export prediction ensemble CSV"),
             downloadButton("downloadPredictionEnsembleModels",
-              "Export model summary CSV")
+              "Export model summary CSV"),
+            downloadButton("downloadPredictionEnsembleReport",
+              "HTML ensemble report")
           )
         )
       )
@@ -2305,6 +2307,20 @@ server <- function(input, output, session) {
         models$coordinate_md5 <- provenance$coordinate_md5
       }
       utils::write.csv(models,file,row.names=FALSE,na="")
+    }
+  )
+  output$downloadPredictionEnsembleReport <- downloadHandler(
+    filename=function() safe_filename("prediction-ensemble-report.html"),
+    content=function(file) {
+      structure <- req(loaded())
+      result <- req(prediction_ensemble_matches())
+      ram_save_prediction_ensemble_report(file,result,list(
+        structure=structure$name,
+        reference_set=input$bgtype,
+        displayed_background=input$background,
+        ramplotr_classification=input$validationMode,
+        loaded_prediction_source=structure$declared_source
+      ))
     }
   )
 

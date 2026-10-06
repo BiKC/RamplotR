@@ -1244,3 +1244,15 @@ body > .container-fluid { max-width: none; padding: 0; }
   border-radius:999px; padding:4px 8px; font-size:9px; font-weight:700; cursor:pointer; }
 .ram-change-top-item:hover,.ram-change-top-item:focus-visible {
   background:#eaf5f2; border-color:#7eb7ae; }
+
+.ram-counterpart-panel { margin-top:14px; padding-top:12px;
+  border-top:1px solid #dbe8e5; }
+.ram-counterpart-controls { display:grid;
+  grid-template-columns:minmax(190px,260px) auto; gap:8px 10px;
+  align-items:end; margin:8px 0 9px; }
+.ram-counterpart-controls .form-group { margin-bottom:0; }
+.ram-counterpart-panel .dataTables_wrapper { margin:8px 0; }
+.ram-counterpart-panel .btn-primary { margin-top:3px; }
+@media(max-width:680px) {
+  .ram-counterpart-controls { grid-template-columns:1fr; }
+}

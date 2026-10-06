@@ -1830,11 +1830,13 @@ server <- function(input, output, session) {
     withProgress(message="Analysing compatible ensemble models",value=0.2,{
       result <- tryCatch(
         ram_ensemble_analyze(structure$pdb,max_models=min(30L,structure$nmodels),
-          classifier=function(torsions)
-            ram_classify_torsions(torsions,
+          classifier=function(torsions) {
+            classified <- ram_classify_torsions(torsions,
               reference_dir=file.path("static",input$bgtype),
               selected_reference=plot_reference(),mode=input$validationMode,
-              threshold_fn=ram_density_thresholds)),
+              threshold_fn=ram_density_thresholds)
+            ram_rama8000_classify(classified,file.path("static","rama8000"))
+          }),
         error=function(e) {
           showNotification(conditionMessage(e),type="error",duration=12)
           NULL
@@ -1899,6 +1901,252 @@ server <- function(input, output, session) {
     filename=function() safe_filename("ensemble.csv"),
     content=function(file) utils::write.csv(req(ensemble_matches())$summary,
                                                file,row.names=FALSE,na="")
+  )
+
+  prediction_ensemble_matches <- reactive({
+    value <- prediction_ensemble_results()
+    if(is.null(value)) return(NULL)
+    structure <- req(loaded())
+    if(!identical(value$key,structure$key) ||
+       !identical(value$mode,input$validationMode) ||
+       !identical(value$reference,input$bgtype) ||
+       !identical(value$background,input$background)) return(NULL)
+    value$result
+  })
+
+  observeEvent(loaded(), {
+    prediction_ensemble_results(NULL)
+  }, ignoreInit=TRUE)
+
+  observeEvent(input$calculatePredictionEnsemble, {
+    structure <- req(loaded())
+    source <- req(input$predictionEnsembleSource)
+    permitted <- c("alphafold2","esmfold","other_prediction")
+    if(!source %in% permitted) return()
+
+    uploaded <- input$predictionEnsembleFiles
+    include_loaded <- isTRUE(input$includeLoadedPrediction) &&
+      !identical(structure$declared_source,"alphafold3")
+    source_loaded <- if(identical(structure$declared_source,"alphafold_db"))
+      "alphafold2" else structure$declared_source
+
+    if(include_loaded && !identical(source_loaded,source)) {
+      showNotification(
+        paste0("The loaded model is declared as ",source_loaded,
+          " but the ensemble is configured as ",source,
+          ". Choose the matching model type or exclude the loaded model."),
+        type="error",duration=14)
+      return()
+    }
+
+    file_count <- if(is.null(uploaded)) 0L else nrow(uploaded)
+    if(file_count + as.integer(include_loaded) < 2L) {
+      showNotification(
+        "A prediction ensemble needs at least two models. Upload another model or include the loaded prediction.",
+        type="warning",duration=12)
+      return()
+    }
+
+    withProgress(message="Analysing prediction ensemble",value=0.05,{
+      pdbs <- list()
+      labels <- character()
+
+      if(include_loaded) {
+        pdbs[[length(pdbs)+1L]] <- structure$pdb
+        labels <- c(labels,structure$name)
+      }
+
+      if(file_count) {
+        for(i in seq_len(file_count)) {
+          incProgress(0.35/max(1L,file_count),
+            detail=paste("Loading",uploaded$name[[i]]))
+          model <- tryCatch(
+            ram_load_structure(
+              path=uploaded$datapath[[i]],
+              original_name=uploaded$name[[i]]
+            ),
+            error=function(e) e
+          )
+          if(inherits(model,"error")) {
+            showNotification(
+              paste(uploaded$name[[i]],conditionMessage(model),sep=": "),
+              type="error",duration=14)
+            return()
+          }
+          if(ram_model_count(model)!=1L) {
+            showNotification(
+              paste(uploaded$name[[i]],
+                "contains multiple structural models. Prediction-ensemble uploads must contain one model per file."),
+              type="error",duration=14)
+            return()
+          }
+          pdbs[[length(pdbs)+1L]] <- model
+          labels <- c(labels,
+            tools::file_path_sans_ext(basename(uploaded$name[[i]])))
+        }
+      }
+
+      result <- tryCatch(
+        ram_prediction_ensemble_analyze(
+          pdbs,source=source,labels=labels,max_models=30L,
+          classifier=function(torsions) {
+            classified <- ram_classify_torsions(
+              torsions,
+              reference_dir=file.path("static",input$bgtype),
+              selected_reference=plot_reference(),
+              mode=input$validationMode,
+              threshold_fn=ram_density_thresholds
+            )
+            ram_rama8000_classify(
+              classified,file.path("static","rama8000"))
+          }
+        ),
+        error=function(e) {
+          showNotification(conditionMessage(e),type="error",duration=14)
+          NULL
+        }
+      )
+      if(is.null(result)) return()
+      prediction_ensemble_results(list(
+        key=structure$key,mode=input$validationMode,
+        reference=input$bgtype,background=input$background,
+        result=result
+      ))
+      incProgress(0.6,detail="Summarising model agreement")
+    })
+  },ignoreInit=TRUE)
+
+  output$predictionEnsembleSummary <- renderUI({
+    result <- prediction_ensemble_matches()
+    if(is.null(result)) return(tags$p(class="ram-field-hint",
+      "Upload at least two compatible prediction models and run the ensemble analysis."))
+    data <- result$summary
+    standard_changes <- if("rama8000_changes" %in% names(data))
+      sum(data$rama8000_changes,na.rm=TRUE) else 0L
+    angular_variable <- sum(
+      pmax(data$phi_sd,data$psi_sd,na.rm=TRUE)>=20,na.rm=TRUE)
+    confidence_variable <- if("plddt_sd" %in% names(data))
+      sum(is.finite(data$plddt_sd) & data$plddt_sd>=10) else 0L
+    tags$div(
+      tags$div(class="ram-confidence-metrics",
+        tags$span(class="ram-confidence-metric",
+          sprintf("%s models analysed",result$analyzed_models)),
+        tags$span(class="ram-confidence-metric",
+          sprintf("%s residues present in every model",result$common_residues)),
+        tags$span(class="ram-confidence-metric",
+          sprintf("%s residues with Rama8000 disagreement",standard_changes)),
+        tags$span(class="ram-confidence-metric",
+          sprintf("%s residues with ≥20° angular SD",angular_variable)),
+        tags$span(class="ram-confidence-metric",
+          sprintf("%s residues with pLDDT SD ≥10",confidence_variable))
+      ),
+      tags$p(class="ram-confidence-explainer",
+        "These values quantify disagreement among prediction models/seeds. They do not demonstrate molecular motion or experimental conformational heterogeneity."),
+      if(result$limited)
+        tags$p(class="ram-confidence-warning",
+          "Only the first 30 models were analysed.")
+    )
+  })
+
+  output$predictionEnsembleTrack <- renderUI({
+    result <- prediction_ensemble_matches()
+    if(is.null(result) || !nrow(result$summary)) return(NULL)
+    data <- result$summary
+    spread <- pmax(data$phi_sd,data$psi_sd,na.rm=TRUE)
+    spread[!is.finite(data$phi_sd) & !is.finite(data$psi_sd)] <- NA_real_
+    band <- ifelse(!is.finite(spread),"unavailable",
+      ifelse(spread<5,"stable",
+        ifelse(spread<15,"moderate",
+          ifelse(spread<30,"variable","high"))))
+    cells <- lapply(seq_len(nrow(data)),function(i) {
+      label <- paste0(data$resn[[i]]," ",data$chain[[i]],":",
+        data$resi[[i]],data$insertion_code[[i]])
+      standard <- if("rama8000_changes" %in% names(data) &&
+                     isTRUE(data$rama8000_changes[[i]]))
+        " · Rama8000 category differs across models" else ""
+      tags$button(type="button",
+        class=paste("ram-ensemble-cell",
+          paste0("ram-ensemble-",band[[i]]),
+          if(nzchar(standard)) "has-standard-change" else ""),
+        "data-chain"=data$chain[[i]],
+        "data-resi"=data$resi[[i]],
+        "data-insertion"=data$insertion_code[[i]],
+        title=paste0(label," · angular SD ",
+          if(is.finite(spread[[i]])) sprintf("%.1f°",spread[[i]]) else "N/A",
+          if("plddt_mean" %in% names(data) && is.finite(data$plddt_mean[[i]]))
+            sprintf(" · mean pLDDT %.1f",data$plddt_mean[[i]]) else "",
+          standard),
+        "aria-label"=paste("Inspect",label,"from prediction ensemble")
+      )
+    })
+    tags$section(class="ram-ensemble-track-panel",
+      tags$div(class="ram-ensemble-track-head",
+        tags$strong("Prediction variability map"),
+        tags$span("max circular SD of φ or ψ per residue")
+      ),
+      tags$div(class="ram-ensemble-track",role="group",
+        "aria-label"="Prediction ensemble residue variability",cells),
+      tags$div(class="ram-ensemble-track-legend",
+        tags$span(class="ram-ensemble-stable","<5°"),
+        tags$span(class="ram-ensemble-moderate","5–15°"),
+        tags$span(class="ram-ensemble-variable","15–30°"),
+        tags$span(class="ram-ensemble-high","≥30°"),
+        tags$span(class="ram-ensemble-standard-mark",
+          "outline = Rama8000 disagreement"))
+    )
+  })
+
+  output$predictionEnsembleRows <- DT::renderDT({
+    result <- prediction_ensemble_matches()
+    req(result)
+    data <- result$summary
+    if(!nrow(data)) return(DT::datatable(data,rownames=FALSE))
+    fields <- c("chain","resi","insertion_code","resn","models_present",
+      "phi_sd","psi_sd","rama8000_mode","rama8000_consistency",
+      "plddt_mean","plddt_sd","plddt_min","plddt_max")
+    fields <- fields[fields %in% names(data)]
+    shown <- data[,fields,drop=FALSE]
+    for(field in intersect(c("phi_sd","psi_sd","plddt_mean","plddt_sd",
+                             "plddt_min","plddt_max"),names(shown)))
+      shown[[field]] <- round(shown[[field]],1L)
+    if("rama8000_consistency" %in% names(shown))
+      shown$rama8000_consistency <- round(100*shown$rama8000_consistency,1L)
+    names(shown) <- c(
+      chain="Chain",resi="Residue",insertion_code="Ins.",resn="AA",
+      models_present="Models",phi_sd="φ SD (°)",psi_sd="ψ SD (°)",
+      rama8000_mode="Rama8000 mode",
+      rama8000_consistency="Rama8000 agreement (%)",
+      plddt_mean="pLDDT mean",plddt_sd="pLDDT SD",
+      plddt_min="pLDDT min",plddt_max="pLDDT max"
+    )[names(shown)]
+    DT::datatable(shown,rownames=FALSE,selection="single",
+      options=list(pageLength=12,scrollX=TRUE,autoWidth=FALSE,dom="ftip"),
+      class="compact stripe hover")
+  },server=FALSE)
+
+  observeEvent(input$predictionEnsembleRows_rows_selected, {
+    data <- req(prediction_ensemble_matches())$summary
+    ix <- input$predictionEnsembleRows_rows_selected[[1L]]
+    if(!length(ix) || !is.finite(ix) || ix<1L || ix>nrow(data)) return()
+    row <- data[ix,,drop=FALSE]
+    select_from(list(chain=as.character(row$chain[[1L]]),
+      resi=as.integer(row$resi[[1L]]),
+      insertion_code=as.character(row$insertion_code[[1L]])))
+  })
+
+  observeEvent(input$ramPredictionEnsemblePick, {
+    select_from(input$ramPredictionEnsemblePick)
+  },ignoreInit=TRUE)
+
+  output$downloadPredictionEnsemble <- downloadHandler(
+    filename=function() safe_filename("prediction-ensemble-residues.csv"),
+    content=function(file) utils::write.csv(
+      req(prediction_ensemble_matches())$summary,file,row.names=FALSE,na="")
+  )
+  output$downloadPredictionEnsembleModels <- downloadHandler(
+    filename=function() safe_filename("prediction-ensemble-models.csv"),
+    content=function(file) utils::write.csv(
+      req(prediction_ensemble_matches())$model_summary,file,row.names=FALSE,na="")
   )
 
   output$summary <- renderUI({

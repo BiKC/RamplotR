@@ -39,6 +39,7 @@ jobs:
       - name: Test browser message handler and source selection
         run: |
           node --check shinyRam/www/custom.js
+          node --check shinyRam/www/experimental-search.js
           node --check shinyRam/www/compare.js
           node --check shinyRam/www/prediction.js
           node tests/compare-ui.test.cjs

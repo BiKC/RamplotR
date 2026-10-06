@@ -526,7 +526,9 @@ ui <- fluidPage(
                 tags$div(class = "ram-table-toolbar",
                   selectInput("compareFilter", "Show comparison",
                     choices = c("All aligned residues" = "All",
-                      "Changed classification" = "changed",
+                      "Changed RamplotR region" = "changed",
+                      "Changed Rama8000 category" = "standard_changed",
+                      "Rama8000 outlier in either structure" = "standard_outlier",
                       "Angle difference ≥ 30°" = "large",
                       "Insertions / deletions" = "gaps"), selected = "All"),
                   downloadButton("downloadComparison", "Export comparison CSV")
@@ -1351,16 +1353,20 @@ server <- function(input, output, session) {
       return(NULL)
     data <- classified()
     if (!"plddt" %in% names(data)) return(NULL)
-    high_outliers <- sum(is.finite(data$plddt) & data$plddt >= 90 &
+    high_standard_outliers <- sum(is.finite(data$plddt) & data$plddt >= 90 &
+      !is.na(data$rama8000_region) & data$rama8000_region == "Outlier")
+    high_not_allowed <- sum(is.finite(data$plddt) & data$plddt >= 90 &
       !is.na(data$region) & data$region == "Not allowed")
     lower_inrange <- sum(is.finite(data$plddt) & data$plddt < 70 &
-      !is.na(data$region) & data$region != "Not allowed")
+      !is.na(data$rama8000_region) & data$rama8000_region != "Outlier")
     tagList(
-      tags$span(class = if (high_outliers > 0L)
+      tags$span(class = if (high_standard_outliers > 0L)
         "ram-confidence-metric ram-review-high" else "ram-confidence-metric",
-        paste(high_outliers, "high-confidence Ramachandran outliers")),
+        paste(high_standard_outliers, "high-confidence Rama8000 outliers")),
       tags$span(class = "ram-confidence-metric",
-        paste(lower_inrange, "lower-confidence residues with in-range geometry"))
+        paste(high_not_allowed, "high-confidence RamplotR Not allowed")),
+      tags$span(class = "ram-confidence-metric",
+        paste(lower_inrange, "lower-confidence residues without a Rama8000 outlier"))
     )
   })
   observe({
@@ -1399,6 +1405,8 @@ server <- function(input, output, session) {
       selected_reference=plot_reference(),
       mode=input$validationMode,
       threshold_fn=ram_density_thresholds)
+    secondary <- ram_rama8000_classify(
+      secondary, file.path("static", "rama8000"))
     secondary <- secondary[secondary$chain == input$compareChainB, , drop=FALSE]
     if (!nrow(original) || !nrow(secondary))
       return(data.frame())
@@ -1498,6 +1506,14 @@ server <- function(input, output, session) {
     criterion <- input$compareFilter
     if (identical(criterion, "changed"))
       result <- result[result$class_changed, , drop=FALSE]
+    else if (identical(criterion, "standard_changed") &&
+             "rama8000_changed" %in% names(result))
+      result <- result[result$rama8000_changed, , drop=FALSE]
+    else if (identical(criterion, "standard_outlier") &&
+             all(c("rama8000_region_a","rama8000_region_b") %in% names(result)))
+      result <- result[
+        result$rama8000_region_a == "Outlier" |
+        result$rama8000_region_b == "Outlier", , drop=FALSE]
     else if (identical(criterion, "large"))
       result <- result[(!is.na(result$delta_phi) & abs(result$delta_phi)>=30) |
                        (!is.na(result$delta_psi) & abs(result$delta_psi)>=30),
@@ -1511,9 +1527,17 @@ server <- function(input, output, session) {
     result <- req(comparison_data())
     if (!nrow(result)) return(tags$p("Select two nonempty protein chains."))
     aligned <- result$alignment %in% c("Match", "Substitution")
+    standard_changes <- if ("rama8000_changed" %in% names(result))
+      sum(result$rama8000_changed, na.rm=TRUE) else 0L
+    standard_outliers <- if (all(c("rama8000_region_a","rama8000_region_b") %in%
+                                 names(result)))
+      sum(result$rama8000_region_a == "Outlier" |
+          result$rama8000_region_b == "Outlier", na.rm=TRUE) else 0L
     tags$div(class="ram-compare-metrics",
       tags$span(tags$strong(sum(aligned)), " aligned residues"),
-      tags$span(tags$strong(sum(result$class_changed)), " region changes"),
+      tags$span(tags$strong(sum(result$class_changed)), " RamplotR region changes"),
+      tags$span(tags$strong(standard_changes), " Rama8000 category changes"),
+      tags$span(tags$strong(standard_outliers), " pairs with a Rama8000 outlier"),
       tags$span(tags$strong(sum(!aligned)), " insertions / deletions"),
       tags$span("Angular differences account for the -180° / +180° boundary.")
     )
@@ -1522,7 +1546,9 @@ server <- function(input, output, session) {
     result <- filtered_comparison()
     fields <- c("chain_a", "residue_a", "insertion_a", "amino_a",
       "chain_b", "residue_b", "insertion_b", "amino_b",
-      "delta_phi", "delta_psi", "class_changed", "alignment")
+      "delta_phi", "delta_psi", "class_changed",
+      "rama8000_region_a", "rama8000_region_b", "rama8000_changed",
+      "alignment")
     if (!all(fields %in% names(result)))
       return(DT::datatable(data.frame()))
     shown <- result[, fields, drop=FALSE]
@@ -1533,12 +1559,15 @@ server <- function(input, output, session) {
     shown$delta_phi <- round(shown$delta_phi, 1)
     shown$delta_psi <- round(shown$delta_psi, 1)
     shown$class_changed <- ifelse(shown$class_changed, "Yes", "No")
+    shown$rama8000_changed <- ifelse(shown$rama8000_changed, "Yes", "No")
     shown <- shown[, c("chain_a", "pos_a", "amino_a",
       "chain_b", "pos_b", "amino_b", "delta_phi", "delta_psi",
-      "class_changed", "alignment"), drop=FALSE]
+      "class_changed", "rama8000_region_a", "rama8000_region_b",
+      "rama8000_changed", "alignment"), drop=FALSE]
     DT::datatable(shown, rownames=FALSE,
       colnames=c("Chain A", "Pos A", "AA A", "Chain B", "Pos B", "AA B",
-                 "Δφ (°)", "Δψ (°)", "Region changed", "Alignment"),
+                 "Δφ (°)", "Δψ (°)", "RamplotR changed",
+                 "Rama8000 A", "Rama8000 B", "Rama8000 changed", "Alignment"),
       selection="single",
       options=list(pageLength=15,scrollX=FALSE,autoWidth=FALSE,dom="ftip"),
       class="compact stripe hover")
@@ -1614,7 +1643,14 @@ server <- function(input, output, session) {
         tags$span(paste("Δψ",angle(row$delta_psi[[1L]]))),
         tags$span(row$alignment[[1L]]),
         if (isTRUE(row$class_changed[[1L]])) tags$span(
-          class="ram-compare-change", "Classification changed")
+          class="ram-compare-change", "RamplotR region changed"),
+        if ("rama8000_region_a" %in% names(row) &&
+            !is.na(row$rama8000_region_a[[1L]]))
+          tags$span(sprintf("Rama8000 %s → %s",
+            row$rama8000_region_a[[1L]], row$rama8000_region_b[[1L]])),
+        if ("rama8000_changed" %in% names(row) &&
+            isTRUE(row$rama8000_changed[[1L]]))
+          tags$span(class="ram-compare-change", "Standard category changed")
       )
     )
   })

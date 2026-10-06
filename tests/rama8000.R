@@ -32,8 +32,11 @@ for(i in seq_len(nrow(cases))) {
   observed[[i]] <- 100 * ram_rama8000_score_one(
     table,cases$phi[[i]],cases$psi[[i]])
 }
-assert(max(abs(observed-cases$score_pct)) < 0.015,
-       paste("Rama8000 interpolation differs from cctbx:",
+# cctbx's regression text prints phi/psi to two decimals but calculates its
+# score from the unrounded coordinates, so the printed percentage is only a
+# display-level check. Category identity is tested exactly below.
+assert(max(abs(observed-cases$score_pct)) < 0.05,
+       paste("Rama8000 score differs unexpectedly from cctbx display output:",
              paste(round(observed,3),collapse=", ")))
 regions <- ram_rama8000_region(observed/100,cases$group)
 assert(identical(regions,cases$region),
@@ -41,6 +44,14 @@ assert(identical(regions,cases$region),
 
 # Periodic angle handling must match at the -180/180 boundary.
 general <- ram_rama8000_table(dir,"general")
+# Odd-numbered grid coordinates must reproduce their source table value
+# exactly; this directly checks table orientation and coordinate indexing.
+grid_phi <- -179 + 2 * (10L - 1L)
+grid_psi <- -179 + 2 * (20L - 1L)
+assert(isTRUE(all.equal(
+  ram_rama8000_score_one(general,grid_phi,grid_psi),
+  general[10L,20L], tolerance=1e-15)),
+  "Rama8000 grid orientation/indexing changed")
 a <- ram_rama8000_score_one(general,181,-179)
 b <- ram_rama8000_score_one(general,-179,-179)
 assert(isTRUE(all.equal(a,b,tolerance=1e-12)),

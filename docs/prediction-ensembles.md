@@ -88,6 +88,13 @@ The model summary records:
 The two downloadable CSV files therefore preserve both residue-level ensemble
 results and model-level provenance.
 
+The **HTML ensemble report** packages the same information into a standalone
+research record: overview metrics, model labels and coordinate hashes, the 25
+largest local backbone-variability positions, all residue-level ensemble
+statistics and the analysis settings used for the run. The report repeats the
+interpretation warning that prediction disagreement is not experimental
+evidence of molecular dynamics.
+
 ## Interpretation
 
 A useful pattern is a residue with:

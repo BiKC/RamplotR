@@ -277,6 +277,17 @@
     if (!selected) lastSequenceScrollKey = "";
   }
 
+  document.addEventListener("click", function (event) {
+    const target = event.target && event.target.closest &&
+      event.target.closest(".ram-change-pick");
+    if (!target) return;
+    const rowId = Number(target.dataset.rowId);
+    if (!Number.isInteger(rowId)) return;
+    if (window.Shiny && window.Shiny.setInputValue)
+      window.Shiny.setInputValue("ramCompareTrackPick", rowId,
+        { priority: "event" });
+  });
+
   function changeCompareSource() {
     const selected = document.querySelector('input[name="compareInputSource"]:checked');
     const upload = selected && selected.value === "upload";

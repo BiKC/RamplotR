@@ -34,6 +34,7 @@ source(file.path("R", "predictions.R"), local = TRUE)
 source(file.path("R", "geometry.R"), local = TRUE)
 source(file.path("R", "experimental.R"), local = TRUE)
 source(file.path("R", "ensemble.R"), local = TRUE)
+source(file.path("R", "group-comparison.R"), local = TRUE)
 
 # Chain colours and contour colours are designed together for a recognisable
 # RamplotR publication identity. Region meaning is encoded by ordered contrast,

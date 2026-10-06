@@ -300,12 +300,12 @@ ram_save_prediction_ensemble_report <- function(path, result, metadata=list(),
   doc <- htmltools::tags$html(
     htmltools::tags$head(
       htmltools::tags$meta(charset="UTF-8"),
-      htmltools::tags$title("RamplotR prediction ensemble"),
+      htmltools::tags$title("RamplotR Prediction ensemble"),
       htmltools::tags$style(htmltools::HTML(
         "body{font:15px system-ui,sans-serif;margin:3em auto;max-width:1180px;color:#18323b}h1,h2{color:#146a70}.lead,.note{color:#516b74;line-height:1.55}.warning{padding:12px 14px;border-left:4px solid #c36b4f;background:#fff5ee}.metrics{display:flex;gap:10px;flex-wrap:wrap}.metric{border:1px solid #dbe7e5;border-radius:8px;padding:8px 11px;min-width:145px;background:#f8fbfa}.metric span{display:block;color:#657c82;font-size:12px}.metric strong{font-size:20px;color:#164f57}.table-wrap{overflow-x:auto}table{border-collapse:collapse;width:100%}th,td{padding:6px 10px;border-bottom:1px solid #dbe6e6;text-align:left;white-space:nowrap}th{background:#eef6f4}section{margin:2em 0}"))
     ),
     htmltools::tags$body(
-      htmltools::tags$h1("RamplotR prediction ensemble"),
+      htmltools::tags$h1("RamplotR Prediction ensemble"),
       htmltools::tags$p(class="lead",
         "Residue-level agreement across independently generated prediction models/seeds."),
       htmltools::tags$p(class="warning",

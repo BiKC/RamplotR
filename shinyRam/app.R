@@ -550,7 +550,51 @@ ui <- fluidPage(
                 ),
                 tags$p(class = "ram-table-hint",
                   "Select a row to highlight its corresponding residues in both 3D structures and the angle plot."),
-                tags$div(class = "ram-residue-table", DT::DTOutput("comparison"))
+                tags$div(class = "ram-residue-table", DT::DTOutput("comparison")),
+                tags$details(id="ram-group-comparison-panel",
+                  class="ram-details ram-group-comparison-panel",
+                  tags$summary("Compare groups of structures"),
+                  tags$p(class="ram-field-hint",
+                    "Compare repeated structural states such as apo vs holo, WT vs mutant, or experimental vs predicted sets. Structures are sequence-aligned to one reference chain before circular φ/ψ summaries are calculated."),
+                  tags$div(class="ram-group-compare-controls",
+                    selectInput("groupReferenceChain","Reference chain",
+                      choices=character(),selectize=FALSE),
+                    numericInput("groupMinIdentity","Minimum chain identity (%)",
+                      value=70,min=20,max=100,step=5),
+                    numericInput("groupMinCoverage","Minimum reference coverage (%)",
+                      value=70,min=20,max=100,step=5)
+                  ),
+                  tags$div(class="ram-group-upload-grid",
+                    tags$section(class="ram-group-upload-card",
+                      textInput("groupALabel","Group A label",value="Group A"),
+                      checkboxInput("groupIncludeLoadedA",
+                        "Include loaded structure in Group A",value=TRUE),
+                      fileInput("groupAFiles","Additional Group A structures",
+                        multiple=TRUE,
+                        accept=c(".pdb",".ent",".cif",".mmcif",".mcif"))
+                    ),
+                    tags$section(class="ram-group-upload-card",
+                      textInput("groupBLabel","Group B label",value="Group B"),
+                      fileInput("groupBFiles","Group B structures",
+                        multiple=TRUE,
+                        accept=c(".pdb",".ent",".cif",".mmcif",".mcif"))
+                    )
+                  ),
+                  tags$p(class="ram-field-hint",
+                    "Each uploaded file contributes model 1. Best-matching protein chains are selected automatically using the identity and reference-coverage thresholds above."),
+                  actionButton("runGroupComparison","Analyse groups",
+                    class="btn-primary btn-sm"),
+                  uiOutput("groupComparisonSummary"),
+                  uiOutput("groupComparisonTrack"),
+                  tags$div(class="ram-residue-table",
+                    DT::DTOutput("groupComparisonRows")),
+                  tags$div(class="ram-ensemble-actions",
+                    downloadButton("downloadGroupComparison",
+                      "Export residue comparison CSV"),
+                    downloadButton("downloadGroupMembers",
+                      "Export matched structure/chain CSV")
+                  )
+                )
               )
             ),
             tabPanel(
@@ -607,6 +651,7 @@ server <- function(input, output, session) {
   external_validation <- reactiveVal(NULL)
   ensemble_results <- reactiveVal(NULL)
   prediction_ensemble_results <- reactiveVal(NULL)
+  group_comparison_results <- reactiveVal(NULL)
   selected_residue <- reactiveVal(NULL)
   selected_comparison <- reactiveVal(NULL)
   viewer_ready <- reactiveVal(FALSE)

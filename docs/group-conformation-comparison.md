@@ -1,0 +1,115 @@
+# Structure-group conformational comparison
+
+RamplotR can compare two **sets** of related protein structures at residue level.
+Typical examples include apo versus ligand-bound structures, wild type versus
+mutants, or experimental versus predicted model sets.
+
+The analysis is deliberately conformation-centred. It compares circular
+backbone phi/psi distributions after sequence alignment instead of reducing
+each structure pair to a single Cartesian RMSD.
+
+## Workflow
+
+1. Load a representative structure in RamplotR.
+2. Open **Compare** and expand **Compare groups of structures**.
+3. Select the protein chain that defines the reference residue coordinate
+   system.
+4. Define Group A and Group B labels.
+5. Optionally include the currently loaded structure in Group A.
+6. Upload one or more PDB/mmCIF files for each group.
+7. Run **Analyse groups**.
+
+Each uploaded file contributes model 1. RamplotR chooses the best matching
+protein chain independently for every file using sequence identity and
+reference-chain coverage. The default acceptance thresholds are 70% identity
+and 70% reference coverage; both can be changed before analysis.
+
+## Residue-level calculations
+
+Every accepted candidate chain is globally sequence-aligned to the selected
+reference chain. Candidate phi/psi values are then represented on the reference
+residue coordinate system. Insertions without a reference residue are not
+invented as comparable positions.
+
+For each residue and each group RamplotR calculates:
+
+- number of models contributing phi and psi;
+- circular mean phi and psi;
+- circular standard deviation of phi and psi;
+- modal Rama8000 category and its within-group consistency.
+
+The between-group effect is reported as wrapped differences between the two
+circular means:
+
+```
+delta_phi = wrap(phi_mean_B - phi_mean_A)
+delta_psi = wrap(psi_mean_B - psi_mean_A)
+backbone_shift = sqrt(delta_phi^2 + delta_psi^2)
+```
+
+Wrapping is performed independently across the -180/180-degree boundary.
+
+The combined backbone shift is a **navigation effect size**, not a statistical
+significance score and not a Cartesian distance.
+
+## Consistent-shift marker
+
+A residue is highlighted as a low-dispersion consistent shift when:
+
+- both groups contribute at least two finite phi and psi observations;
+- the between-group combined shift is at least 30 degrees; and
+- the largest within-group circular SD across phi and psi is at most 15
+  degrees.
+
+These thresholds intentionally identify residues worth inspecting. They do not
+establish a biological effect or a p-value. The exact group means, angular
+differences and within-group dispersion remain visible in the table.
+
+A second marker indicates when the modal Rama8000 category differs between the
+two groups.
+
+## Interpretation
+
+Group-level conformational differences can reflect genuine structural states,
+but can also arise from:
+
+- ligands or cofactors;
+- construct boundaries and engineered mutations;
+- crystal packing;
+- cryo-EM classification;
+- differences in experimental resolution;
+- prediction uncertainty;
+- different domain arrangements or oligomeric states.
+
+Sequence alignment alone therefore does not prove that two groups are
+biologically exchangeable. The exported member table records the automatically
+selected chain, sequence identity and coverage for every input structure so
+these assumptions can be audited.
+
+For prediction ensembles, use RamplotR's dedicated prediction-ensemble
+workflow when the main question is seed/model uncertainty. Group comparison is
+more appropriate when the researcher has already defined biologically
+meaningful sets such as apo/holo or WT/mutant.
+
+## Exports
+
+The group comparison can export:
+
+- one residue-level CSV containing circular means, SDs, wrapped differences,
+  combined displacement and Rama8000 mode changes;
+- one member CSV recording each structure label, selected chain, identity,
+  reference coverage, candidate coverage and aligned residue count.
+
+## Testing
+
+Unit tests cover:
+
+- automatic best-chain selection;
+- rejection of unrelated chains at explicit thresholds;
+- circular means across +179/-179 degrees;
+- wrapped between-group differences;
+- low-dispersion consistent-shift detection;
+- Rama8000 modal-category changes.
+
+The browser test additionally compares 1CRN against an identical uploaded
+1CRN group and requires every residue to remain in the smallest shift band.

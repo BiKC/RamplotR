@@ -629,7 +629,7 @@ const assert = require("node:assert/strict");
       return {
         a: stage.getRepresentationsByName("ram-compare-highlight-a").list.length,
         b: stage.getRepresentationsByName("ram-compare-highlight-b").list.length,
-        panel: document.querySelector(".ram-compare-selection-pair").textContent,
+        panel: document.querySelector(".ram-compare-selection").textContent,
         layout: getComputedStyle(document.querySelector(".ram-compare-workspace")).display
       };
     });

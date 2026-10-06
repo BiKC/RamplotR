@@ -15,7 +15,7 @@ assert(identical(q$review_status, c("Not allowed","Missing angles","Near boundar
 a$rama8000_region <- c("Favored",NA,"Outlier","Allowed")
 q_standard <- ram_review_queue(a)
 assert(identical(q_standard$review_status,
-  c("Rama8000 outlier","Missing angles","Other","Other")),
+  c("Rama8000 outlier","Missing angles","Near boundary","Other")),
   "Rama8000 outliers should be reviewed separately from RamplotR regions")
 assert(identical(q$resn, c("GLY","THR","PRO","ALA")),
        "Review queue ordering")

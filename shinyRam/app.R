@@ -1925,7 +1925,7 @@ server <- function(input, output, session) {
       number <- data$resi[[i]]
       show_number <- k==1L || k==length(finite) ||
         (!is.na(number) && number %% 10L==0L)
-      classes <- c("ram-group-cell","ram-group-pick",
+      classes <- c("ram-change-cell","ram-group-cell","ram-group-pick",
                    band_class(data$shift_band[[i]]))
       if (isTRUE(data$consistent_shift[[i]]))
         classes <- c(classes,"is-consistent")

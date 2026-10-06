@@ -684,6 +684,42 @@ const assert = require("node:assert/strict");
     await page.screenshot({
       path:"benchmarks/output/ui-preview/compare-self.png",fullPage:true
     });
+
+    // Group comparison reuses the same circular statistics across uploaded
+    // structure sets. An identical 1CRN-vs-1CRN analysis must not invent
+    // conformational differences.
+    await page.click("#ram-group-comparison-panel > summary");
+    await page.waitForSelector("#groupBFiles",{timeout:10000});
+    const groupB=await page.$("#groupBFiles");
+    await groupB.uploadFile(path.resolve("benchmarks/output/ui-preview/1CRN.pdb"));
+    await page.waitForFunction(() => {
+      const input=document.getElementById("groupBFiles");
+      return input && input.files && input.files.length===1;
+    },{timeout:10000});
+    await new Promise(resolve=>setTimeout(resolve,1000));
+    await page.click("#runGroupComparison");
+    await page.waitForFunction(() => {
+      const summary=document.getElementById("groupComparisonSummary");
+      return summary && summary.textContent.includes("0 residues with ≥30° mean shift") &&
+        document.querySelectorAll(".ram-group-cell").length>20 &&
+        document.querySelectorAll("#groupComparisonRows tbody tr").length>0;
+    },{timeout:30000});
+    const groupState=await page.evaluate(() => ({
+      cells:[...document.querySelectorAll(".ram-group-cell")]
+        .map(node=>[...node.classList]),
+      summary:document.getElementById("groupComparisonSummary").textContent
+    }));
+    assert.ok(groupState.cells.every(classes=>classes.includes("ram-change-small")),
+      "Identical structure groups should stay entirely in the Small shift band.");
+    assert.ok(!groupState.summary.includes("low-dispersion consistent shifts 1"),
+      "Self-group comparison must not invent a consistent between-group shift.");
+    await page.click(".ram-group-cell");
+    await page.waitForFunction(() =>
+      document.querySelector("#selectedResidueInfo strong"),{timeout:12000});
+    await page.screenshot({
+      path:"benchmarks/output/ui-preview/group-comparison-self.png",fullPage:true
+    });
+
     await page.click('.nav-tabs a[data-value="plot"]');
 
     // Multi-chain experimental fixture: the compact overview and the

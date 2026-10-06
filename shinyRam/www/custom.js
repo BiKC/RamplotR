@@ -169,6 +169,20 @@
   // when the user switches chains or changes scientific reference datasets.
   document.addEventListener("click", function (event) {
     const button = event.target && event.target.closest &&
+      event.target.closest(".ram-ensemble-cell");
+    if (!button) return;
+    const resi = Number(button.dataset.resi);
+    if (!Number.isInteger(resi) || !window.Shiny || !window.Shiny.setInputValue)
+      return;
+    window.Shiny.setInputValue("ramPredictionEnsemblePick", {
+      chain: String(button.dataset.chain || ""),
+      resi,
+      insertion_code: String(button.dataset.insertion || "")
+    }, { priority: "event" });
+  });
+
+  document.addEventListener("click", function (event) {
+    const button = event.target && event.target.closest &&
       event.target.closest(".ram-seq-res");
     if (!button) return;
     const pick = {

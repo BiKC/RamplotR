@@ -59,8 +59,10 @@ jobs:
           Rscript tests/ensemble.R
           Rscript tests/batch.R
         shell: bash
-      - name: Verify AlphaFold and ESMFold confidence formats
-        run: Rscript tests/predictions.R
+      - name: Verify AlphaFold, ESMFold and experimental counterpart formats
+        run: |
+          Rscript tests/predictions.R
+          Rscript tests/counterparts.R
         shell: bash
       - name: Verify residue review, sequence, pairwise alignment and model selection
         run: Rscript tests/inspection.R

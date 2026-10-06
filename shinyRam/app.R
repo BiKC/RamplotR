@@ -500,6 +500,7 @@ ui <- fluidPage(
                 ),
                 uiOutput("compareChainControls"),
                 tags$div(class = "ram-compare-status", uiOutput("compareSummary")),
+                uiOutput("compareChangeTrack"),
                 tags$div(class = "ram-compare-toolbar",
                   selectInput("compareJumpSide", "Locate in", c(
                     "Primary chain" = "a", "Comparison chain" = "b")),
@@ -541,7 +542,8 @@ ui <- fluidPage(
                       "Changed RamplotR region" = "changed",
                       "Changed Rama8000 category" = "standard_changed",
                       "Rama8000 outlier in either structure" = "standard_outlier",
-                      "Angle difference ≥ 30°" = "large",
+                      "Combined backbone shift ≥ 30°" = "shift_large",
+                      "Either angle difference ≥ 30°" = "large",
                       "Insertions / deletions" = "gaps"), selected = "All"),
                   downloadButton("downloadComparison", "Export comparison CSV")
                 ),
@@ -1464,6 +1466,12 @@ server <- function(input, output, session) {
   observeEvent(input$ramComparePlotPick, {
     choose_comparison(input$ramComparePlotPick)
   }, ignoreInit=TRUE)
+  observeEvent(input$ramCompareTrackPick, {
+    data <- isolate(comparison_data())
+    row_id <- suppressWarnings(as.integer(input$ramCompareTrackPick))
+    index <- match(row_id, data$row_id)
+    if (length(index) == 1L && !is.na(index)) choose_comparison(index)
+  }, ignoreInit=TRUE)
   observeEvent(input$comparison_row_last_clicked, {
     rows <- filtered_comparison()
     i <- suppressWarnings(as.integer(input$comparison_row_last_clicked))
@@ -1533,6 +1541,9 @@ server <- function(input, output, session) {
       result <- result[
         result$rama8000_region_a == "Outlier" |
         result$rama8000_region_b == "Outlier", , drop=FALSE]
+    else if (identical(criterion, "shift_large"))
+      result <- result[is.finite(result$angular_displacement) &
+                       result$angular_displacement >= 30, , drop=FALSE]
     else if (identical(criterion, "large"))
       result <- result[(!is.na(result$delta_phi) & abs(result$delta_phi)>=30) |
                        (!is.na(result$delta_psi) & abs(result$delta_psi)>=30),

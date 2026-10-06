@@ -360,6 +360,13 @@ const assert = require("node:assert/strict");
       !document.querySelector(".ram-global-inspector").classList.contains("is-empty")
       && getComputedStyle(document.getElementById("prevReview")).display !== "none",
       {timeout:10000});
+    const evidencePanel = await page.$eval("#selectedResidueInfo .ram-evidence-panel",
+      node => ({
+        summary: node.querySelector("summary")?.textContent?.trim() || "",
+        items: node.querySelectorAll(".ram-evidence-item").length
+      }));
+    assert.ok(evidencePanel.summary.startsWith("Why inspect this residue?"),
+      "Selected residues should explain why they merit inspection without a composite score.");
     await page.screenshot({
       path: "benchmarks/output/ui-preview/desktop-residue-zoom.png",
       fullPage: true

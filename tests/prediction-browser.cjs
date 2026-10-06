@@ -50,8 +50,17 @@ const puppeteer = require("puppeteer-core");
     await page.setRequestInterception(true);
     page.on("request",request => {
       const url=request.url();
-      const cors={"access-control-allow-origin":"*","content-type":"application/json"};
+      const cors={
+        "access-control-allow-origin":"*",
+        "access-control-allow-methods":"GET, POST, OPTIONS",
+        "access-control-allow-headers":"content-type",
+        "content-type":"application/json"
+      };
       if(url==="https://search.rcsb.org/rcsbsearch/v2/query") {
+        if(request.method()==="OPTIONS") {
+          request.respond({status:204,headers:cors,body:""});
+          return;
+        }
         counterpartSearchBodies.push(JSON.parse(request.postData()||"{}"));
         request.respond({status:200,headers:cors,body:JSON.stringify({
           total_count:1,

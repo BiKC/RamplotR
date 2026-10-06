@@ -603,6 +603,7 @@ server <- function(input, output, session) {
   comparison_loaded <- reactiveVal(NULL)
   external_validation <- reactiveVal(NULL)
   ensemble_results <- reactiveVal(NULL)
+  prediction_ensemble_results <- reactiveVal(NULL)
   selected_residue <- reactiveVal(NULL)
   selected_comparison <- reactiveVal(NULL)
   viewer_ready <- reactiveVal(FALSE)
@@ -1743,23 +1744,70 @@ server <- function(input, output, session) {
 
   output$ensemblePanel <- renderUI({
     structure <- req(loaded())
-    if(structure$nmodels<=1L) return(NULL)
+    is_prediction <- structure$declared_source %in%
+      c("alphafold_db","alphafold2","alphafold3","esmfold","other_prediction")
+    if(structure$nmodels<=1L && !is_prediction) return(NULL)
+
     tags$details(id="ram-ensemble-panel",class="ram-confidence-panel",
       tags$summary(
         tags$span(class="ram-confidence-title","Ensemble analysis"),
         tags$span(class="ram-confidence-subtitle",
-          paste(structure$nmodels,"structural models · circular φ/ψ variation and region consistency"))
+          if(is_prediction)
+            "Prediction-model agreement · circular φ/ψ variation · Rama8000 and pLDDT"
+          else paste(structure$nmodels,
+            "structural models · circular φ/ψ variation and region consistency"))
       ),
       tags$div(class="ram-confidence-body",
-        tags$p(class="ram-confidence-explainer",
-          "Model variation is matched by chain, residue and insertion code. Circular statistics correctly handle the -180°/180° boundary; models with missing coordinates contribute only observed angles."),
-        tags$div(class="ram-ensemble-actions",
-          actionButton("calculateEnsemble","Analyse ensemble",
-                       class="btn-primary btn-sm"),
-          downloadButton("downloadEnsemble","Export ensemble CSV")
+        if(structure$nmodels>1L) tagList(
+          tags$h4("Models stored in this structure"),
+          tags$p(class="ram-confidence-explainer",
+            "Model variation is matched by chain, residue and insertion code. Circular statistics correctly handle the -180°/180° boundary; models with missing coordinates contribute only observed angles."),
+          tags$div(class="ram-ensemble-actions",
+            actionButton("calculateEnsemble","Analyse structural models",
+                         class="btn-primary btn-sm"),
+            downloadButton("downloadEnsemble","Export structural ensemble CSV")
+          ),
+          uiOutput("ensembleResultSummary"),
+          tags$div(class="ram-residue-table",DT::DTOutput("ensembleRows"))
         ),
-        uiOutput("ensembleResultSummary"),
-        tags$div(class="ram-residue-table",DT::DTOutput("ensembleRows"))
+        if(is_prediction) tagList(
+          if(structure$nmodels>1L) tags$hr(),
+          tags$div(class="ram-prediction-ensemble-head",
+            tags$h4("Prediction ensemble"),
+            tags$p(class="ram-confidence-explainer",
+              "Upload independently generated AF2/ColabFold, ESMFold or other pLDDT-in-B-factor models. RamplotR compares model-to-model geometry and confidence; this variation is prediction uncertainty/heterogeneity, not experimental dynamics.")
+          ),
+          tags$div(class="ram-prediction-ensemble-controls",
+            selectInput("predictionEnsembleSource","Prediction model type",
+              choices=c("AlphaFold 2 / ColabFold"="alphafold2",
+                        "ESMFold"="esmfold",
+                        "Other model with pLDDT in B-factor"="other_prediction"),
+              selected=if(structure$declared_source %in%
+                c("esmfold","other_prediction")) structure$declared_source
+                else "alphafold2",
+              selectize=FALSE),
+            fileInput("predictionEnsembleFiles",
+              "Additional prediction models",
+              multiple=TRUE,
+              accept=c(".pdb",".ent",".cif",".mmcif",".mcif")),
+            checkboxInput("includeLoadedPrediction",
+              paste("Include currently loaded model:",structure$name),value=TRUE),
+            actionButton("calculatePredictionEnsemble",
+              "Analyse prediction ensemble",class="btn-primary btn-sm")
+          ),
+          tags$p(class="ram-field-hint",
+            "AlphaFold 3 ensembles are not accepted in this first version because per-model atom confidence needs its matching JSON sidecar; they are not silently treated as AF2."),
+          uiOutput("predictionEnsembleSummary"),
+          uiOutput("predictionEnsembleTrack"),
+          tags$div(class="ram-residue-table",
+            DT::DTOutput("predictionEnsembleRows")),
+          tags$div(class="ram-ensemble-actions",
+            downloadButton("downloadPredictionEnsemble",
+              "Export prediction ensemble CSV"),
+            downloadButton("downloadPredictionEnsembleModels",
+              "Export model summary CSV")
+          )
+        )
       )
     )
   })

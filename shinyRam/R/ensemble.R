@@ -157,14 +157,16 @@ ram_ensemble_summary <- function(models) {
 ram_prediction_ensemble_analyze <- function(pdbs, classifier, source,
                                             labels = NULL,
                                             max_models = 30L) {
-  if(!is.list(pdbs) || !length(pdbs))
-    stop("Upload at least one predicted structure.")
+  if(!is.list(pdbs) || length(pdbs) < 2L)
+    stop("A prediction ensemble requires at least two predicted structures.")
   permitted <- c("alphafold2","esmfold","other_prediction")
   if(length(source)!=1L || !source %in% permitted)
     stop("Prediction ensembles currently support AF2/ColabFold, ESMFold or other pLDDT-in-B-factor models.")
-  count <- min(length(pdbs),as.integer(max_models))
-  if(!is.finite(count) || count<1L || count>100L)
-    stop("Analyze between 1 and 100 prediction models.")
+  max_models <- suppressWarnings(as.integer(max_models))
+  if(length(max_models)!=1L || is.na(max_models) ||
+     max_models < 2L || max_models > 30L)
+    stop("Prediction ensemble max_models must be between 2 and 30.")
+  count <- min(length(pdbs),max_models)
   if(is.null(labels)) labels <- paste("Model",seq_along(pdbs))
   labels <- as.character(labels)
   if(length(labels)!=length(pdbs) || any(!nzchar(labels)))

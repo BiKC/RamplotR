@@ -97,5 +97,13 @@ assert(inherits(try(ram_prediction_ensemble_analyze(
   list(make_prediction(),make_prediction()),prediction_classifier,
   source="alphafold3"),silent=TRUE),"try-error"),
   "AF3 must not be silently interpreted as a B-factor prediction ensemble.")
+assert(inherits(try(ram_prediction_ensemble_analyze(
+  list(make_prediction()),prediction_classifier,
+  source="esmfold"),silent=TRUE),"try-error"),
+  "Prediction ensemble helper must require at least two models.")
+assert(inherits(try(ram_prediction_ensemble_analyze(
+  list(make_prediction(),make_prediction()),prediction_classifier,
+  source="esmfold",max_models=31L),silent=TRUE),"try-error"),
+  "Prediction ensemble helper must enforce the documented 30-model maximum.")
 
 message("Circular ensemble geometry and residue-alignment tests passed.")

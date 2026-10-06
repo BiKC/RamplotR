@@ -1563,8 +1563,12 @@ server <- function(input, output, session) {
                                  names(result)))
       sum(result$rama8000_region_a == "Outlier" |
           result$rama8000_region_b == "Outlier", na.rm=TRUE) else 0L
+    shifts <- result$angular_displacement[is.finite(result$angular_displacement)]
     tags$div(class="ram-compare-metrics",
       tags$span(tags$strong(sum(aligned)), " aligned residues"),
+      tags$span(tags$strong(sum(shifts>=30)), " pairs with ≥30° combined shift"),
+      tags$span(tags$strong(if(length(shifts)) sprintf("%.1f°",max(shifts)) else "n/a"),
+                " largest combined shift"),
       tags$span(tags$strong(sum(result$class_changed)), " RamplotR region changes"),
       tags$span(tags$strong(standard_changes), " Rama8000 category changes"),
       tags$span(tags$strong(standard_outliers), " pairs with a Rama8000 outlier"),
@@ -1588,20 +1592,31 @@ server <- function(input, output, session) {
       aa <- data[[paste0("amino_",side)]][[i]]
       paste0(aa," ",chain,resi,ifelse(is.na(ins),"",ins))
     }
-    cells <- lapply(finite,function(i) {
+    cells <- lapply(seq_along(finite),function(k) {
+      i <- finite[[k]]
       shift <- data$angular_displacement[[i]]
-      tags$button(
-        type="button",
-        class=paste("ram-change-cell","ram-change-pick",
-          band_class(data$shift_band[[i]]),
-          if (!is.null(selected) && identical(data$row_id[[i]],selected))
-            "is-selected" else ""),
-        "data-row-id"=data$row_id[[i]],
-        title=sprintf("%s ↔ %s · Δφ %.1f° · Δψ %.1f° · combined %.1f°",
-          residue_label("a",i),residue_label("b",i),
-          data$delta_phi[[i]],data$delta_psi[[i]],shift),
-        "aria-label"=sprintf("Inspect aligned residue pair with %.1f degree backbone shift",
-          shift)
+      number <- data$residue_a[[i]]
+      insertion <- data$insertion_a[[i]]
+      show_number <- k==1L || k==length(finite) ||
+        (!is.na(number) && number %% 10L == 0L)
+      tags$div(class="ram-change-slot",
+        tags$span(class="ram-change-position",
+          if(show_number) paste0(number,ifelse(is.na(insertion),"",insertion))
+          else "\u00a0",
+          "aria-hidden"="true"),
+        tags$button(
+          type="button",
+          class=paste("ram-change-cell","ram-change-pick",
+            band_class(data$shift_band[[i]]),
+            if (!is.null(selected) && identical(data$row_id[[i]],selected))
+              "is-selected" else ""),
+          "data-row-id"=data$row_id[[i]],
+          title=sprintf("%s ↔ %s · Δφ %.1f° · Δψ %.1f° · combined %.1f°",
+            residue_label("a",i),residue_label("b",i),
+            data$delta_phi[[i]],data$delta_psi[[i]],shift),
+          "aria-label"=sprintf(
+            "Inspect aligned residue pair with %.1f degree backbone shift",shift)
+        )
       )
     })
     ranked <- finite[order(data$angular_displacement[finite],decreasing=TRUE)]

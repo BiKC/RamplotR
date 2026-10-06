@@ -17,9 +17,9 @@ library(colourpicker)
 library(bio3d)
 library(NGLVieweR)
 
-# Confidence JSON files can be substantially larger than Shiny's 5 MB
-# default upload limit. The parser separately rejects JSON above 32 MB.
-options(shiny.maxRequestSize = 40 * 1024^2)
+# Confidence JSON and multi-file prediction ensembles can exceed Shiny's
+# 5 MB default upload limit. JSON parsing still enforces its own 32 MB limit.
+options(shiny.maxRequestSize = 120 * 1024^2)
 
 # Used for processing data
 

@@ -1790,8 +1790,12 @@ server <- function(input, output, session) {
               "Additional prediction models",
               multiple=TRUE,
               accept=c(".pdb",".ent",".cif",".mmcif",".mcif")),
-            checkboxInput("includeLoadedPrediction",
-              paste("Include currently loaded model:",structure$name),value=TRUE),
+            if(!identical(structure$declared_source,"alphafold3"))
+              checkboxInput("includeLoadedPrediction",
+                paste("Include currently loaded model:",structure$name),value=TRUE)
+            else
+              tags$p(class="ram-confidence-warning",
+                "The loaded AlphaFold 3 model is not auto-added: matching atom-confidence JSON is required for ensemble confidence analysis."),
             actionButton("calculatePredictionEnsemble",
               "Analyse prediction ensemble",class="btn-primary btn-sm")
           ),

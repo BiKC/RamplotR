@@ -137,13 +137,13 @@ ram_ensemble_summary <- function(models) {
       if(!length(values)) NA_real_ else fun(values)
     },numeric(1))
     out$plddt_models <- as.integer(finite_count)
-    out$plddt_mean <- safe_stat(mean)
+    out$plddt_mean <- safe_stat(base::mean)
     out$plddt_sd <- vapply(seq_len(n),function(i) {
       values <- confidence[i,is.finite(confidence[i,])]
       if(length(values)<2L) NA_real_ else stats::sd(values)
     },numeric(1))
-    out$plddt_min <- safe_stat(min)
-    out$plddt_max <- safe_stat(max)
+    out$plddt_min <- safe_stat(base::min)
+    out$plddt_max <- safe_stat(base::max)
   }
 
   spread <- pmax(replace(out$phi_sd,is.na(out$phi_sd),0),
@@ -197,9 +197,9 @@ ram_prediction_ensemble_analyze <- function(pdbs, classifier, source,
       rama8000_outliers=if ("rama8000_region" %in% names(table))
         sum(table$rama8000_region=="Outlier",na.rm=TRUE) else NA_integer_,
       plddt_mean=if ("plddt" %in% names(table) && any(is.finite(table$plddt)))
-        mean(table$plddt[is.finite(table$plddt)]) else NA_real_,
+        base::mean(table$plddt[is.finite(table$plddt)]) else NA_real_,
       plddt_min=if ("plddt" %in% names(table) && any(is.finite(table$plddt)))
-        min(table$plddt[is.finite(table$plddt)]) else NA_real_,
+        base::min(table$plddt[is.finite(table$plddt)]) else NA_real_,
       stringsAsFactors=FALSE
     )
   }))

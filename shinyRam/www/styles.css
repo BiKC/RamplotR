@@ -1162,3 +1162,38 @@ body > .container-fluid { max-width: none; padding: 0; }
   .ram-sequence-jump { margin-left:0; }
   .ram-sequence-scroll-hint { display:none; }
 }
+
+/* Compact residue-level comparison track. Colour is ordinal only: the exact
+   wrapped delta-phi/delta-psi values remain the scientific measurements. */
+.ram-change-explorer { margin:12px 0 16px; padding:12px 13px;
+  border:1px solid #dce9e6; border-radius:10px; background:#fbfdfc; }
+.ram-change-head { display:flex; justify-content:space-between; align-items:flex-start;
+  gap:14px; flex-wrap:wrap; }
+.ram-change-head h3 { margin:0 0 3px; font-size:13px; color:#164f57; }
+.ram-change-head p { margin:0; max-width:720px; font-size:10px; line-height:1.45;
+  color:#647c82; }
+.ram-change-legend { display:flex; flex-wrap:wrap; gap:5px; }
+.ram-change-legend span { border-radius:999px; padding:3px 7px; font-size:9px;
+  border:1px solid rgba(40,70,72,.12); color:#294f55; font-weight:700; }
+.ram-change-small { background:#dcefeb; }
+.ram-change-moderate { background:#f1e8bd; }
+.ram-change-large { background:#f2c995; }
+.ram-change-very-large { background:#e99d8d; }
+.ram-change-track { display:flex; align-items:stretch; gap:1px; overflow-x:auto;
+  padding:7px 2px 8px; margin:9px 0 6px; min-height:27px; scrollbar-width:thin; }
+.ram-change-cell { width:7px; min-width:7px; height:22px; border:0; padding:0;
+  border-radius:2px; cursor:pointer; }
+.ram-change-cell.ram-change-small { background:#77b8ad; }
+.ram-change-cell.ram-change-moderate { background:#d4b755; }
+.ram-change-cell.ram-change-large { background:#dc8a48; }
+.ram-change-cell.ram-change-very-large { background:#cb5646; }
+.ram-change-cell.is-selected { outline:2px solid #173f48; outline-offset:1px; }
+.ram-change-cell:hover,.ram-change-cell:focus-visible { outline:2px solid #146f76;
+  outline-offset:1px; }
+.ram-change-top { display:flex; align-items:center; flex-wrap:wrap; gap:5px;
+  margin-top:7px; font-size:10px; color:#5e777d; }
+.ram-change-top > strong { margin-right:3px; color:#315f66; }
+.ram-change-top-item { border:1px solid #cddfdb; background:#fff; color:#23565e;
+  border-radius:999px; padding:4px 8px; font-size:9px; font-weight:700; cursor:pointer; }
+.ram-change-top-item:hover,.ram-change-top-item:focus-visible {
+  background:#eaf5f2; border-color:#7eb7ae; }

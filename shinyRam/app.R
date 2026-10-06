@@ -34,6 +34,7 @@ source(file.path("R", "predictions.R"), local = TRUE)
 source(file.path("R", "geometry.R"), local = TRUE)
 source(file.path("R", "experimental.R"), local = TRUE)
 source(file.path("R", "ensemble.R"), local = TRUE)
+source(file.path("R", "group-comparison.R"), local = TRUE)
 
 # Chain colours and contour colours are designed together for a recognisable
 # RamplotR publication identity. Region meaning is encoded by ordered contrast,
@@ -550,7 +551,50 @@ ui <- fluidPage(
                 ),
                 tags$p(class = "ram-table-hint",
                   "Select a row to highlight its corresponding residues in both 3D structures and the angle plot."),
-                tags$div(class = "ram-residue-table", DT::DTOutput("comparison"))
+                tags$div(class = "ram-residue-table", DT::DTOutput("comparison"))                tags$details(id="ram-group-comparison-panel",
+                  class="ram-details ram-group-comparison-panel",
+                  tags$summary("Compare groups of structures"),
+                  tags$p(class="ram-field-hint",
+                    "Compare repeated structural states such as apo vs holo, WT vs mutant, or experimental vs predicted sets. Structures are sequence-aligned to one reference chain before circular φ/ψ summaries are calculated."),
+                  tags$div(class="ram-group-compare-controls",
+                    selectInput("groupReferenceChain","Reference chain",
+                      choices=character(),selectize=FALSE),
+                    numericInput("groupMinIdentity","Minimum chain identity (%)",
+                      value=70,min=20,max=100,step=5),
+                    numericInput("groupMinCoverage","Minimum reference coverage (%)",
+                      value=70,min=20,max=100,step=5)
+                  ),
+                  tags$div(class="ram-group-upload-grid",
+                    tags$section(class="ram-group-upload-card",
+                      textInput("groupALabel","Group A label",value="Group A"),
+                      checkboxInput("groupIncludeLoadedA",
+                        "Include loaded structure in Group A",value=TRUE),
+                      fileInput("groupAFiles","Additional Group A structures",
+                        multiple=TRUE,
+                        accept=c(".pdb",".ent",".cif",".mmcif",".mcif"))
+                    ),
+                    tags$section(class="ram-group-upload-card",
+                      textInput("groupBLabel","Group B label",value="Group B"),
+                      fileInput("groupBFiles","Group B structures",
+                        multiple=TRUE,
+                        accept=c(".pdb",".ent",".cif",".mmcif",".mcif"))
+                    )
+                  ),
+                  tags$p(class="ram-field-hint",
+                    "Each uploaded file contributes model 1. Best-matching protein chains are selected automatically using the identity and reference-coverage thresholds above."),
+                  actionButton("runGroupComparison","Analyse groups",
+                    class="btn-primary btn-sm"),
+                  uiOutput("groupComparisonSummary"),
+                  uiOutput("groupComparisonTrack"),
+                  tags$div(class="ram-residue-table",
+                    DT::DTOutput("groupComparisonRows")),
+                  tags$div(class="ram-ensemble-actions",
+                    downloadButton("downloadGroupComparison",
+                      "Export residue comparison CSV"),
+                    downloadButton("downloadGroupMembers",
+                      "Export matched structure/chain CSV")
+                  )
+                )
               )
             ),
             tabPanel(
@@ -608,6 +652,7 @@ server <- function(input, output, session) {
   external_validation <- reactiveVal(NULL)
   ensemble_results <- reactiveVal(NULL)
   prediction_ensemble_results <- reactiveVal(NULL)
+  group_comparison_results <- reactiveVal(NULL)
   experimental_search_results <- reactiveVal(NULL)
   experimental_search_status <- reactiveVal(NULL)
   experimental_search_request <- reactiveVal(0L)
@@ -1922,7 +1967,299 @@ server <- function(input, output, session) {
     filename=function() "RamplotR_structure_comparison.csv",
     content=function(file) utils::write.csv(
       isolate(filtered_comparison()), file,row.names=FALSE,na="")
+  )  group_comparison_matches <- reactive({
+    value <- group_comparison_results()
+    if (is.null(value)) return(NULL)
+    structure <- req(loaded())
+    if (!identical(value$key,structure$key) ||
+        !identical(value$mode,input$validationMode) ||
+        !identical(value$reference,input$bgtype) ||
+        !identical(value$background,input$background)) return(NULL)
+    value$result
+  })
+
+  observeEvent(loaded(), {
+    structure <- loaded()
+    if (is.null(structure)) return()
+    updateSelectInput(session,"groupReferenceChain",
+      choices=structure$chains,selected=structure$chains[[1L]])
+    group_comparison_results(NULL)
+  },ignoreInit=TRUE)
+
+  observeEvent(list(input$validationMode,input$bgtype,input$background), {
+    if (!is.null(group_comparison_results()))
+      group_comparison_results(NULL)
+  },ignoreInit=TRUE)
+
+  observeEvent(input$runGroupComparison, {
+    structure <- req(loaded())
+    ref_chain <- req(input$groupReferenceChain)
+    label_a <- trimws(input$groupALabel)
+    label_b <- trimws(input$groupBLabel)
+    if (!nzchar(label_a)) label_a <- "Group A"
+    if (!nzchar(label_b)) label_b <- "Group B"
+    min_identity <- suppressWarnings(as.numeric(input$groupMinIdentity)/100)
+    min_coverage <- suppressWarnings(as.numeric(input$groupMinCoverage)/100)
+    if (!is.finite(min_identity)) min_identity <- 0.70
+    if (!is.finite(min_coverage)) min_coverage <- 0.70
+
+    reference <- classified()
+    reference <- reference[reference$chain==ref_chain,,drop=FALSE]
+    if (nrow(reference)<5L) {
+      showNotification("The selected reference chain is too short.",
+                       type="error",duration=10)
+      return()
+    }
+
+    classify_uploaded <- function(upload) {
+      if (is.null(upload) || !nrow(upload))
+        return(list(tables=list(),labels=character()))
+      tables <- vector("list",nrow(upload))
+      labels <- character(nrow(upload))
+      for(i in seq_len(nrow(upload))) {
+        parsed <- ram_load_structure(
+          path=upload$datapath[[i]],original_name=upload$name[[i]])
+        torsions <- ram_extract_torsions(ram_model_at(parsed,1L))
+        classified_upload <- ram_classify_torsions(
+          torsions,
+          reference_dir=file.path("static",input$bgtype),
+          selected_reference=plot_reference(),
+          mode=input$validationMode,
+          threshold_fn=ram_density_thresholds
+        )
+        tables[[i]] <- ram_rama8000_classify(
+          classified_upload,file.path("static","rama8000"))
+        labels[[i]] <- tools::file_path_sans_ext(
+          basename(upload$name[[i]]))
+      }
+      list(tables=tables,labels=labels)
+    }
+
+    withProgress(message="Comparing structure groups",value=0.05,{
+      group_a <- list(); labels_a <- character()
+      if (isTRUE(input$groupIncludeLoadedA)) {
+        group_a <- list(classified())
+        labels_a <- structure$name
+      }
+      upload_a <- tryCatch(classify_uploaded(input$groupAFiles),
+        error=function(e) e)
+      if (inherits(upload_a,"error")) {
+        showNotification(conditionMessage(upload_a),type="error",duration=14)
+        return()
+      }
+      if (length(upload_a$tables)) {
+        group_a <- c(group_a,upload_a$tables)
+        labels_a <- c(labels_a,upload_a$labels)
+      }
+      incProgress(0.25,detail=paste("Loaded",length(group_a),label_a,"structures"))
+
+      upload_b <- tryCatch(classify_uploaded(input$groupBFiles),
+        error=function(e) e)
+      if (inherits(upload_b,"error")) {
+        showNotification(conditionMessage(upload_b),type="error",duration=14)
+        return()
+      }
+      group_b <- upload_b$tables
+      labels_b <- upload_b$labels
+      if (!length(group_a) || !length(group_b)) {
+        showNotification(
+          "Both groups need at least one structure. Include the loaded structure or upload files for Group A, and upload at least one Group B structure.",
+          type="warning",duration=14)
+        return()
+      }
+      incProgress(0.20,detail=paste("Loaded",length(group_b),label_b,"structures"))
+
+      prepared_a <- tryCatch(
+        ram_prepare_structure_group(reference,group_a,labels_a,
+          min_identity,min_coverage),error=function(e)e)
+      if (inherits(prepared_a,"error")) {
+        showNotification(paste(label_a,conditionMessage(prepared_a),sep=": "),
+                         type="error",duration=16)
+        return()
+      }
+      prepared_b <- tryCatch(
+        ram_prepare_structure_group(reference,group_b,labels_b,
+          min_identity,min_coverage),error=function(e)e)
+      if (inherits(prepared_b,"error")) {
+        showNotification(paste(label_b,conditionMessage(prepared_b),sep=": "),
+                         type="error",duration=16)
+        return()
+      }
+      incProgress(0.25,detail="Calculating circular group summaries")
+
+      comparison <- ram_group_conformation_compare(
+        reference,prepared_a$models,prepared_b$models,label_a,label_b)
+      members <- rbind(
+        transform(prepared_a$model_summary,group=label_a),
+        transform(prepared_b$model_summary,group=label_b)
+      )
+      result <- list(
+        comparison=comparison,members=members,
+        label_a=label_a,label_b=label_b,
+        n_a=length(prepared_a$models),n_b=length(prepared_b$models),
+        reference_chain=ref_chain
+      )
+      group_comparison_results(list(
+        key=structure$key,mode=input$validationMode,
+        reference=input$bgtype,background=input$background,
+        result=result
+      ))
+      incProgress(0.25,detail="Preparing residue-level comparison")
+    })
+  },ignoreInit=TRUE)
+
+  output$groupComparisonSummary <- renderUI({
+    result <- group_comparison_matches()
+    if (is.null(result)) return(tags$p(class="ram-field-hint",
+      "Choose two structure sets and run the group analysis."))
+    data <- result$comparison
+    finite <- is.finite(data$angular_displacement)
+    tags$div(
+      tags$div(class="ram-confidence-metrics",
+        tags$span(class="ram-confidence-metric",
+          sprintf("%s: %d structures",result$label_a,result$n_a)),
+        tags$span(class="ram-confidence-metric",
+          sprintf("%s: %d structures",result$label_b,result$n_b)),
+        tags$span(class="ram-confidence-metric",
+          sprintf("%d residues compared",sum(finite))),
+        tags$span(class="ram-confidence-metric",
+          sprintf("%d residues with ≥30° mean shift",
+            sum(finite & data$angular_displacement>=30))),
+        tags$span(class="ram-confidence-metric",
+          sprintf("%d low-dispersion consistent shifts",
+            sum(data$consistent_shift,na.rm=TRUE))),
+        tags$span(class="ram-confidence-metric",
+          sprintf("%d Rama8000 mode changes",
+            sum(data$rama8000_mode_changed,na.rm=TRUE)))
+      ),
+      tags$p(class="ram-confidence-explainer",
+        "Between-group displacement compares circular mean φ/ψ values. Within-group SD is shown separately. The thresholds are navigation aids, not statistical significance tests.")
+    )
+  })
+
+  output$groupComparisonTrack <- renderUI({
+    result <- group_comparison_matches()
+    if (is.null(result)) return(NULL)
+    data <- result$comparison
+    finite <- which(is.finite(data$angular_displacement))
+    if (!length(finite)) return(NULL)
+    band_class <- function(value)
+      paste0("ram-change-",tolower(gsub(" ","-",value,fixed=TRUE)))
+    cells <- lapply(seq_along(finite),function(k) {
+      i <- finite[[k]]
+      number <- data$resi[[i]]
+      insertion <- data$insertion_code[[i]]
+      if (is.na(insertion)) insertion <- ""
+      show_number <- k==1L || k==length(finite) ||
+        (!is.na(number) && number %% 10L==0L)
+      classes <- c("ram-change-cell","ram-group-cell","ram-group-pick",
+                   band_class(data$shift_band[[i]]))
+      if (isTRUE(data$consistent_shift[[i]]))
+        classes <- c(classes,"is-consistent")
+      if (isTRUE(data$rama8000_mode_changed[[i]]))
+        classes <- c(classes,"has-standard-change")
+      tags$div(class="ram-change-slot",
+        tags$span(class="ram-change-position",
+          if(show_number) paste0(number,insertion)
+          else "\u00a0","aria-hidden"="true"),
+        tags$button(type="button",class=paste(classes,collapse=" "),
+          "data-chain"=data$chain[[i]],
+          "data-resi"=data$resi[[i]],
+          "data-insertion"=insertion,
+          title=sprintf("%s %s:%s · %s → %s · Δφ %.1f° · Δψ %.1f° · shift %.1f° · max within-group SD %s",
+            data$resn[[i]],data$chain[[i]],data$resi[[i]],
+            result$label_a,result$label_b,
+            data$delta_phi[[i]],data$delta_psi[[i]],
+            data$angular_displacement[[i]],
+            if(is.finite(data$max_within_group_sd[[i]]))
+              sprintf("%.1f°",data$max_within_group_sd[[i]]) else "n/a")
+        )
+      )
+    })
+    tags$section(class="ram-change-explorer ram-group-change-explorer",
+      tags$div(class="ram-change-head",
+        tags$div(tags$h3("Between-group backbone shift"),
+          tags$p("Each cell is one reference-chain residue. Colour shows displacement between group circular means; dark outline marks low-dispersion consistent shifts.")),
+        tags$div(class="ram-change-legend",
+          tags$span(class="ram-change-small","<15°"),
+          tags$span(class="ram-change-moderate","15–30°"),
+          tags$span(class="ram-change-large","30–60°"),
+          tags$span(class="ram-change-very-large","≥60°"))
+      ),
+      tags$div(class="ram-change-track",role="group",
+        "aria-label"="Between-group conformational-change track",cells),
+      tags$p(class="ram-field-hint",
+        "A secondary outline marks residues whose modal Rama8000 category differs between groups.")
+    )
+  })
+
+  output$groupComparisonRows <- DT::renderDT({
+    result <- group_comparison_matches()
+    req(result)
+    data <- result$comparison
+    shown <- data[,c(
+      "chain","resi","insertion_code","resn",
+      "a_phi_models","b_phi_models",
+      "a_phi_mean","b_phi_mean","delta_phi",
+      "a_psi_mean","b_psi_mean","delta_psi",
+      "angular_displacement","max_within_group_sd",
+      "a_rama8000_mode","b_rama8000_mode",
+      "consistent_shift","rama8000_mode_changed"
+    ),drop=FALSE]
+    for(field in c("a_phi_mean","b_phi_mean","delta_phi",
+                   "a_psi_mean","b_psi_mean","delta_psi",
+                   "angular_displacement","max_within_group_sd"))
+      shown[[field]] <- round(shown[[field]],1L)
+    shown$consistent_shift <- ifelse(shown$consistent_shift,"Yes","No")
+    shown$rama8000_mode_changed <- ifelse(shown$rama8000_mode_changed,
+                                           "Yes","No")
+    DT::datatable(shown,rownames=FALSE,selection="single",
+      colnames=c("Chain","Residue","Ins.","AA","n A","n B",
+        "φ A","φ B","Δφ","ψ A","ψ B","Δψ",
+        "Mean shift","Max within SD","Rama8000 A","Rama8000 B",
+        "Consistent shift","Rama8000 changed"),
+      options=list(pageLength=12,scrollX=TRUE,autoWidth=FALSE,dom="ftip"),
+      class="compact stripe hover")
+  },server=FALSE)
+
+  observeEvent(input$groupComparisonRows_rows_selected, {
+    result <- req(group_comparison_matches())
+    selection <- input$groupComparisonRows_rows_selected
+    if (is.null(selection) || !length(selection)) return()
+    ix <- suppressWarnings(as.integer(selection[[1L]]))
+    if(length(ix)!=1L || is.na(ix) || ix<1L ||
+       ix>nrow(result$comparison)) return()
+    row <- result$comparison[ix,,drop=FALSE]
+    selected_residue(list(chain=as.character(row$chain[[1L]]),
+      resi=as.integer(row$resi[[1L]]),
+      insertion_code=if(is.na(row$insertion_code[[1L]])) ""
+        else as.character(row$insertion_code[[1L]])))
+  })
+
+  observeEvent(input$ramGroupComparisonPick, {
+    item <- input$ramGroupComparisonPick
+    if (!is.list(item) || is.null(item$resi)) return()
+    selected_residue(list(
+      chain=as.character(item$chain),
+      resi=as.integer(item$resi),
+      insertion_code=if(is.null(item$insertion_code)) ""
+        else as.character(item$insertion_code)
+    ))
+  },ignoreInit=TRUE)
+
+  output$downloadGroupComparison <- downloadHandler(
+    filename=function() safe_filename("group-conformation-comparison.csv"),
+    content=function(file) utils::write.csv(
+      req(group_comparison_matches())$comparison,
+      file,row.names=FALSE,na="")
   )
+  output$downloadGroupMembers <- downloadHandler(
+    filename=function() safe_filename("group-conformation-members.csv"),
+    content=function(file) utils::write.csv(
+      req(group_comparison_matches())$members,
+      file,row.names=FALSE,na="")
+  )
+
   observeEvent(comparison_data(), {
     result <- comparison_data()
     if (!nrow(result)) return()

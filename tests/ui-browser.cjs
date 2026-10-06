@@ -627,6 +627,8 @@ const assert = require("node:assert/strict");
         bands: [...new Set(cells.map(node =>
           [...node.classList].find(cls => cls.startsWith("ram-change-") &&
             !["ram-change-cell","ram-change-pick"].includes(cls))))],
+        positions: Array.from(document.querySelectorAll(".ram-change-position"))
+          .map(node => node.textContent.trim()).filter(Boolean),
         topLabels: top.map(node => node.textContent.trim())
       };
     });
@@ -634,6 +636,8 @@ const assert = require("node:assert/strict");
       "Conformational change explorer should contain aligned residue cells.");
     assert.ok(changeTrack.topLabels.length > 0 && changeTrack.topLabels.length <= 5,
       "Explorer should expose the largest local shifts as navigation targets.");
+    assert.ok(changeTrack.positions.includes("10"),
+      "Change explorer should show permanent true residue numbers.");
     // Self-comparison should be entirely in the Small band.
     assert.deepEqual(changeTrack.bands, ["ram-change-small"],
       "Self-comparison should have no artificial backbone displacement.");

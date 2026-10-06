@@ -186,14 +186,33 @@ ram_prediction_ensemble_analyze <- function(pdbs, classifier, source,
     classified$model_label <- labels[[i]]
     classified
   })
+  summary <- ram_ensemble_summary(models)
+  model_summary <- do.call(rbind,lapply(seq_len(count),function(i) {
+    table <- models[[i]]
+    finite_angles <- is.finite(table$phi) & is.finite(table$psi)
+    data.frame(
+      model=labels[[i]],
+      residues=nrow(table),
+      finite_phi_psi=sum(finite_angles),
+      rama8000_outliers=if ("rama8000_region" %in% names(table))
+        sum(table$rama8000_region=="Outlier",na.rm=TRUE) else NA_integer_,
+      plddt_mean=if ("plddt" %in% names(table) && any(is.finite(table$plddt)))
+        mean(table$plddt[is.finite(table$plddt)]) else NA_real_,
+      plddt_min=if ("plddt" %in% names(table) && any(is.finite(table$plddt)))
+        min(table$plddt[is.finite(table$plddt)]) else NA_real_,
+      stringsAsFactors=FALSE
+    )
+  }))
   list(
-    summary=ram_ensemble_summary(models),
+    summary=summary,
+    model_summary=model_summary,
     models=models,
     labels=labels[seq_len(count)],
     analyzed_models=count,
     available_models=length(pdbs),
-    limited=count<length(pdbs),
-    source=source
+    common_residues=sum(summary$models_present==count),
+    source=source,
+    limited=count<length(pdbs)
   )
 }
 

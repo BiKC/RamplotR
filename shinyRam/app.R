@@ -25,6 +25,7 @@ options(shiny.maxRequestSize = 40 * 1024^2)
 
 source(file.path("R", "reference-loader.R"), local = TRUE)
 source(file.path("R", "ramachandran.R"), local = TRUE)
+source(file.path("R", "rama8000.R"), local = TRUE)
 source(file.path("R", "backbone.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
 source(file.path("R", "inspection.R"), local = TRUE)
@@ -925,6 +926,10 @@ server <- function(input, output, session) {
       mode = input$validationMode,
       threshold_fn = ram_density_thresholds
     )
+    # Compute the six-class Rama8000 result in parallel. It is independent
+    # of the selected RamplotR plotting background and is exposed explicitly
+    # rather than relabelling the native four-region result.
+    result <- ram_rama8000_classify(result, file.path("static", "rama8000"))
     if (current_model() == 1L)
       result <- ram_apply_prediction(result, structure$prediction)
     result <- ram_join_geometry(result,model_geometry())
@@ -973,7 +978,8 @@ server <- function(input, output, session) {
       data$insertion_code == selected$insertion_code
     )
     columns <- c("chain", "resi", "insertion_code", "resn",
-                 "phi", "psi", "region", "density")
+                 "phi", "psi", "region", "density",
+                 "rama8000_region", "rama8000_group", "rama8000_score")
     if ("plddt" %in% names(data))
       columns <- c(columns, "plddt", "confidence_category")
     shown <- data[, columns, drop = FALSE]
@@ -981,10 +987,12 @@ server <- function(input, output, session) {
     shown$phi <- round(shown$phi, 1L)
     shown$psi <- round(shown$psi, 1L)
     shown$density <- round(shown$density, 1L)
+    shown$rama8000_score <- round(100 * shown$rama8000_score, 2L)
     widget <- DT::datatable(
       shown, rownames = FALSE,
       colnames = c("Chain", "Residue", "Ins.", "AA", "Phi (°)", "Psi (°)",
-                   "Region", "Percentile",
+                   "RamplotR region", "Percentile", "Rama8000", "Rama8000 class",
+                   "Rama8000 score (%)",
                    if ("plddt" %in% names(shown)) c("pLDDT", "Confidence")),
       selection = list(mode = "single",
                        selected = if (length(marked)) marked[[1L]] else integer(0)),
@@ -995,12 +1003,19 @@ server <- function(input, output, session) {
       ),
       class = "compact stripe hover"
     )
-    DT::formatStyle(widget, "region",
+    widget <- DT::formatStyle(widget, "region",
       backgroundColor = DT::styleEqual(
         c("Favoured", "Allowed", "Generously allowed", "Not allowed"),
         c("#D4ECE7", "#E8F3F1", "#FFF5E1", "#FCE5DD")
       ),
       fontWeight = "600"
+    )
+    DT::formatStyle(widget, "rama8000_region",
+      backgroundColor = DT::styleEqual(
+        c("Favored", "Allowed", "Outlier"),
+        c("#D4ECE7", "#FFF5E1", "#FCE5DD")
+      ),
+      fontWeight = "650"
     )
   }, server = FALSE)
   output$downloadResidues <- downloadHandler(
@@ -1795,14 +1810,28 @@ server <- function(input, output, session) {
         tags$td(class = "ram-numeric", percentage(n)))
     }
     outlier <- count_region("Not allowed")
+
+    standard <- data[!is.na(data$rama8000_region), , drop=FALSE]
+    standard_n <- nrow(standard)
+    standard_count <- function(region)
+      sum(standard$rama8000_region == region, na.rm=TRUE)
+    standard_pct <- function(n) if (!standard_n) "n/a" else
+      sprintf("%.2f%%", 100 * n / standard_n)
+    standard_row <- function(label, n) tags$tr(
+      tags$td(label),
+      tags$td(class="ram-numeric", format(n, big.mark=",")),
+      tags$td(class="ram-numeric", standard_pct(n))
+    )
+    standard_outliers <- standard_count("Outlier")
+
     tags$div(class = "ram-summary",
       tags$div(class = "ram-summary-metrics",
         metric("Selected residues", nrow(data), "Across selected chains"),
-        metric("Classified, excluding Gly/Pro", count,
-               "Residues with defined backbone angles"),
-        metric("Outliers", outlier, "Outside the selected reference regions")
+        metric("RamplotR not allowed", outlier, "Native density regions"),
+        metric("Rama8000 outliers", standard_outliers,
+               "Six-class standard validation")
       ),
-      tags$h3("Region breakdown"),
+      tags$h3("RamplotR density regions"),
       tags$p(class = "ram-summary-note",
         "Percentages use classified residues other than glycine and proline as the denominator."),
       tags$div(class = "ram-summary-table-wrap",
@@ -1815,16 +1844,28 @@ server <- function(input, output, session) {
             region_row("Not allowed", outlier),
             region_row("Total classified", count)
           ))),
+      tags$h3("Rama8000 standard validation"),
+      tags$p(class="ram-summary-note",
+        "Current cctbx/Phenix-style six-class evaluation: General, Gly, cis-Pro, trans-Pro, pre-Pro and Ile/Val. This result is independent of the RamplotR display background."),
+      tags$div(class="ram-summary-table-wrap",
+        tags$table(class="ram-summary-table",
+          tags$thead(tags$tr(tags$th("Region"),tags$th("Residues"),tags$th("Share"))),
+          tags$tbody(
+            standard_row("Favored", standard_count("Favored")),
+            standard_row("Allowed", standard_count("Allowed")),
+            standard_row("Outlier", standard_outliers),
+            standard_row("Total classified", standard_n)
+          ))),
       tags$div(class = "ram-summary-footnotes",
         tags$div(
           tags$strong(format(sum(is.na(data$region) &
             !data$resn %in% c("GLY", "PRO")), big.mark = ",")),
-          tags$span("Missing or terminal angles (excluding Gly/Pro)")
+          tags$span("Missing or terminal angles (RamplotR)")
         ),
-        tags$div(tags$strong(format(sum(data$resn == "GLY"), big.mark = ",")),
-                 tags$span("Glycine residues")),
-        tags$div(tags$strong(format(sum(data$resn == "PRO"), big.mark = ",")),
-                 tags$span("Proline residues"))
+        tags$div(
+          tags$strong(format(sum(is.na(data$rama8000_region)), big.mark=",")),
+          tags$span("Missing or terminal angles (Rama8000)")
+        )
       )
     )
   })
@@ -1970,6 +2011,13 @@ server <- function(input, output, session) {
         tags$span(paste("ψ", angle(row$psi[[1L]]))),
         tags$span(if (is.finite(row$density[[1L]]))
           sprintf("Density percentile %.1f", row$density[[1L]]) else ""),
+        if ("rama8000_region" %in% names(row) &&
+            !is.na(row$rama8000_region[[1L]]))
+          tags$span(class = if (identical(row$rama8000_region[[1L]], "Outlier"))
+                      "ram-inspector-warning" else "ram-inspector-plddt",
+            sprintf("Rama8000 %s · %s · %.2f%%",
+              row$rama8000_region[[1L]], row$rama8000_group[[1L]],
+              100 * row$rama8000_score[[1L]])),
         if ("omega" %in% names(row) && is.finite(row$omega[[1L]]))
           tags$span(sprintf("ω %.1f° · %s",row$omega[[1L]],
                             row$omega_status[[1L]])),

@@ -838,7 +838,44 @@ server <- function(input, output, session) {
   }, ignoreInit = TRUE)
 
   # Comparison loading is a separate, deliberate action, so changing plot
-  # settings does not repeatedly refetch the secondary structure.
+  # settings does not repeatedly refetch the secondary structure. The helper is
+  # shared by the manual Compare tab and prediction-to-experiment discovery.
+  load_comparison_structure <- function(path = NULL, original_name = NULL,
+                                        pdb_id = NULL,
+                                        preferred_chain_a = NULL,
+                                        preferred_chain_b = NULL) {
+    is_upload <- !is.null(path)
+    source_id <- if (is_upload) path else toupper(trimws(pdb_id))
+    source_name <- if (is_upload) original_name else source_id
+    data <- tryCatch(
+      ram_load_structure(
+        path = path,
+        original_name = original_name,
+        pdb_id = if (is_upload) NULL else source_id
+      ), error = function(e) {
+        showNotification(conditionMessage(e), type="error", duration=12)
+        NULL
+      }
+    )
+    if (is.null(data)) return(FALSE)
+    torsions <- tryCatch(ram_extract_torsions(ram_model_at(data, 1L)),
+      error = function(e) {
+        showNotification(conditionMessage(e), type="error",duration=12)
+        NULL
+      })
+    if (is.null(torsions)) return(FALSE)
+    comparison_loaded(list(
+      pdb=data, torsions=torsions,
+      name=tools::file_path_sans_ext(basename(source_name)),
+      source_id=source_id,
+      viewer_format=if (is_upload) ram_detect_format(source_name) else NULL,
+      nmodels=ram_model_count(data),
+      preferred_chain_a=preferred_chain_a,
+      preferred_chain_b=preferred_chain_b
+    ))
+    TRUE
+  }
+
   observeEvent(input$compareSubmit, {
     is_upload <- identical(input$compareInputSource, "upload")
     if (is_upload && (is.null(input$compareFile) ||
@@ -846,41 +883,36 @@ server <- function(input, output, session) {
       showNotification("Choose a second PDB or mmCIF file.", type="error")
       return()
     }
-    secondary <- if (is_upload) input$compareFile$datapath else
-      toupper(trimws(input$comparePDB))
-    source_name <- if (is_upload) input$compareFile$name else secondary
-    data <- tryCatch(
-      ram_load_structure(
-        path = if (is_upload) secondary else NULL,
-        original_name = if (is_upload) source_name else NULL,
-        pdb_id = if (is_upload) NULL else secondary
-      ), error = function(e) {
-        showNotification(conditionMessage(e), type="error", duration=12)
-        NULL
+    if (is_upload) {
+      load_comparison_structure(
+        path=input$compareFile$datapath,
+        original_name=input$compareFile$name
+      )
+    } else {
+      pdb_id <- toupper(trimws(input$comparePDB))
+      if (!nzchar(pdb_id)) {
+        showNotification("Enter a PDB accession.", type="error")
+        return()
       }
-    )
-    if (is.null(data)) return()
-    torsions <- tryCatch(ram_extract_torsions(ram_model_at(data, 1L)),
-      error = function(e) {
-        showNotification(conditionMessage(e), type="error",duration=12)
-        NULL
-      })
-    if (is.null(torsions)) return()
-    comparison_loaded(list(pdb=data, torsions=torsions,
-      name=tools::file_path_sans_ext(basename(source_name)),
-      source_id=secondary,
-      viewer_format=if (is_upload) ram_detect_format(source_name) else NULL,
-      nmodels=ram_model_count(data)))
+      load_comparison_structure(pdb_id=pdb_id)
+    }
   }, ignoreInit=TRUE)
+
   output$compareChainControls <- renderUI({
     first <- req(loaded())
     second <- req(comparison_loaded())
+    chains_b <- unique(second$torsions$chain)
+    preferred_a <- second$preferred_chain_a
+    preferred_b <- second$preferred_chain_b
+    selected_a <- if (!is.null(preferred_a) && preferred_a %in% first$chains)
+      preferred_a else first$chains[[1L]]
+    selected_b <- if (!is.null(preferred_b) && preferred_b %in% chains_b)
+      preferred_b else chains_b[[1L]]
     tags$div(class="ram-compare-chains",
       selectInput("compareChainA", paste("Chain in", first$name),
-        choices=first$chains, selected=first$chains[[1L]]),
+        choices=first$chains, selected=selected_a),
       selectInput("compareChainB", paste("Chain in", second$name),
-        choices=unique(second$torsions$chain),
-        selected=unique(second$torsions$chain)[[1L]]),
+        choices=chains_b, selected=selected_b),
       if (second$nmodels > 1L)
         selectInput("compareModel", "Second structure model",
           choices=as.character(seq_len(second$nmodels)), selected="1")

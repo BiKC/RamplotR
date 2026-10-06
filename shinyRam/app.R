@@ -1572,6 +1572,69 @@ server <- function(input, output, session) {
       tags$span("Angular differences account for the -180° / +180° boundary.")
     )
   })
+  output$compareChangeTrack <- renderUI({
+    data <- comparison_data()
+    if (!nrow(data) || !"angular_displacement" %in% names(data)) return(NULL)
+    finite <- which(is.finite(data$angular_displacement) &
+                    data$alignment %in% c("Match","Substitution"))
+    if (!length(finite)) return(NULL)
+    selected <- selected_comparison()
+    band_class <- function(value)
+      paste0("ram-change-",tolower(gsub(" ","-",value,fixed=TRUE)))
+    residue_label <- function(side, i) {
+      chain <- data[[paste0("chain_",side)]][[i]]
+      resi <- data[[paste0("residue_",side)]][[i]]
+      ins <- data[[paste0("insertion_",side)]][[i]]
+      aa <- data[[paste0("amino_",side)]][[i]]
+      paste0(aa," ",chain,resi,ifelse(is.na(ins),"",ins))
+    }
+    cells <- lapply(finite,function(i) {
+      shift <- data$angular_displacement[[i]]
+      tags$button(
+        type="button",
+        class=paste("ram-change-cell","ram-change-pick",
+          band_class(data$shift_band[[i]]),
+          if (!is.null(selected) && identical(data$row_id[[i]],selected))
+            "is-selected" else ""),
+        "data-row-id"=data$row_id[[i]],
+        title=sprintf("%s ↔ %s · Δφ %.1f° · Δψ %.1f° · combined %.1f°",
+          residue_label("a",i),residue_label("b",i),
+          data$delta_phi[[i]],data$delta_psi[[i]],shift),
+        "aria-label"=sprintf("Inspect aligned residue pair with %.1f degree backbone shift",
+          shift)
+      )
+    })
+    ranked <- finite[order(data$angular_displacement[finite],decreasing=TRUE)]
+    ranked <- head(ranked,5L)
+    tags$section(class="ram-change-explorer",
+      tags$div(class="ram-change-head",
+        tags$div(
+          tags$h3("Conformational change explorer"),
+          tags$p("Each cell is one aligned residue. Colour ranks the combined wrapped φ/ψ displacement; it is a navigation measure, not a significance score.")
+        ),
+        tags$div(class="ram-change-legend",
+          tags$span(class="ram-change-small","<15°"),
+          tags$span(class="ram-change-moderate","15–30°"),
+          tags$span(class="ram-change-large","30–60°"),
+          tags$span(class="ram-change-very-large","≥60°")
+        )
+      ),
+      tags$div(class="ram-change-track",role="group",
+        "aria-label"="Aligned residue conformational-change track",cells),
+      tags$div(class="ram-change-top",
+        tags$strong("Largest local shifts"),
+        lapply(ranked,function(i) tags$button(
+          type="button",class="ram-change-top-item ram-change-pick",
+          "data-row-id"=data$row_id[[i]],
+          sprintf("%s ↔ %s · %.1f°",
+            residue_label("a",i),residue_label("b",i),
+            data$angular_displacement[[i]])
+        ))
+      )
+    )
+  })
+  outputOptions(output,"compareChangeTrack",suspendWhenHidden=FALSE)
+
   output$comparison <- DT::renderDT({
     result <- filtered_comparison()
     fields <- c("chain_a", "residue_a", "insertion_a", "amino_a",

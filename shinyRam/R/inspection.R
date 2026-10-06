@@ -34,7 +34,9 @@ ram_amino_acid_letters <- c(
 ram_sequence_data <- function(data) {
   if (!nrow(data)) return(data.frame(
     chain=character(), resi=integer(), insertion_code=character(),
-    resn=character(), letter=character(), region=character(), plddt=numeric(),
+    resn=character(), letter=character(), region=character(),
+    rama8000_region=character(), rama8000_group=character(),
+    rama8000_score=numeric(), plddt=numeric(),
     stringsAsFactors=FALSE))
   key <- paste(data$chain, data$resi, data$insertion_code, sep="\r")
   data <- data[!duplicated(key), , drop=FALSE]
@@ -45,6 +47,12 @@ ram_sequence_data <- function(data) {
     resn=as.character(data$resn),
     letter=unname(ram_amino_acid_letters[data$resn]),
     region=as.character(data$region),
+    rama8000_region=if ("rama8000_region" %in% names(data))
+      as.character(data$rama8000_region) else rep(NA_character_,nrow(data)),
+    rama8000_group=if ("rama8000_group" %in% names(data))
+      as.character(data$rama8000_group) else rep(NA_character_,nrow(data)),
+    rama8000_score=if ("rama8000_score" %in% names(data))
+      as.numeric(data$rama8000_score) else rep(NA_real_,nrow(data)),
     plddt=if ("plddt" %in% names(data)) as.numeric(data$plddt) else
       rep(NA_real_, nrow(data)),
     stringsAsFactors=FALSE

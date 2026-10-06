@@ -50,7 +50,11 @@ const puppeteer=require("puppeteer-core");
     await page.waitForSelector("#validationXml");
     await (await page.$("#validationXml")).uploadFile(xml);
     await new Promise(resolve=>setTimeout(resolve,1400));
-    await page.click("#confirmValidationSource");
+    await page.evaluate(() => {
+      const checkbox=document.getElementById("confirmValidationSource");
+      if(!checkbox) throw Error("Official-validation confirmation checkbox missing.");
+      checkbox.click();
+    });
     await page.waitForFunction(() =>
       window.Shiny && window.Shiny.shinyapp &&
       window.Shiny.shinyapp.$inputValues &&

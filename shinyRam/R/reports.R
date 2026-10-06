@@ -202,3 +202,152 @@ ram_save_html_report <- function(path, data, metadata, svg_path,
   writeLines(as.character(doc),path,useBytes=TRUE)
   invisible(path)
 }
+
+
+# Standalone report for independently generated prediction ensembles. This is
+# intentionally separate from the single-structure report: model disagreement
+# is prediction uncertainty/heterogeneity, not evidence of molecular dynamics.
+ram_save_prediction_ensemble_report <- function(path, result, metadata=list(),
+                                                max_report_rows=10000L) {
+  if(!is.list(result) || is.null(result$summary) ||
+     !is.data.frame(result$summary) || is.null(result$model_summary) ||
+     !is.data.frame(result$model_summary))
+    stop("Prediction ensemble report requires residue and model summaries.")
+  if(!is.numeric(max_report_rows) || length(max_report_rows)!=1L ||
+     !is.finite(max_report_rows) || max_report_rows<1L)
+    stop("max_report_rows must be a positive finite number.")
+  max_report_rows <- as.integer(max_report_rows)
+
+  table_for <- function(frame) {
+    if(!nrow(frame))
+      return(htmltools::tags$p(class="note","No rows available."))
+    rows <- lapply(seq_len(nrow(frame)),function(i)
+      htmltools::tags$tr(lapply(frame[i,,drop=FALSE],function(value)
+        htmltools::tags$td(if(length(value)==0L || is.na(value[[1L]])) ""
+          else as.character(value[[1L]])))))
+    htmltools::tags$div(class="table-wrap",
+      htmltools::tags$table(
+        htmltools::tags$thead(htmltools::tags$tr(
+          lapply(names(frame),htmltools::tags$th))),
+        htmltools::tags$tbody(rows)))
+  }
+  metric <- function(label,value)
+    htmltools::tags$div(class="metric",
+      htmltools::tags$span(label),htmltools::tags$strong(value))
+
+  residues <- result$summary
+  spread <- pmax(residues$phi_sd,residues$psi_sd,na.rm=TRUE)
+  spread[!is.finite(residues$phi_sd) & !is.finite(residues$psi_sd)] <- NA_real_
+  rama_changes <- if("rama8000_changes" %in% names(residues))
+    sum(residues$rama8000_changes,na.rm=TRUE) else NA_integer_
+  plddt_variable <- if("plddt_sd" %in% names(residues))
+    sum(is.finite(residues$plddt_sd) & residues$plddt_sd>=10) else NA_integer_
+  angular_variable <- sum(is.finite(spread) & spread>=20)
+  common <- if(!is.null(result$common_residues)) result$common_residues else
+    sum(residues$models_present==result$analyzed_models,na.rm=TRUE)
+
+  ranked <- residues
+  ranked$max_angular_sd <- spread
+  ranked <- ranked[order(-replace(ranked$max_angular_sd,
+                                  !is.finite(ranked$max_angular_sd),-Inf)),
+                   ,drop=FALSE]
+  ranked <- utils::head(ranked,25L)
+  rank_fields <- intersect(c("chain","resi","insertion_code","resn",
+    "models_present","phi_sd","psi_sd","max_angular_sd",
+    "rama8000_mode","rama8000_consistency",
+    "plddt_mean","plddt_sd","plddt_min","plddt_max"),names(ranked))
+  ranked <- ranked[,rank_fields,drop=FALSE]
+
+  all_fields <- intersect(c("chain","resi","insertion_code","resn",
+    "models_present","phi_models","psi_models","phi_mean","phi_sd",
+    "psi_mean","psi_sd","rama8000_models","rama8000_mode",
+    "rama8000_consistency","rama8000_changes","plddt_models","plddt_mean",
+    "plddt_sd","plddt_min","plddt_max"),names(residues))
+  shown <- utils::head(residues[,all_fields,drop=FALSE],max_report_rows)
+  numeric_fields <- c("phi_mean","phi_sd","psi_mean","psi_sd",
+    "rama8000_consistency","plddt_mean","plddt_sd","plddt_min","plddt_max",
+    "max_angular_sd")
+  for(field in intersect(numeric_fields,union(names(shown),names(ranked)))) {
+    if(field %in% names(shown)) shown[[field]] <- round(shown[[field]],2L)
+    if(field %in% names(ranked)) ranked[[field]] <- round(ranked[[field]],2L)
+  }
+
+  models <- result$model_summary
+  if(!is.null(result$provenance) && is.data.frame(result$provenance)) {
+    provenance <- result$provenance
+    if(nrow(provenance)!=nrow(models))
+      stop("Prediction ensemble provenance no longer matches model order.")
+    for(field in setdiff(names(provenance),"model"))
+      models[[field]] <- provenance[[field]]
+  }
+  for(field in intersect(c("plddt_mean","plddt_min"),names(models)))
+    models[[field]] <- round(models[[field]],2L)
+
+  provenance <- c(metadata,list(
+    prediction_source=if(is.null(result$source)) "unknown" else result$source,
+    analyzed_models=result$analyzed_models,
+    available_models=result$available_models,
+    generated_utc=format(Sys.time(),"%Y-%m-%dT%H:%M:%SZ",tz="UTC"),
+    R_version=R.version.string
+  ))
+  provenance_frame <- data.frame(
+    Setting=gsub("_"," ",names(provenance)),
+    Value=vapply(provenance,function(x)
+      paste(as.character(x),collapse=", "),character(1)),
+    stringsAsFactors=FALSE
+  )
+
+  doc <- htmltools::tags$html(
+    htmltools::tags$head(
+      htmltools::tags$meta(charset="UTF-8"),
+      htmltools::tags$title("RamplotR prediction ensemble"),
+      htmltools::tags$style(htmltools::HTML(
+        "body{font:15px system-ui,sans-serif;margin:3em auto;max-width:1180px;color:#18323b}h1,h2{color:#146a70}.lead,.note{color:#516b74;line-height:1.55}.warning{padding:12px 14px;border-left:4px solid #c36b4f;background:#fff5ee}.metrics{display:flex;gap:10px;flex-wrap:wrap}.metric{border:1px solid #dbe7e5;border-radius:8px;padding:8px 11px;min-width:145px;background:#f8fbfa}.metric span{display:block;color:#657c82;font-size:12px}.metric strong{font-size:20px;color:#164f57}.table-wrap{overflow-x:auto}table{border-collapse:collapse;width:100%}th,td{padding:6px 10px;border-bottom:1px solid #dbe6e6;text-align:left;white-space:nowrap}th{background:#eef6f4}section{margin:2em 0}"))
+    ),
+    htmltools::tags$body(
+      htmltools::tags$h1("RamplotR prediction ensemble"),
+      htmltools::tags$p(class="lead",
+        "Residue-level agreement across independently generated prediction models/seeds."),
+      htmltools::tags$p(class="warning",
+        htmltools::tags$strong("Interpretation: "),
+        "model-to-model spread represents prediction uncertainty or heterogeneity. It is not experimental evidence of molecular motion or conformational dynamics."),
+      htmltools::tags$section(
+        htmltools::tags$h2("Ensemble overview"),
+        htmltools::tags$div(class="metrics",
+          metric("Models analysed",result$analyzed_models),
+          metric("Common residues",common),
+          metric("Rama8000 disagreements",
+            if(is.na(rama_changes)) "n/a" else rama_changes),
+          metric("Angular SD >=20°",angular_variable),
+          metric("pLDDT SD >=10",
+            if(is.na(plddt_variable)) "n/a" else plddt_variable)
+        )
+      ),
+      htmltools::tags$section(
+        htmltools::tags$h2("Model provenance"),
+        htmltools::tags$p(class="note",
+          "Coordinate hashes identify the exact uploaded models when available."),
+        table_for(models)
+      ),
+      htmltools::tags$section(
+        htmltools::tags$h2("Largest local backbone variability"),
+        htmltools::tags$p(class="note",
+          "Ranked by max(circular SD of phi, circular SD of psi). This is a navigation ranking, not a significance statistic."),
+        table_for(ranked)
+      ),
+      htmltools::tags$section(
+        htmltools::tags$h2("All residue-level ensemble statistics"),
+        if(nrow(residues)>max_report_rows)
+          htmltools::tags$p(class="note",
+            sprintf("Showing the first %d of %d rows.",max_report_rows,nrow(residues))),
+        table_for(shown)
+      ),
+      htmltools::tags$section(
+        htmltools::tags$h2("Analysis provenance"),
+        table_for(provenance_frame)
+      )
+    )
+  )
+  writeLines(as.character(doc),path,useBytes=TRUE)
+  invisible(path)
+}

@@ -22,6 +22,22 @@ assert(one$phi_models==2L && one$psi_models==2L &&
 assert(two$changes_class && two$class_consistency==0.5 &&
        two$classified_models==2L,
        "Classification changes across models must be explicit.")
+
+m$rama8000_region <- c("Favored","Allowed")
+m$plddt <- c(95,88)
+other$rama8000_region <- c("Outlier","Allowed")
+other$plddt <- c(91,92)
+extended <- ram_ensemble_summary(list(m,other))
+e1 <- extended[extended$resi==1L,,drop=FALSE]
+e2 <- extended[extended$resi==2L,,drop=FALSE]
+assert(e1$rama8000_changes && e1$rama8000_consistency==0.5 &&
+       e1$rama8000_models==2L,
+       "Prediction ensembles must expose Rama8000 category disagreement.")
+assert(!e2$rama8000_changes && e2$rama8000_consistency==1,
+       "Stable Rama8000 categories must remain explicit.")
+assert(e1$plddt_models==2L && abs(e1$plddt_mean-93)<1e-12 &&
+       e1$plddt_min==91 && e1$plddt_max==95,
+       "Prediction ensemble pLDDT summary changed.")
 only_one <- other[other$resi!=1L,,drop=FALSE]
 partial <- ram_ensemble_summary(list(m,only_one))
 p <- partial[partial$resi==1L,,drop=FALSE]

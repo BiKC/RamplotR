@@ -390,6 +390,21 @@ const assert = require("node:assert/strict");
     await page.waitForSelector("#regions table tbody tr", { timeout: 18000 });
     await page.waitForFunction(() =>
       document.querySelector("#regions tbody tr.selected"), { timeout: 18000 });
+    const standardColumns = await page.evaluate(() => {
+      const headings = Array.from(document.querySelectorAll("#regions thead th"))
+        .map(node => node.textContent.trim());
+      const first = Array.from(document.querySelectorAll(
+        "#regions tbody tr:first-child td")).map(node => node.textContent.trim());
+      return {headings, first};
+    });
+    assert.ok(standardColumns.headings.includes("Rama8000") &&
+              standardColumns.headings.includes("Rama8000 class") &&
+              standardColumns.headings.includes("Rama8000 score (%)"),
+              "Residue table must expose standard Rama8000 category, class and score.");
+    const standardIndex = standardColumns.headings.indexOf("Rama8000");
+    assert.ok(["Favored","Allowed","Outlier"].includes(
+      standardColumns.first[standardIndex]),
+      "Every finite test residue should show a valid Rama8000 category.");
     // One physical table (no DataTables scroll-head clone) must align the
     // column headings with the corresponding residue values.
     const geometry = await page.evaluate(() => {
@@ -620,6 +635,14 @@ const assert = require("node:assert/strict");
     assert.equal(pairState.a,1);
     assert.equal(pairState.b,1);
     assert.equal(pairState.layout,"grid");
+    assert.ok(pairState.panel.includes("Rama8000"),
+      "Aligned-pair inspector should expose the standard validation state.");
+    const compareHeaders = await page.$eval("#comparison thead th",
+      nodes => nodes.map(node => node.textContent.trim()));
+    assert.ok(compareHeaders.includes("Rama8000 A") &&
+              compareHeaders.includes("Rama8000 B") &&
+              compareHeaders.includes("Rama8000 changed"),
+      "Comparison table should expose standard validation changes.");
     await page.screenshot({
       path:"benchmarks/output/ui-preview/compare-self.png",fullPage:true
     });

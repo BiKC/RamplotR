@@ -1179,10 +1179,14 @@ body > .container-fluid { max-width: none; padding: 0; }
 .ram-change-moderate { background:#f1e8bd; }
 .ram-change-large { background:#f2c995; }
 .ram-change-very-large { background:#e99d8d; }
-.ram-change-track { display:flex; align-items:stretch; gap:1px; overflow-x:auto;
-  padding:7px 2px 8px; margin:9px 0 6px; min-height:27px; scrollbar-width:thin; }
+.ram-change-track { display:flex; align-items:flex-end; gap:1px; overflow-x:auto;
+  padding:19px 2px 8px; margin:9px 0 6px; min-height:39px; scrollbar-width:thin; }
+.ram-change-slot { position:relative; width:8px; min-width:8px; height:22px; }
+.ram-change-position { position:absolute; left:50%; top:-13px;
+  transform:translateX(-50%); font-size:7px; line-height:1; color:#70868b;
+  white-space:nowrap; pointer-events:none; }
 .ram-change-cell { width:7px; min-width:7px; height:22px; border:0; padding:0;
-  border-radius:2px; cursor:pointer; }
+  border-radius:2px; cursor:pointer; display:block; }
 .ram-change-cell.ram-change-small { background:#77b8ad; }
 .ram-change-cell.ram-change-moderate { background:#d4b755; }
 .ram-change-cell.ram-change-large { background:#dc8a48; }

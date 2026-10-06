@@ -31,6 +31,7 @@ source(file.path("R", "io.R"), local = TRUE)
 source(file.path("R", "inspection.R"), local = TRUE)
 source(file.path("R", "reports.R"), local = TRUE)
 source(file.path("R", "predictions.R"), local = TRUE)
+source(file.path("R", "counterparts.R"), local = TRUE)
 source(file.path("R", "geometry.R"), local = TRUE)
 source(file.path("R", "experimental.R"), local = TRUE)
 source(file.path("R", "ensemble.R"), local = TRUE)
@@ -606,6 +607,7 @@ server <- function(input, output, session) {
   external_validation <- reactiveVal(NULL)
   ensemble_results <- reactiveVal(NULL)
   prediction_ensemble_results <- reactiveVal(NULL)
+  experimental_counterparts <- reactiveVal(NULL)
   selected_residue <- reactiveVal(NULL)
   selected_comparison <- reactiveVal(NULL)
   viewer_ready <- reactiveVal(FALSE)
@@ -827,23 +829,17 @@ server <- function(input, output, session) {
       loaded(list(key = key, name = name, torsions = torsions, chains = chains,
                   pdb = pdb, nmodels = ram_model_count(pdb), source_id = source_id,
                   viewer_format = viewer_format, prediction = prediction,
-                  declared_source = declared_source, input_source = source_type))
+                  declared_source = declared_source, input_source = source_type,
+                  uniprot_accession = if (is_afdb) source_label else NA_character_))
       incProgress(0.25, detail = "Preparing interactive views")
     })
   }, ignoreInit = TRUE)
 
   # Comparison loading is a separate, deliberate action, so changing plot
   # settings does not repeatedly refetch the secondary structure.
-  observeEvent(input$compareSubmit, {
-    is_upload <- identical(input$compareInputSource, "upload")
-    if (is_upload && (is.null(input$compareFile) ||
-                      is.null(input$compareFile$datapath))) {
-      showNotification("Choose a second PDB or mmCIF file.", type="error")
-      return()
-    }
-    secondary <- if (is_upload) input$compareFile$datapath else
-      toupper(trimws(input$comparePDB))
-    source_name <- if (is_upload) input$compareFile$name else secondary
+  load_comparison_structure <- function(secondary, source_name=secondary,
+                                             is_upload=FALSE,
+                                             preferred_chain=NULL) {
     data <- tryCatch(
       ram_load_structure(
         path = if (is_upload) secondary else NULL,
@@ -854,28 +850,51 @@ server <- function(input, output, session) {
         NULL
       }
     )
-    if (is.null(data)) return()
-    torsions <- tryCatch(ram_extract_torsions(ram_model_at(data, 1L)),
-      error = function(e) {
-        showNotification(conditionMessage(e), type="error",duration=12)
+    if (is.null(data)) return(invisible(FALSE))
+    torsions <- tryCatch(ram_extract_torsions(ram_model_at(data,1L)),
+      error=function(e) {
+        showNotification(conditionMessage(e),type="error",duration=12)
         NULL
       })
-    if (is.null(torsions)) return()
-    comparison_loaded(list(pdb=data, torsions=torsions,
+    if(is.null(torsions)) return(invisible(FALSE))
+    comparison_loaded(list(
+      pdb=data,torsions=torsions,
       name=tools::file_path_sans_ext(basename(source_name)),
       source_id=secondary,
-      viewer_format=if (is_upload) ram_detect_format(source_name) else NULL,
-      nmodels=ram_model_count(data)))
-  }, ignoreInit=TRUE)
+      viewer_format=if(is_upload) ram_detect_format(source_name) else NULL,
+      nmodels=ram_model_count(data),
+      preferred_chain=if(length(preferred_chain)==1L &&
+                         !is.na(preferred_chain) && nzchar(preferred_chain))
+        as.character(preferred_chain) else NULL
+    ))
+    invisible(TRUE)
+  }
+
+  observeEvent(input$compareSubmit, {
+    is_upload <- identical(input$compareInputSource,"upload")
+    if(is_upload && (is.null(input$compareFile) ||
+                     is.null(input$compareFile$datapath))) {
+      showNotification("Choose a second PDB or mmCIF file.",type="error")
+      return()
+    }
+    secondary <- if(is_upload) input$compareFile$datapath else
+      toupper(trimws(input$comparePDB))
+    source_name <- if(is_upload) input$compareFile$name else secondary
+    load_comparison_structure(secondary,source_name,is_upload)
+  },ignoreInit=TRUE)
+
   output$compareChainControls <- renderUI({
     first <- req(loaded())
     second <- req(comparison_loaded())
+    second_chains <- unique(second$torsions$chain)
+    selected_second <- if(!is.null(second$preferred_chain) &&
+                          second$preferred_chain %in% second_chains)
+      second$preferred_chain else second_chains[[1L]]
     tags$div(class="ram-compare-chains",
       selectInput("compareChainA", paste("Chain in", first$name),
         choices=first$chains, selected=first$chains[[1L]]),
       selectInput("compareChainB", paste("Chain in", second$name),
-        choices=unique(second$torsions$chain),
-        selected=unique(second$torsions$chain)[[1L]]),
+        choices=second_chains, selected=selected_second),
       if (second$nmodels > 1L)
         selectInput("compareModel", "Second structure model",
           choices=as.character(seq_len(second$nmodels)), selected="1")
@@ -1366,10 +1385,166 @@ server <- function(input, output, session) {
           "No matching PAE matrix was provided for this model."),
         if (length(prediction$notes)) tags$p(
           class = "ram-confidence-warning",
-          paste(prediction$notes, collapse = " "))
+          paste(prediction$notes, collapse = " ")),
+        tags$section(class="ram-counterpart-panel",
+          tags$div(class="ram-confidence-map-title",
+            tags$strong("Experimental counterparts"),
+            tags$span("Find deposited PDB structures mapped to the same UniProt protein.")),
+          tags$p(class="ram-confidence-explainer",
+            "Hits come from the 3D-Beacons network and are restricted to experimentally determined PDBe records. Select a hit to open it directly in RamplotR's Compare workflow."),
+          tags$div(class="ram-counterpart-controls",
+            textInput("counterpartAccession","UniProt accession",
+              value=if(!is.null(structure$uniprot_accession) &&
+                       !is.na(structure$uniprot_accession))
+                structure$uniprot_accession else "",
+              placeholder="e.g. P69905"),
+            actionButton("lookupCounterparts","Find experimental structures",
+              class="btn-default btn-sm")
+          ),
+          uiOutput("counterpartSummary"),
+          DT::DTOutput("counterpartTable"),
+          actionButton("useCounterpart","Compare selected structure",
+            class="btn-primary btn-sm")
+        )
       )
     )
   })
+  lookup_experimental_counterparts <- function(accession, quiet=FALSE) {
+    structure <- req(loaded())
+    normalized <- tryCatch(ram_uniprot_accession(accession),
+      error=function(e) {
+        if(!quiet) showNotification(conditionMessage(e),type="warning",duration=10)
+        NULL
+      })
+    if(is.null(normalized)) return(invisible(FALSE))
+    result <- tryCatch(
+      withProgress(message="Finding experimental structures",value=0.2,{
+        incProgress(0.35,detail="Querying 3D-Beacons")
+        ram_lookup_experimental_counterparts(normalized,max_results=50L)
+      }),
+      error=function(e) e
+    )
+    if(inherits(result,"error")) {
+      experimental_counterparts(list(
+        key=structure$key,accession=normalized,data=NULL,
+        error=conditionMessage(result)
+      ))
+      if(!quiet)
+        showNotification(paste("Experimental counterpart lookup:",
+          conditionMessage(result)),type="warning",duration=14)
+      return(invisible(FALSE))
+    }
+    experimental_counterparts(list(
+      key=structure$key,accession=normalized,data=result,error=NULL
+    ))
+    invisible(TRUE)
+  }
+
+  observeEvent(loaded(), {
+    experimental_counterparts(NULL)
+    structure <- loaded()
+    if(is.null(structure) || is.null(structure$prediction)) return()
+    accession <- structure$uniprot_accession
+    if(!is.null(accession) && length(accession)==1L &&
+       !is.na(accession) && nzchar(accession))
+      lookup_experimental_counterparts(accession,quiet=TRUE)
+  },ignoreInit=TRUE)
+
+  observeEvent(input$lookupCounterparts, {
+    lookup_experimental_counterparts(input$counterpartAccession,quiet=FALSE)
+  },ignoreInit=TRUE)
+
+  counterpart_matches <- reactive({
+    value <- experimental_counterparts()
+    structure <- req(loaded())
+    if(is.null(value) || !identical(value$key,structure$key)) return(NULL)
+    value
+  })
+
+  output$counterpartSummary <- renderUI({
+    value <- counterpart_matches()
+    if(is.null(value))
+      return(tags$p(class="ram-field-hint",
+        "AlphaFold DB models are looked up automatically. For other predictions, enter the matching UniProt accession."))
+    if(!is.null(value$error))
+      return(tags$p(class="ram-confidence-warning",
+        paste("Lookup unavailable:",value$error)))
+    data <- value$data
+    if(is.null(data) || !nrow(data))
+      return(tags$p(class="ram-field-hint",
+        paste("No experimentally determined PDBe structures were returned for",
+              value$accession,".")))
+    best <- data[1L,,drop=FALSE]
+    best_detail <- paste0(
+      if(is.finite(best$coverage[[1L]]))
+        sprintf("%.0f%% coverage",100*best$coverage[[1L]]) else "coverage unavailable",
+      if(is.finite(best$resolution[[1L]]))
+        sprintf(" · %.2f Å",best$resolution[[1L]]) else ""
+    )
+    tags$div(class="ram-official-summary",
+      tags$strong(sprintf("%d experimental structure%s for %s",
+        nrow(data),if(nrow(data)==1L) "" else "s",value$accession)),
+      tags$p(sprintf("Best-ranked hit: %s%s · %s",
+        best$pdb_id[[1L]],
+        if(nzchar(best$chains[[1L]])) paste0(" · chain ",best$chains[[1L]]) else "",
+        best_detail)),
+      tags$p(class="ram-field-hint",
+        "Ranked by UniProt coverage first, then experimental resolution. Missing resolution is retained for methods such as NMR.")
+    )
+  })
+
+  output$counterpartTable <- DT::renderDT({
+    value <- counterpart_matches()
+    if(is.null(value) || !is.null(value$error) ||
+       is.null(value$data) || !nrow(value$data))
+      return(DT::datatable(data.frame(),rownames=FALSE,
+        options=list(dom="t"),class="compact"))
+    data <- value$data
+    shown <- data.frame(
+      PDB=data$pdb_id,
+      Chains=data$chains,
+      Coverage=ifelse(is.finite(data$coverage),
+        sprintf("%.0f%%",100*data$coverage),""),
+      Resolution=ifelse(is.finite(data$resolution),
+        sprintf("%.2f Å",data$resolution),""),
+      Method=data$experimental_method,
+      UniProt_range=ifelse(!is.na(data$uniprot_start) & !is.na(data$uniprot_end),
+        paste0(data$uniprot_start,"–",data$uniprot_end),""),
+      stringsAsFactors=FALSE
+    )
+    DT::datatable(shown,rownames=FALSE,selection="single",
+      options=list(pageLength=8,dom="tip",scrollX=TRUE,autoWidth=FALSE),
+      class="compact stripe hover")
+  },server=FALSE)
+
+  observeEvent(input$useCounterpart, {
+    value <- counterpart_matches()
+    if(is.null(value) || is.null(value$data) || !nrow(value$data)) {
+      showNotification("Find an experimental structure first.",type="warning")
+      return()
+    }
+    selected <- input$counterpartTable_rows_selected
+    if(length(selected)!=1L || is.na(selected) ||
+       selected<1L || selected>nrow(value$data)) {
+      showNotification("Select one experimental structure from the table.",
+                       type="warning")
+      return()
+    }
+    row <- value$data[selected,,drop=FALSE]
+    pdb_id <- row$pdb_id[[1L]]
+    mapped_chain <- if(nzchar(row$chains[[1L]]))
+      trimws(strsplit(row$chains[[1L]],",",fixed=TRUE)[[1L]][[1L]])
+      else NULL
+    updateRadioButtons(session,"compareInputSource",selected="pdb")
+    updateTextInput(session,"comparePDB",value=pdb_id)
+    if(load_comparison_structure(pdb_id,pdb_id,FALSE,mapped_chain)) {
+      updateTabsetPanel(session,"analysisTabs",selected="compare")
+      showNotification(
+        paste("Loaded",pdb_id,"as the experimental comparison structure."),
+        type="message",duration=8)
+    }
+  },ignoreInit=TRUE)
+
   output$predictionReviewMetrics <- renderUI({
     if (is.null(req(loaded())$prediction) || current_model() != 1L)
       return(NULL)

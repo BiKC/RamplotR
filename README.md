@@ -19,7 +19,7 @@ RamplotR is an open-source R Shiny application that brings backbone geometry, a 
 | **Work with predicted models** | Import AlphaFold DB models or upload AlphaFold 2/3, ColabFold and ESMFold structures. Examine pLDDT/PAE and analyse multiple AF2/ColabFold or ESMFold seeds as a prediction ensemble with residue-level φ/ψ, Rama8000 and confidence agreement. |
 | **Examine structural geometry** | Explore peptide ω, side-chain χ1 and descriptive Cβ measurements. Optionally attach the matching deposited structure's official wwPDB validation report for independent rotamer, clash and geometry annotations. |
 | **Inspect experimental evidence** | Overlay a local CCP4/MRC cryo-EM map in the 3D viewer as a qualitative aid, without uploading the map to a separate service. |
-| **Compare models** | Sequence-align chains from two structures; inspect wrapped angular differences, native density-region changes and Rama8000 category changes/outliers. For compatible multi-model structures, calculate circular φ/ψ variability and classification consistency. |
+| **Compare models** | Sequence-align chains from two structures; use the Conformational Change Explorer to navigate residue-level wrapped φ/ψ displacement, then inspect paired residues in linked 2D/3D views alongside native and Rama8000 category changes. |
 | **Publish or automate** | Export SVG and high-resolution PNG figures, filtered CSV tables and standalone HTML reports. Run the offline R command-line tool on individual files or a directory of structures. |
 
 Advanced analysis stays in collapsible panels or dedicated comparison/summary views, keeping the everyday 2D/3D inspection screen uncluttered.

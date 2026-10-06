@@ -67,6 +67,28 @@ ram_angular_difference <- function(a, b) {
   delta
 }
 
+# A simple local displacement in phi/psi space after each angular component
+# has been wrapped independently. This is a navigation/ranking measure, not a
+# statistical significance score or a Cartesian structural distance.
+ram_backbone_angular_displacement <- function(delta_phi, delta_psi) {
+  phi <- as.numeric(delta_phi)
+  psi <- as.numeric(delta_psi)
+  out <- sqrt(phi^2 + psi^2)
+  out[!is.finite(phi) | !is.finite(psi)] <- NA_real_
+  out
+}
+
+ram_backbone_shift_band <- function(displacement) {
+  value <- as.numeric(displacement)
+  out <- rep("Unavailable", length(value))
+  finite <- is.finite(value)
+  out[finite & value < 15] <- "Small"
+  out[finite & value >= 15 & value < 30] <- "Moderate"
+  out[finite & value >= 30 & value < 60] <- "Large"
+  out[finite & value >= 60] <- "Very large"
+  out
+}
+
 # Needleman-Wunsch global alignment of one chain from each structure. Rows
 # containing gaps are retained for display; differences are NA without both
 # measured angles. A modest cell limit prevents unbounded Shiny allocations.
@@ -140,6 +162,9 @@ ram_compare_torsions <- function(a, b) {
   )
   result$delta_phi <- ram_angular_difference(result$phi_a, result$phi_b)
   result$delta_psi <- ram_angular_difference(result$psi_a, result$psi_b)
+  result$angular_displacement <- ram_backbone_angular_displacement(
+    result$delta_phi, result$delta_psi)
+  result$shift_band <- ram_backbone_shift_band(result$angular_displacement)
   result$class_changed <- !is.na(result$region_a) &
     !is.na(result$region_b) & result$region_a != result$region_b
   if (all(c("rama8000_region","rama8000_group","rama8000_score") %in% names(a)) &&

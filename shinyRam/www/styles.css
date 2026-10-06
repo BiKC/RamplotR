@@ -1244,3 +1244,52 @@ body > .container-fluid { max-width: none; padding: 0; }
   border-radius:999px; padding:4px 8px; font-size:9px; font-weight:700; cursor:pointer; }
 .ram-change-top-item:hover,.ram-change-top-item:focus-visible {
   background:#eaf5f2; border-color:#7eb7ae; }
+
+/* Predicted-to-experimental counterpart discovery. Search metadata is kept
+   compact so the result remains a gateway into the linked Compare workspace. */
+.ram-counterpart-panel .ram-confidence-body { gap:10px; }
+.ram-counterpart-controls {
+  display:grid; grid-template-columns:minmax(130px,.8fr) minmax(165px,.9fr) auto;
+  gap:9px 12px; align-items:end; margin:8px 0 4px;
+}
+.ram-counterpart-controls .form-group { margin-bottom:0; }
+.ram-counterpart-searching {
+  margin:6px 0 0; color:#2e6f76; font-size:11px; font-weight:700;
+}
+.ram-counterpart-empty {
+  border:1px dashed #c8dcd8; border-radius:8px; padding:11px 12px;
+  background:#fbfdfc; color:#527077;
+}
+.ram-counterpart-empty p { margin:4px 0 0; font-size:10px; }
+.ram-counterpart-results { display:grid; gap:8px; margin-top:6px; }
+.ram-counterpart-result-head {
+  display:flex; gap:8px; align-items:baseline; flex-wrap:wrap;
+  font-size:10px; color:#607a80;
+}
+.ram-counterpart-result-head strong { color:#245c63; font-size:11px; }
+.ram-counterpart-card {
+  display:flex; justify-content:space-between; gap:12px; align-items:center;
+  border:1px solid #d8e7e4; border-radius:9px; padding:10px 11px;
+  background:#fff;
+}
+.ram-counterpart-card-main {
+  min-width:0; display:grid; grid-template-columns:auto minmax(0,1fr);
+  gap:10px; align-items:start;
+}
+.ram-counterpart-id { display:flex; flex-direction:column; gap:1px;
+  min-width:66px; font-size:9px; color:#6a7f84; }
+.ram-counterpart-id strong { font-size:15px; color:#154f57; letter-spacing:.03em; }
+.ram-counterpart-copy { min-width:0; font-size:10px; color:#3d5d63; }
+.ram-counterpart-copy > strong { display:block; color:#234d54; font-size:11px; }
+.ram-counterpart-copy p { margin:3px 0 0; max-width:720px; }
+.ram-counterpart-meta { display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
+.ram-counterpart-meta span { padding:2px 6px; border-radius:999px;
+  background:#eff6f4; border:1px solid #ddebe8; font-size:9px; color:#42666d; }
+.ram-counterpart-actions { display:flex; gap:6px; flex:0 0 auto; }
+@media(max-width:760px) {
+  .ram-counterpart-controls { grid-template-columns:1fr; }
+  .ram-counterpart-card { align-items:flex-start; flex-direction:column; }
+  .ram-counterpart-card-main { grid-template-columns:1fr; }
+  .ram-counterpart-id { flex-direction:row; gap:7px; align-items:baseline; }
+  .ram-counterpart-actions { width:100%; flex-wrap:wrap; }
+}

@@ -1576,9 +1576,9 @@ server <- function(input, output, session) {
     result <- filtered_comparison()
     fields <- c("chain_a", "residue_a", "insertion_a", "amino_a",
       "chain_b", "residue_b", "insertion_b", "amino_b",
-      "delta_phi", "delta_psi", "class_changed",
-      "rama8000_region_a", "rama8000_region_b", "rama8000_changed",
-      "alignment")
+      "delta_phi", "delta_psi", "angular_displacement", "shift_band",
+      "class_changed", "rama8000_region_a", "rama8000_region_b",
+      "rama8000_changed", "alignment")
     if (!all(fields %in% names(result)))
       return(DT::datatable(data.frame()))
     shown <- result[, fields, drop=FALSE]
@@ -1588,16 +1588,19 @@ server <- function(input, output, session) {
       paste0(shown$residue_b, shown$insertion_b))
     shown$delta_phi <- round(shown$delta_phi, 1)
     shown$delta_psi <- round(shown$delta_psi, 1)
+    shown$angular_displacement <- round(shown$angular_displacement, 1)
     shown$class_changed <- ifelse(shown$class_changed, "Yes", "No")
     shown$rama8000_changed <- ifelse(shown$rama8000_changed, "Yes", "No")
     shown <- shown[, c("chain_a", "pos_a", "amino_a",
       "chain_b", "pos_b", "amino_b", "delta_phi", "delta_psi",
-      "class_changed", "rama8000_region_a", "rama8000_region_b",
+      "angular_displacement", "shift_band", "class_changed",
+      "rama8000_region_a", "rama8000_region_b",
       "rama8000_changed", "alignment"), drop=FALSE]
     DT::datatable(shown, rownames=FALSE,
       colnames=c("Chain A", "Pos A", "AA A", "Chain B", "Pos B", "AA B",
-                 "Δφ (°)", "Δψ (°)", "RamplotR changed",
-                 "Rama8000 A", "Rama8000 B", "Rama8000 changed", "Alignment"),
+                 "Δφ (°)", "Δψ (°)", "Backbone shift (°)", "Shift band",
+                 "RamplotR changed", "Rama8000 A", "Rama8000 B",
+                 "Rama8000 changed", "Alignment"),
       selection="single",
       options=list(pageLength=15,scrollX=FALSE,autoWidth=FALSE,dom="ftip"),
       class="compact stripe hover")
@@ -1671,6 +1674,8 @@ server <- function(input, output, session) {
       tags$div(class="ram-compare-selection-deltas",
         tags$span(paste("Δφ",angle(row$delta_phi[[1L]]))),
         tags$span(paste("Δψ",angle(row$delta_psi[[1L]]))),
+        tags$span(paste("Combined",angle(row$angular_displacement[[1L]]),
+                        "·",row$shift_band[[1L]])),
         tags$span(row$alignment[[1L]]),
         if (isTRUE(row$class_changed[[1L]])) tags$span(
           class="ram-compare-change", "RamplotR region changed"),

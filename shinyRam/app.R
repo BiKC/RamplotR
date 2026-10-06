@@ -348,13 +348,20 @@ ui <- fluidPage(
                     ),
                     tags$div(class = "ram-sequence-detail",
                       tags$p(class = "ram-sequence-instruction",
-                        "Permanent labels show actual PDB residue numbers every ten positions. Enter a number beside a chain to jump directly to it. The colour behind each letter shows Ramachandran classification; the separate coloured underline and number indicate pLDDT, when available."),
+                        "Permanent labels show actual PDB residue numbers every ten positions. Enter a number beside a chain to jump directly to it. The letter background shows the native RamplotR density region, the small corner dot shows Rama8000 standard validation, and the separate underline/number shows pLDDT when available."),
                       tags$div(class = "ram-sequence-legend",
                         tags$span(class="ram-swatch ram-sw-favoured", "Favoured"),
                         tags$span(class="ram-swatch ram-sw-allowed", "Allowed"),
                         tags$span(class="ram-swatch ram-sw-generously-allowed", "Generously allowed"),
                         tags$span(class="ram-swatch ram-sw-outlier", "Not allowed"),
                         tags$span(class="ram-swatch ram-sw-missing", "Missing angles")
+                      ),
+                      tags$div(class="ram-sequence-standard-key",
+                        tags$strong("Standard validation · Rama8000"),
+                        tags$span(class="ram-standard-key-favored", "Favored"),
+                        tags$span(class="ram-standard-key-allowed", "Allowed"),
+                        tags$span(class="ram-standard-key-outlier", "Outlier"),
+                        tags$span("Corner dot on each residue.")
                       ),
                       tags$div(class="ram-sequence-confidence-key",
                         tags$strong("Model confidence · pLDDT"),
@@ -1191,6 +1198,9 @@ server <- function(input, output, session) {
               lapply(seq_len(nrow(chain)), function(i) {
                 residue <- chain[i,,drop=FALSE]
                 score <- residue$plddt[[1L]]
+                standard <- residue$rama8000_region[[1L]]
+                standard_class <- if (is.na(standard)) "ram-seq-standard-missing"
+                  else paste0("ram-seq-standard-",tolower(standard))
                 position <- paste0(residue$resi[[1L]],
                                    residue$insertion_code[[1L]])
                 tags$div(class="ram-seq-slot",
@@ -1200,6 +1210,7 @@ server <- function(input, output, session) {
                   tags$button(type="button",
                     class=paste("ram-seq-res",
                       paste0("ram-seq-",statuses[[i]]),
+                      standard_class,
                       if (show_confidence) "ram-seq-with-confidence" else ""),
                     style=if (is.finite(score))
                       paste0("--ram-plddt-color:",ram_plddt_color(score)) else NULL,
@@ -1209,10 +1220,13 @@ server <- function(input, output, session) {
                     "data-insertion"=residue$insertion_code[[1L]],
                     "data-plddt"=if (is.finite(score))
                       sprintf("%.1f",score) else "",
+                    "data-rama8000"=if (!is.na(standard)) standard else "",
                     title=paste0(residue$resn[[1L]], " ",
                       residue$chain[[1L]], position, " · ",
                       if (is.na(residue$region[[1L]])) "Missing angles"
                       else residue$region[[1L]],
+                      if (!is.na(standard)) paste0(" · Rama8000 ",standard,
+                        " (",residue$rama8000_group[[1L]],")") else "",
                       if (is.finite(score)) sprintf(" · pLDDT %.1f",score)
                       else "",
                       if (!selectable[[i]]) " · Hidden by current filters"

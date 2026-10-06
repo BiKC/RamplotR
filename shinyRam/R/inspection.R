@@ -31,6 +31,25 @@ ram_amino_acid_letters <- c(
   PRO="P", SER="S", THR="T", TRP="W", TYR="Y", VAL="V"
 )
 
+ram_chain_query_sequence <- function(data, chain) {
+  residues <- ram_sequence_data(data)
+  if (!nrow(residues)) return(list(sequence="", residues=residues,
+                                   known_fraction=NA_real_))
+  target <- as.character(chain)
+  rows <- residues$chain == target
+  residues <- residues[rows, , drop=FALSE]
+  if (!nrow(residues)) return(list(sequence="", residues=residues,
+                                   known_fraction=NA_real_))
+  letters <- toupper(as.character(residues$letter))
+  letters[!grepl("^[ACDEFGHIKLMNPQRSTVWY]$", letters)] <- "X"
+  known <- letters != "X"
+  list(
+    sequence=paste0(letters,collapse=""),
+    residues=residues,
+    known_fraction=mean(known)
+  )
+}
+
 ram_sequence_data <- function(data) {
   if (!nrow(data)) return(data.frame(
     chain=character(), resi=integer(), insertion_code=character(),

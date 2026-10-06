@@ -1,6 +1,6 @@
 # End-to-end offline batch regression with known downloaded wwPDB structures.
 # Called by ui-preview.yml after fetching 1CRN and 1D3Z.
-for(filename in c("io","backbone","ramachandran","geometry","experimental",
+for(filename in c("io","backbone","ramachandran","rama8000","geometry","experimental",
                   "ensemble","predictions","reports","batch"))
   source(file.path("shinyRam","R",paste0(filename,".R")))
 assert <- function(x,msg) if(!isTRUE(x)) stop(msg,call.=FALSE)
@@ -21,12 +21,14 @@ assert(nrow(run)==1L && run$status[[1]]=="ok" &&
        file.exists(paste0(prefix,".svg")),
        paste("Batch figure/report/JSON export failed:",run$error[[1]]))
 csv <- utils::read.csv(paste0(prefix,".residues.csv"))
-assert(all(c("omega","omega_status","chi1","phi","psi","region") %in%
+assert(all(c("omega","omega_status","chi1","phi","psi","region",
+             "rama8000_group","rama8000_score","rama8000_region") %in%
            names(csv)) &&
        all(csv$omega_status %in% c("Cis","Trans","Twisted","Missing")),
        "Batch must export new geometry without changing original columns.")
 doc <- paste(readLines(paste0(prefix,".html"),warn=FALSE),collapse="\n")
 assert(grepl("Additional descriptive geometry",doc,fixed=TRUE) &&
+       grepl("Rama8000 standard validation",doc,fixed=TRUE) &&
        grepl("Analysis provenance",doc,fixed=TRUE),
        "Batch HTML report must contain geometry and provenance.")
 if(!requireNamespace("jsonlite",quietly=TRUE))

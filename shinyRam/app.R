@@ -353,7 +353,7 @@ ui <- fluidPage(
                         tags$span(class="ram-swatch ram-sw-favoured", "Favoured"),
                         tags$span(class="ram-swatch ram-sw-allowed", "Allowed"),
                         tags$span(class="ram-swatch ram-sw-generously-allowed", "Generously allowed"),
-                        tags$span(class="ram-swatch ram-sw-outlier", "Outlier"),
+                        tags$span(class="ram-swatch ram-sw-outlier", "Not allowed"),
                         tags$span(class="ram-swatch ram-sw-missing", "Missing angles")
                       ),
                       tags$div(class="ram-sequence-confidence-key",
@@ -453,7 +453,9 @@ ui <- fluidPage(
                       "Allowed", "Favoured"), selected = "All"
                   ),
                   selectInput("reviewFilter", "Review",
-                    c("All residues" = "All", "Outliers" = "Outlier",
+                    c("All residues" = "All",
+                      "Rama8000 outliers" = "Rama8000 outlier",
+                      "RamplotR: Not allowed" = "Not allowed",
                       "Missing angles" = "Missing angles",
                       "Near a contour boundary" = "Near boundary"),
                     selected = "All"

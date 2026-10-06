@@ -1923,6 +1923,8 @@ server <- function(input, output, session) {
     cells <- lapply(seq_along(finite),function(k) {
       i <- finite[[k]]
       number <- data$resi[[i]]
+      insertion <- data$insertion_code[[i]]
+      if (is.na(insertion)) insertion <- ""
       show_number <- k==1L || k==length(finite) ||
         (!is.na(number) && number %% 10L==0L)
       classes <- c("ram-change-cell","ram-group-cell","ram-group-pick",
@@ -1933,12 +1935,12 @@ server <- function(input, output, session) {
         classes <- c(classes,"has-standard-change")
       tags$div(class="ram-change-slot",
         tags$span(class="ram-change-position",
-          if(show_number) paste0(number,data$insertion_code[[i]])
+          if(show_number) paste0(number,insertion)
           else "\u00a0","aria-hidden"="true"),
         tags$button(type="button",class=paste(classes,collapse=" "),
           "data-chain"=data$chain[[i]],
           "data-resi"=data$resi[[i]],
-          "data-insertion"=data$insertion_code[[i]],
+          "data-insertion"=insertion,
           title=sprintf("%s %s:%s · %s → %s · Δφ %.1f° · Δψ %.1f° · shift %.1f° · max within-group SD %s",
             data$resn[[i]],data$chain[[i]],data$resi[[i]],
             result$label_a,result$label_b,
@@ -1997,13 +1999,16 @@ server <- function(input, output, session) {
 
   observeEvent(input$groupComparisonRows_rows_selected, {
     result <- req(group_comparison_matches())
-    ix <- input$groupComparisonRows_rows_selected[[1L]]
-    if(!length(ix) || !is.finite(ix) || ix<1L ||
+    selection <- input$groupComparisonRows_rows_selected
+    if (is.null(selection) || !length(selection)) return()
+    ix <- suppressWarnings(as.integer(selection[[1L]]))
+    if(length(ix)!=1L || is.na(ix) || ix<1L ||
        ix>nrow(result$comparison)) return()
     row <- result$comparison[ix,,drop=FALSE]
     selected_residue(list(chain=as.character(row$chain[[1L]]),
       resi=as.integer(row$resi[[1L]]),
-      insertion_code=as.character(row$insertion_code[[1L]])))
+      insertion_code=if(is.na(row$insertion_code[[1L]])) ""
+        else as.character(row$insertion_code[[1L]])))
   })
 
   observeEvent(input$ramGroupComparisonPick, {

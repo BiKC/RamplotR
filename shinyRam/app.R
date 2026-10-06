@@ -1950,10 +1950,16 @@ server <- function(input, output, session) {
     withProgress(message="Analysing prediction ensemble",value=0.05,{
       pdbs <- list()
       labels <- character()
+      hashes <- character()
 
       if(include_loaded) {
         pdbs[[length(pdbs)+1L]] <- structure$pdb
         labels <- c(labels,structure$name)
+        hashes <- c(hashes,
+          if(is.character(structure$source_id) &&
+             length(structure$source_id)==1L &&
+             file.exists(structure$source_id))
+            unname(tools::md5sum(structure$source_id)) else NA_character_)
       }
 
       if(file_count) {
@@ -1983,7 +1989,16 @@ server <- function(input, output, session) {
           pdbs[[length(pdbs)+1L]] <- model
           labels <- c(labels,
             tools::file_path_sans_ext(basename(uploaded$name[[i]])))
+          hashes <- c(hashes,unname(tools::md5sum(uploaded$datapath[[i]])))
         }
+      }
+
+      known_hashes <- hashes[!is.na(hashes) & nzchar(hashes)]
+      if(anyDuplicated(known_hashes)) {
+        showNotification(
+          "The ensemble contains duplicate coordinate files. Remove duplicate seeds/models before analysing agreement.",
+          type="error",duration=14)
+        return()
       }
 
       result <- tryCatch(
@@ -2007,6 +2022,12 @@ server <- function(input, output, session) {
         }
       )
       if(is.null(result)) return()
+      result$provenance <- data.frame(
+        model=result$labels,
+        source=result$source,
+        coordinate_md5=hashes[seq_len(result$analyzed_models)],
+        stringsAsFactors=FALSE
+      )
       prediction_ensemble_results(list(
         key=structure$key,mode=input$validationMode,
         reference=input$bgtype,background=input$background,
@@ -2145,8 +2166,14 @@ server <- function(input, output, session) {
   )
   output$downloadPredictionEnsembleModels <- downloadHandler(
     filename=function() safe_filename("prediction-ensemble-models.csv"),
-    content=function(file) utils::write.csv(
-      req(prediction_ensemble_matches())$model_summary,file,row.names=FALSE,na="")
+    content=function(file) {
+      result <- req(prediction_ensemble_matches())
+      models <- result$model_summary
+      if(!is.null(result$provenance))
+        models <- merge(models,result$provenance,by="model",all.x=TRUE,
+                        sort=FALSE)
+      utils::write.csv(models,file,row.names=FALSE,na="")
+    }
   )
 
   output$summary <- renderUI({

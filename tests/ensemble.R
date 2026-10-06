@@ -25,8 +25,8 @@ assert(two$changes_class && two$class_consistency==0.5 &&
 
 m$rama8000_region <- c("Favored","Allowed")
 m$plddt <- c(95,88)
-other$rama8000_region <- c("Outlier","Allowed")
-other$plddt <- c(91,92)
+other$rama8000_region <- ifelse(other$resi==1L,"Outlier","Allowed")
+other$plddt <- ifelse(other$resi==1L,91,92)
 extended <- ram_ensemble_summary(list(m,other))
 e1 <- extended[extended$resi==1L,,drop=FALSE]
 e2 <- extended[extended$resi==2L,,drop=FALSE]

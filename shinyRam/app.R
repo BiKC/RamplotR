@@ -1997,6 +1997,23 @@ server <- function(input, output, session) {
                                                file,row.names=FALSE,na="")
   )
 
+  prediction_ensemble_input_key <- reactive({
+    structure <- req(loaded())
+    uploaded <- input$predictionEnsembleFiles
+    file_signature <- if(is.null(uploaded) || !nrow(uploaded)) "" else
+      paste(uploaded$name,uploaded$size,uploaded$type,uploaded$datapath,
+            sep=":",collapse="|")
+    include_loaded <- isTRUE(input$includeLoadedPrediction) &&
+      !identical(structure$declared_source,"alphafold3")
+    paste(
+      if(is.null(input$predictionEnsembleSource)) "" else input$predictionEnsembleSource,
+      include_loaded,
+      if(include_loaded) current_model() else "",
+      file_signature,
+      sep="::"
+    )
+  })
+
   prediction_ensemble_matches <- reactive({
     value <- prediction_ensemble_results()
     if(is.null(value)) return(NULL)
@@ -2004,7 +2021,9 @@ server <- function(input, output, session) {
     if(!identical(value$key,structure$key) ||
        !identical(value$mode,input$validationMode) ||
        !identical(value$reference,input$bgtype) ||
-       !identical(value$background,input$background)) return(NULL)
+       !identical(value$background,input$background) ||
+       !identical(value$input_key,prediction_ensemble_input_key()))
+      return(NULL)
     value$result
   })
 
@@ -2045,15 +2064,23 @@ server <- function(input, output, session) {
       pdbs <- list()
       labels <- character()
       hashes <- character()
+      structure_models <- integer()
+      input_roles <- character()
 
       if(include_loaded) {
-        pdbs[[length(pdbs)+1L]] <- structure$pdb
-        labels <- c(labels,structure$name)
+        selected_model <- current_model()
+        pdbs[[length(pdbs)+1L]] <- ram_model_at(structure$pdb,selected_model)
+        labels <- c(labels,
+          if(structure$nmodels>1L)
+            sprintf("%s [model %s]",structure$name,selected_model)
+          else structure$name)
         hashes <- c(hashes,
           if(is.character(structure$source_id) &&
              length(structure$source_id)==1L &&
              file.exists(structure$source_id))
             unname(tools::md5sum(structure$source_id)) else NA_character_)
+        structure_models <- c(structure_models,selected_model)
+        input_roles <- c(input_roles,"loaded")
       }
 
       if(file_count) {
@@ -2084,6 +2111,8 @@ server <- function(input, output, session) {
           labels <- c(labels,
             tools::file_path_sans_ext(basename(uploaded$name[[i]])))
           hashes <- c(hashes,unname(tools::md5sum(uploaded$datapath[[i]])))
+          structure_models <- c(structure_models,1L)
+          input_roles <- c(input_roles,"uploaded")
         }
       }
 
@@ -2119,12 +2148,15 @@ server <- function(input, output, session) {
       result$provenance <- data.frame(
         model=result$labels,
         source=result$source,
+        input_role=input_roles[seq_len(result$analyzed_models)],
+        structure_model=structure_models[seq_len(result$analyzed_models)],
         coordinate_md5=hashes[seq_len(result$analyzed_models)],
         stringsAsFactors=FALSE
       )
       prediction_ensemble_results(list(
         key=structure$key,mode=input$validationMode,
         reference=input$bgtype,background=input$background,
+        input_key=prediction_ensemble_input_key(),
         result=result
       ))
       incProgress(0.6,detail="Summarising model agreement")
@@ -2263,9 +2295,15 @@ server <- function(input, output, session) {
     content=function(file) {
       result <- req(prediction_ensemble_matches())
       models <- result$model_summary
-      if(!is.null(result$provenance))
-        models <- merge(models,result$provenance,by="model",all.x=TRUE,
-                        sort=FALSE)
+      if(!is.null(result$provenance)) {
+        provenance <- result$provenance
+        if(nrow(provenance)!=nrow(models))
+          stop("Prediction ensemble provenance no longer matches model order.")
+        models$source <- provenance$source
+        models$input_role <- provenance$input_role
+        models$structure_model <- provenance$structure_model
+        models$coordinate_md5 <- provenance$coordinate_md5
+      }
       utils::write.csv(models,file,row.names=FALSE,na="")
     }
   )

@@ -58,6 +58,22 @@ Confidence is attached to a specific prediction model, not automatically
 transferred to unrelated models in an NMR ensemble. For additional models
 choose the model and supply compatible confidence data separately.
 
+## Experimental counterpart discovery
+
+For a loaded prediction, the confidence panel also offers an **Experimental
+counterparts** workflow. AlphaFold DB inputs retain their UniProt accession and
+query 3D-Beacons automatically. For uploaded prediction models, provide the
+matching UniProt accession manually.
+
+Only experimentally determined **PDBe** records are shown. Selecting one loads
+that PDB entry directly into RamplotR's Compare tab for sequence-aligned
+residue-level phi/psi and 3D inspection. A shared UniProt accession is useful
+evidence that the structures represent the same protein, but it does not imply
+the same construct, ligand state, oligomeric state or conformation.
+
+See [Experimental counterparts for predicted structures](experimental-counterparts.md)
+for details and limitations.
+
 ## Interpretation and provenance
 
 pLDDT is a prediction of local correctness, while PAE measures expected

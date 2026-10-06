@@ -46,4 +46,56 @@ assert(p$models_present==1L && p$phi_models==1L &&
 bad <- rbind(m,m[1,,drop=FALSE])
 assert(inherits(try(ram_ensemble_summary(list(bad)),silent=TRUE),
                "try-error"),"Ambiguous IDs must be rejected.")
+# Prediction-ensemble orchestration is tested with small stubs so this unit test
+# remains independent of Bio3D and file I/O.
+ram_model_at <- function(pdb,index=1L) pdb
+ram_extract_torsions <- function(pdb) pdb$torsions
+ram_prediction_key <- function(chain,resi,insertion_code="") {
+  paste(chain,resi,insertion_code,sep="\r")
+}
+ram_plddt_category <- function(value) {
+  ifelse(value>=90,"Very high",ifelse(value>=70,"Confident",
+    ifelse(value>=50,"Low","Very low")))
+}
+ram_prediction_from_atoms <- function(pdb,torsions,source) {
+  data.frame(chain=torsions$chain,resi=torsions$resi,
+    insertion_code=torsions$insertion_code,
+    plddt=pdb$plddt,stringsAsFactors=FALSE)
+}
+make_prediction <- function(phi_shift=0,plddt=c(92,81)) list(
+  torsions=data.frame(chain="A",resi=1:2,insertion_code="",
+    resn=c("ALA","SER"),phi=c(-60,-80)+phi_shift,
+    psi=c(-45,150),stringsAsFactors=FALSE),
+  plddt=plddt
+)
+prediction_classifier <- function(torsions) {
+  torsions$region <- c("Favoured","Allowed")
+  torsions$rama8000_region <- if(torsions$phi[[1L]] < -55)
+    c("Favored","Allowed") else c("Allowed","Allowed")
+  torsions
+}
+prediction <- ram_prediction_ensemble_analyze(
+  list(make_prediction(0,c(94,80)),make_prediction(12,c(88,84))),
+  classifier=prediction_classifier,source="alphafold2",
+  labels=c("seed-1","seed-2")
+)
+assert(prediction$analyzed_models==2L && prediction$available_models==2L &&
+       prediction$common_residues==2L,
+       "Prediction ensemble model/residue coverage changed.")
+assert(identical(prediction$labels,c("seed-1","seed-2")) &&
+       identical(as.character(prediction$model_summary$model),
+                 c("seed-1","seed-2")),
+       "Prediction ensemble model labels must be preserved.")
+p1 <- prediction$summary[prediction$summary$resi==1L,,drop=FALSE]
+assert(p1$plddt_models==2L && abs(p1$plddt_mean-91)<1e-12 &&
+       p1$rama8000_changes && p1$rama8000_consistency==0.5,
+       "Prediction ensemble must combine pLDDT and Rama8000 disagreement.")
+assert(abs(prediction$model_summary$plddt_mean[[1L]]-87)<1e-12 &&
+       prediction$model_summary$residues[[1L]]==2L,
+       "Per-model prediction provenance summary changed.")
+assert(inherits(try(ram_prediction_ensemble_analyze(
+  list(make_prediction(),make_prediction()),prediction_classifier,
+  source="alphafold3"),silent=TRUE),"try-error"),
+  "AF3 must not be silently interpreted as a B-factor prediction ensemble.")
+
 message("Circular ensemble geometry and residue-alignment tests passed.")

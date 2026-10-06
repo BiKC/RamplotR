@@ -94,4 +94,22 @@ assert(identical(m$atom$x,c(11,12)) &&
 assert(ram_model_count(m)==1L, "Selected model must not retain ensemble flag")
 assert(inherits(try(ram_model_at(pdb,3L),silent=TRUE),"try-error"),
        "Invalid model must fail")
+seq_fixture <- data.frame(
+  chain=c("A","A","A","B"),
+  resi=c(1L,2L,3L,1L),
+  insertion_code=c("","","",""),
+  resn=c("ALA","GLY","MSE","VAL"),
+  phi=c(-60,-70,-80,-90),
+  psi=c(-40,140,150,160),
+  region=c("Favoured","Allowed","Allowed","Favoured"),
+  stringsAsFactors=FALSE
+)
+seq_a <- ram_chain_query_sequence(seq_fixture,"A")
+assert(identical(seq_a$sequence,"AGX"),
+       "Counterpart search must preserve unknown residues as X.")
+assert(isTRUE(all.equal(seq_a$known_fraction,2/3)),
+       "Known-residue fraction changed for counterpart sequence search.")
+assert(identical(ram_chain_query_sequence(seq_fixture,"B")$sequence,"V"),
+       "Chain-specific counterpart sequence extraction changed.")
+
 message("Inspection, alignment and structural model unit tests passed")

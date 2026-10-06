@@ -6,7 +6,7 @@ The everyday workflow is deliberately short: load a PDB/mmCIF structure, inspect
 
 The inspector beneath the structure input is shared across tabs. Selecting a residue from the Ramachandran plot, DataTable, sequence, or 3D structure updates the inspector, highlights the corresponding point, shows the residue as orange sticks and focuses the NGL camera.
 
-**Show in plot** brings you to the plot and molecular viewer without clearing the selection. **Clear** restores the overview. **Previous issue** and **Next issue** navigate through residues prioritised as outliers, unavailable/terminal backbone angles, and positions within two percentile points of a density cutoff. “Near boundary” is a visual review hint; it is not an additional scientific quality classification.
+**Show in plot** brings you to the plot and molecular viewer without clearing the selection. **Clear** restores the overview. **Previous issue** and **Next issue** navigate through residues prioritised as Rama8000 outliers, native RamplotR `Not allowed` regions, unavailable/terminal backbone angles, and positions within two percentile points of a density cutoff. “Near boundary” is a visual review hint; it is not an additional scientific quality classification.
 
 On a loaded screen with no selected residue, the inspector is reduced to a single review action. After selecting a residue, navigation controls become available. Representation buttons and the ligand, DNA, RNA, spin and rock switches remain visible beneath the viewer, so users can discover them without opening a settings menu.
 
@@ -27,11 +27,7 @@ beside any chain, or press Enter in its number field, to find positions
 directly, such as residue 104. A hidden residue is still located, with a
 message explaining that its selection is blocked by current plot filters.
 
-For predicted models, each residue button also shows its numerical
-**pLDDT** below the amino-acid letter. A separate coloured underline and
-legend distinguish high, confident, low and very low pLDDT from the
-Ramachandran classification fill. Positions with unavailable confidence
-show a dash, never an invented zero.
+For every structure, the expanded navigator keeps the native RamplotR density region as the letter background and shows the independent **Rama8000 standard-validation category** as a small corner marker (Favored, Allowed or Outlier). For predicted models, each residue button additionally shows its numerical **pLDDT** below the amino-acid letter. A separate coloured underline and legend distinguish high, confident, low and very low pLDDT from both geometry classifications. Positions with unavailable confidence show a dash, never an invented zero.
 
 ## The residue table
 
@@ -74,9 +70,11 @@ partner. If one structure contains an insertion/deletion at the selected
 position, only the available residue is highlighted and the missing
 partner is shown as an alignment gap.
 
+Above the paired 2D/3D workspace, the **Conformational change explorer** represents each aligned residue as one compact cell. Its colour ranks the combined wrapped backbone displacement, defined as `sqrt(Δφ² + Δψ²)` after wrapping each angle across ±180°. The bands (<15°, 15–30°, 30–60° and ≥60°) are navigation aids, not statistical significance thresholds or Cartesian distances. Clicking a cell or one of the five largest-shift shortcuts selects that aligned pair everywhere, including both 3D structures.
+
 Use **Find aligned pair** to jump by the true residue number in either
 selected chain (for example 104), then inspect the primary/comparison
-amino acids, φ/ψ angles and wrapped Δφ/Δψ directly below the views.
+amino acids, φ/ψ angles, wrapped Δφ/Δψ, combined backbone displacement and Rama8000 categories directly below the views.
 **Fit both chains** resets the camera without clearing the current
 selection. The shared primary-structure inspector and sequence navigator
 follow the selected primary residue when it is visible under current plot
@@ -93,7 +91,7 @@ Record the software version, reference dataset, background, classification mode,
 
 ## Regression coverage
 
-- `Rscript tests/inspection.R`: review ordering, sequence identities, insertion/deletion-aware alignment, angular wraparound and model coordinates.
+- `Rscript tests/inspection.R`: review ordering, sequence identities, insertion/deletion-aware alignment, angular wraparound, conformational-displacement ranking and model coordinates.
 - `Rscript tests/reports.R`: export real vector SVG, PNG and self-contained HTML.
 - `Rscript tests/model-integration.R`: an actual multi-model 1D3Z NMR PDB.
 - `node tests/ui.test.cjs`: JS message-handler and residue-selection contracts.

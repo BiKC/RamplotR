@@ -500,6 +500,7 @@ ui <- fluidPage(
                 ),
                 uiOutput("compareChainControls"),
                 tags$div(class = "ram-compare-status", uiOutput("compareSummary")),
+                uiOutput("compareChangeTrack"),
                 tags$div(class = "ram-compare-toolbar",
                   selectInput("compareJumpSide", "Locate in", c(
                     "Primary chain" = "a", "Comparison chain" = "b")),
@@ -541,7 +542,8 @@ ui <- fluidPage(
                       "Changed RamplotR region" = "changed",
                       "Changed Rama8000 category" = "standard_changed",
                       "Rama8000 outlier in either structure" = "standard_outlier",
-                      "Angle difference ≥ 30°" = "large",
+                      "Combined backbone shift ≥ 30°" = "shift_large",
+                      "Either angle difference ≥ 30°" = "large",
                       "Insertions / deletions" = "gaps"), selected = "All"),
                   downloadButton("downloadComparison", "Export comparison CSV")
                 ),
@@ -1464,6 +1466,12 @@ server <- function(input, output, session) {
   observeEvent(input$ramComparePlotPick, {
     choose_comparison(input$ramComparePlotPick)
   }, ignoreInit=TRUE)
+  observeEvent(input$ramCompareTrackPick, {
+    data <- isolate(comparison_data())
+    row_id <- suppressWarnings(as.integer(input$ramCompareTrackPick))
+    index <- match(row_id, data$row_id)
+    if (length(index) == 1L && !is.na(index)) choose_comparison(index)
+  }, ignoreInit=TRUE)
   observeEvent(input$comparison_row_last_clicked, {
     rows <- filtered_comparison()
     i <- suppressWarnings(as.integer(input$comparison_row_last_clicked))
@@ -1533,6 +1541,9 @@ server <- function(input, output, session) {
       result <- result[
         result$rama8000_region_a == "Outlier" |
         result$rama8000_region_b == "Outlier", , drop=FALSE]
+    else if (identical(criterion, "shift_large"))
+      result <- result[is.finite(result$angular_displacement) &
+                       result$angular_displacement >= 30, , drop=FALSE]
     else if (identical(criterion, "large"))
       result <- result[(!is.na(result$delta_phi) & abs(result$delta_phi)>=30) |
                        (!is.na(result$delta_psi) & abs(result$delta_psi)>=30),
@@ -1552,8 +1563,12 @@ server <- function(input, output, session) {
                                  names(result)))
       sum(result$rama8000_region_a == "Outlier" |
           result$rama8000_region_b == "Outlier", na.rm=TRUE) else 0L
+    shifts <- result$angular_displacement[is.finite(result$angular_displacement)]
     tags$div(class="ram-compare-metrics",
       tags$span(tags$strong(sum(aligned)), " aligned residues"),
+      tags$span(tags$strong(sum(shifts>=30)), " pairs with ≥30° combined shift"),
+      tags$span(tags$strong(if(length(shifts)) sprintf("%.1f°",max(shifts)) else "n/a"),
+                " largest combined shift"),
       tags$span(tags$strong(sum(result$class_changed)), " RamplotR region changes"),
       tags$span(tags$strong(standard_changes), " Rama8000 category changes"),
       tags$span(tags$strong(standard_outliers), " pairs with a Rama8000 outlier"),
@@ -1561,13 +1576,87 @@ server <- function(input, output, session) {
       tags$span("Angular differences account for the -180° / +180° boundary.")
     )
   })
+  output$compareChangeTrack <- renderUI({
+    data <- comparison_data()
+    if (!nrow(data) || !"angular_displacement" %in% names(data)) return(NULL)
+    finite <- which(is.finite(data$angular_displacement) &
+                    data$alignment %in% c("Match","Substitution"))
+    if (!length(finite)) return(NULL)
+    selected <- selected_comparison()
+    band_class <- function(value)
+      paste0("ram-change-",tolower(gsub(" ","-",value,fixed=TRUE)))
+    residue_label <- function(side, i) {
+      chain <- data[[paste0("chain_",side)]][[i]]
+      resi <- data[[paste0("residue_",side)]][[i]]
+      ins <- data[[paste0("insertion_",side)]][[i]]
+      aa <- data[[paste0("amino_",side)]][[i]]
+      paste0(aa," ",chain,resi,ifelse(is.na(ins),"",ins))
+    }
+    cells <- lapply(seq_along(finite),function(k) {
+      i <- finite[[k]]
+      shift <- data$angular_displacement[[i]]
+      number <- data$residue_a[[i]]
+      insertion <- data$insertion_a[[i]]
+      show_number <- k==1L || k==length(finite) ||
+        (!is.na(number) && number %% 10L == 0L)
+      tags$div(class="ram-change-slot",
+        tags$span(class="ram-change-position",
+          if(show_number) paste0(number,ifelse(is.na(insertion),"",insertion))
+          else "\u00a0",
+          "aria-hidden"="true"),
+        tags$button(
+          type="button",
+          class=paste("ram-change-cell","ram-change-pick",
+            band_class(data$shift_band[[i]]),
+            if (!is.null(selected) && identical(data$row_id[[i]],selected))
+              "is-selected" else ""),
+          "data-row-id"=data$row_id[[i]],
+          title=sprintf("%s ↔ %s · Δφ %.1f° · Δψ %.1f° · combined %.1f°",
+            residue_label("a",i),residue_label("b",i),
+            data$delta_phi[[i]],data$delta_psi[[i]],shift),
+          "aria-label"=sprintf(
+            "Inspect aligned residue pair with %.1f degree backbone shift",shift)
+        )
+      )
+    })
+    ranked <- finite[order(data$angular_displacement[finite],decreasing=TRUE)]
+    ranked <- head(ranked,5L)
+    tags$section(class="ram-change-explorer",
+      tags$div(class="ram-change-head",
+        tags$div(
+          tags$h3("Conformational change explorer"),
+          tags$p("Each cell is one aligned residue. Colour ranks the combined wrapped φ/ψ displacement; it is a navigation measure, not a significance score.")
+        ),
+        tags$div(class="ram-change-legend",
+          tags$span(class="ram-change-small","<15°"),
+          tags$span(class="ram-change-moderate","15–30°"),
+          tags$span(class="ram-change-large","30–60°"),
+          tags$span(class="ram-change-very-large","≥60°")
+        )
+      ),
+      tags$div(class="ram-change-track",role="group",
+        "aria-label"="Aligned residue conformational-change track",cells),
+      tags$div(class="ram-change-top",
+        tags$strong("Largest local shifts"),
+        lapply(ranked,function(i) tags$button(
+          type="button",class="ram-change-top-item ram-change-pick",
+          "data-row-id"=data$row_id[[i]],
+          sprintf("%s ↔ %s · %.1f°",
+            residue_label("a",i),residue_label("b",i),
+            data$angular_displacement[[i]])
+        ))
+      )
+    )
+  })
+  outputOptions(output,"compareChangeTrack",suspendWhenHidden=FALSE)
+
   output$comparison <- DT::renderDT({
     result <- filtered_comparison()
     fields <- c("chain_a", "residue_a", "insertion_a", "amino_a",
       "chain_b", "residue_b", "insertion_b", "amino_b",
-      "delta_phi", "delta_psi", "class_changed",
-      "rama8000_region_a", "rama8000_region_b", "rama8000_changed",
-      "alignment")
+      "delta_phi", "delta_psi", "angular_displacement", "shift_band",
+      "class_changed", "rama8000_region_a", "rama8000_region_b",
+      "rama8000_changed", "alignment")
     if (!all(fields %in% names(result)))
       return(DT::datatable(data.frame()))
     shown <- result[, fields, drop=FALSE]
@@ -1577,16 +1666,19 @@ server <- function(input, output, session) {
       paste0(shown$residue_b, shown$insertion_b))
     shown$delta_phi <- round(shown$delta_phi, 1)
     shown$delta_psi <- round(shown$delta_psi, 1)
+    shown$angular_displacement <- round(shown$angular_displacement, 1)
     shown$class_changed <- ifelse(shown$class_changed, "Yes", "No")
     shown$rama8000_changed <- ifelse(shown$rama8000_changed, "Yes", "No")
     shown <- shown[, c("chain_a", "pos_a", "amino_a",
       "chain_b", "pos_b", "amino_b", "delta_phi", "delta_psi",
-      "class_changed", "rama8000_region_a", "rama8000_region_b",
+      "angular_displacement", "shift_band", "class_changed",
+      "rama8000_region_a", "rama8000_region_b",
       "rama8000_changed", "alignment"), drop=FALSE]
     DT::datatable(shown, rownames=FALSE,
       colnames=c("Chain A", "Pos A", "AA A", "Chain B", "Pos B", "AA B",
-                 "Δφ (°)", "Δψ (°)", "RamplotR changed",
-                 "Rama8000 A", "Rama8000 B", "Rama8000 changed", "Alignment"),
+                 "Δφ (°)", "Δψ (°)", "Backbone shift (°)", "Shift band",
+                 "RamplotR changed", "Rama8000 A", "Rama8000 B",
+                 "Rama8000 changed", "Alignment"),
       selection="single",
       options=list(pageLength=15,scrollX=FALSE,autoWidth=FALSE,dom="ftip"),
       class="compact stripe hover")
@@ -1660,6 +1752,8 @@ server <- function(input, output, session) {
       tags$div(class="ram-compare-selection-deltas",
         tags$span(paste("Δφ",angle(row$delta_phi[[1L]]))),
         tags$span(paste("Δψ",angle(row$delta_psi[[1L]]))),
+        tags$span(paste("Combined",angle(row$angular_displacement[[1L]]),
+                        "·",row$shift_band[[1L]])),
         tags$span(row$alignment[[1L]]),
         if (isTRUE(row$class_changed[[1L]])) tags$span(
           class="ram-compare-change", "RamplotR region changed"),

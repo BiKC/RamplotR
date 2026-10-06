@@ -614,6 +614,42 @@ const assert = require("node:assert/strict");
         node && node.clientWidth > 0 && node.clientHeight > 0 &&
         s.getRepresentationsByName("ram-compare-highlight-a").list.length > 0;
     }, {timeout:50000});
+    await page.waitForFunction(() => {
+      const track = document.querySelector(".ram-change-track");
+      const cells = document.querySelectorAll(".ram-change-cell");
+      return track && cells.length > 20;
+    }, {timeout:18000});
+    const changeTrack = await page.evaluate(() => {
+      const cells = Array.from(document.querySelectorAll(".ram-change-cell"));
+      const top = Array.from(document.querySelectorAll(".ram-change-top-item"));
+      return {
+        cells: cells.length,
+        bands: [...new Set(cells.map(node =>
+          [...node.classList].find(cls => cls.startsWith("ram-change-") &&
+            !["ram-change-cell","ram-change-pick"].includes(cls))))],
+        positions: Array.from(document.querySelectorAll(".ram-change-position"))
+          .map(node => node.textContent.trim()).filter(Boolean),
+        topLabels: top.map(node => node.textContent.trim())
+      };
+    });
+    assert.ok(changeTrack.cells > 20,
+      "Conformational change explorer should contain aligned residue cells.");
+    assert.ok(changeTrack.topLabels.length > 0 && changeTrack.topLabels.length <= 5,
+      "Explorer should expose the largest local shifts as navigation targets.");
+    assert.ok(changeTrack.positions.includes("10"),
+      "Change explorer should show permanent true residue numbers.");
+    // Self-comparison should be entirely in the Small band.
+    assert.deepEqual(changeTrack.bands, ["ram-change-small"],
+      "Self-comparison should have no artificial backbone displacement.");
+    await page.click(".ram-change-cell");
+    await page.waitForFunction(() => {
+      const cell = document.querySelector(".ram-change-cell.is-selected");
+      const stage = window.getNGLStage && window.getNGLStage("NGLCompare");
+      return cell && stage &&
+        stage.getRepresentationsByName("ram-compare-highlight-a").list.length === 1 &&
+        stage.getRepresentationsByName("ram-compare-highlight-b").list.length === 1 &&
+        document.querySelector(".ram-compare-selection-pair");
+    }, {timeout:18000});
     await page.$eval("#compareJumpResidue", input => {
       input.value = "12";
       input.dispatchEvent(new Event("input",{bubbles:true}));

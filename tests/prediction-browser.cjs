@@ -46,6 +46,34 @@ const puppeteer = require("puppeteer-core");
   try {
     const page = await browser.newPage();
     page.on("pageerror",error=>console.error("Browser error:",error.message));
+    const counterpartSearchBodies = [];
+    await page.setRequestInterception(true);
+    page.on("request",request => {
+      const url=request.url();
+      const cors={"access-control-allow-origin":"*","content-type":"application/json"};
+      if(url==="https://search.rcsb.org/rcsbsearch/v2/query") {
+        counterpartSearchBodies.push(JSON.parse(request.postData()||"{}"));
+        request.respond({status:200,headers:cors,body:JSON.stringify({
+          total_count:1,
+          result_set:[{identifier:"1CRN_1",score:1}]
+        })});
+      } else if(url==="https://data.rcsb.org/rest/v1/core/polymer_entity/1CRN/1") {
+        request.respond({status:200,headers:cors,body:JSON.stringify({
+          rcsb_polymer_entity_container_identifiers:{auth_asym_ids:["A"]},
+          rcsb_polymer_entity:{pdbx_description:"Crambin"},
+          entity_poly:{pdbx_strand_id:"A"}
+        })});
+      } else if(url==="https://data.rcsb.org/rest/v1/core/entry/1CRN") {
+        request.respond({status:200,headers:cors,body:JSON.stringify({
+          struct:{title:"Water structure of crambin"},
+          exptl:[{method:"X-RAY DIFFRACTION"}],
+          rcsb_entry_info:{resolution_combined:[1.5]},
+          rcsb_accession_info:{initial_release_date:"1981-04-30"}
+        })});
+      } else {
+        request.continue();
+      }
+    });
     await page.setViewport({width:1366,height:900,deviceScaleFactor:1});
     await page.goto("http://127.0.0.1:8765",{
       waitUntil:"networkidle2",timeout:60000});
@@ -101,6 +129,49 @@ const puppeteer = require("puppeteer-core");
       "ESMFold without PAE must not invent an error map");
     await page.screenshot({path:path.join(output,"prediction-esmfold.png"),
       fullPage:true});
+
+    // A predicted model can discover experimental PDB counterparts without
+    // leaving the RamplotR workflow. API calls are mocked here so CI tests the
+    // client-side request contract and one-click comparison deterministically.
+    await page.click("#ram-experimental-counterparts > summary");
+    await page.waitForSelector("#findExperimentalStructures",{timeout:10000});
+    await page.select("#experimentalIdentity","0.90");
+    await page.click("#findExperimentalStructures");
+    await page.waitForFunction(() =>
+      document.querySelectorAll(".ram-counterpart-card").length===1 &&
+      document.querySelector(".ram-counterpart-card").textContent.includes("1CRN") &&
+      document.querySelector(".ram-counterpart-card").textContent.includes("X-RAY DIFFRACTION") &&
+      document.querySelector(".ram-counterpart-card").textContent.includes("1.50 Å"),
+      {timeout:20000});
+    assert.equal(counterpartSearchBodies.length,1,
+      "Experimental counterpart search should issue one RCSB sequence request.");
+    const counterpartRequest=counterpartSearchBodies[0];
+    assert.equal(counterpartRequest.query.service,"sequence");
+    assert.equal(counterpartRequest.query.parameters.target,"pdb_protein_sequence");
+    assert.equal(counterpartRequest.query.parameters.identity_cutoff,0.9);
+    assert.deepEqual(counterpartRequest.request_options.results_content_type,
+      ["experimental"]);
+    const pdbeHref=await page.$eval(".ram-counterpart-card a",
+      node=>node.href);
+    assert.ok(pdbeHref.includes("ebi.ac.uk/pdbe/entry/pdb/1crn"),
+      "Experimental candidates should link to the current PDBe entry page.");
+    await page.click(".ram-experimental-compare");
+    await page.waitForFunction(() => {
+      const active=document.querySelector(".ram-main .nav-tabs li.active a");
+      const chain=document.getElementById("compareChainB");
+      const rows=document.querySelectorAll("#comparison tbody tr");
+      return active && active.dataset.value==="compare" &&
+        chain && chain.value==="A" && rows.length>0;
+    },{timeout:45000});
+    await page.waitForFunction(() =>
+      document.querySelectorAll(".ram-change-cell").length>20,
+      {timeout:20000});
+    await page.screenshot({
+      path:path.join(output,"prediction-experimental-counterpart.png"),
+      fullPage:true
+    });
+    await page.click('.nav-tabs a[data-value="plot"]');
+
     await page.click("#ram-sequence-panel > summary");
     await page.waitForFunction(() => {
       const buttons = Array.from(document.querySelectorAll("#sequenceView .ram-seq-res"));

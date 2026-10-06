@@ -57,6 +57,7 @@ jobs:
           Rscript tests/geometry.R
           Rscript tests/experimental.R
           Rscript tests/ensemble.R
+          Rscript tests/group-comparison.R
           Rscript tests/batch.R
         shell: bash
       - name: Verify AlphaFold and ESMFold confidence formats

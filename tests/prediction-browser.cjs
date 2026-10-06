@@ -208,8 +208,10 @@ const puppeteer = require("puppeteer-core");
         first
       };
     });
-    assert.ok(ensembleState.summary.includes("pLDDT SD ≥10"),
-      "Prediction ensemble should report confidence disagreement.");
+    const disagreement = ensembleState.summary.match(
+      /(\d+) residues with pLDDT SD ≥10/);
+    assert.ok(disagreement && Number(disagreement[1]) > 0,
+      "Synthetic 20-point pLDDT differences must produce a nonzero disagreement count.");
     assert.ok(ensembleState.cells>20,
       "Prediction ensemble variability map should cover the protein.");
     await page.click(".ram-ensemble-cell");

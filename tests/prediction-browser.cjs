@@ -97,6 +97,33 @@ const puppeteer = require("puppeteer-core");
       await page.screenshot({path:path.join(output,"prediction-debug.png"),fullPage:true});
       throw error;
     }
+    await page.waitForSelector("#ram-confidence-panel > summary",{timeout:12000});
+    const confidencePanelOpen=await page.$eval("#ram-confidence-panel",
+      panel=>panel.open);
+    if(!confidencePanelOpen)
+      await page.click("#ram-confidence-panel > summary");
+    await page.waitForSelector("#counterpartAccession",
+      {visible:true,timeout:12000});
+    const counterpartUi=await page.evaluate(() => ({
+      accession:document.getElementById("counterpartAccession")?.value || "",
+      lookup:Boolean(document.getElementById("lookupCounterparts")),
+      use:Boolean(document.getElementById("useCounterpart"))
+    }));
+    assert.equal(counterpartUi.accession,"",
+      "Uploaded predictions should not invent a UniProt accession.");
+    assert.ok(counterpartUi.lookup && counterpartUi.use,
+      "Prediction confidence should expose experimental counterpart controls.");
+    await page.$eval("#counterpartAccession",input=>{
+      input.value="not an accession";
+      input.dispatchEvent(new Event("input",{bubbles:true}));
+      input.dispatchEvent(new Event("change",{bubbles:true}));
+    });
+    await page.click("#lookupCounterparts");
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll(".shiny-notification")]
+        .some(node=>node.textContent.includes("valid UniProt accession")),
+      {timeout:12000});
+
     assert.equal(await page.$("#ram-pae-plot"),null,
       "ESMFold without PAE must not invent an error map");
     await page.screenshot({path:path.join(output,"prediction-esmfold.png"),

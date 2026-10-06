@@ -4,17 +4,23 @@
 ram_review_queue <- function(data, boundary_margin = 2) {
   if (!nrow(data)) return(data)
   missing <- is.na(data$phi) | is.na(data$psi) | is.na(data$region)
-  outlier <- !missing & data$region == "Not allowed"
+  not_allowed <- !missing & data$region == "Not allowed"
+  standard_outlier <- if ("rama8000_region" %in% names(data))
+    !missing & !is.na(data$rama8000_region) & data$rama8000_region == "Outlier"
+    else rep(FALSE, nrow(data))
   # The density percentile is cumulative mass above the residue's density.
-  # Closeness to any original contour probability is a review hint only.
+  # Closeness to any RamplotR contour probability is a review hint only.
   near <- !missing & !is.na(data$density) &
     vapply(data$density, function(value) {
       any(abs(value - c(85, 98, 99.95)) <= boundary_margin)
     }, logical(1))
   data$review_status <- ifelse(missing, "Missing angles",
-    ifelse(outlier, "Outlier", ifelse(near, "Near boundary", "Other")))
+    ifelse(standard_outlier, "Rama8000 outlier",
+      ifelse(not_allowed, "Not allowed",
+        ifelse(near, "Near boundary", "Other"))))
   priority <- match(data$review_status,
-                    c("Outlier", "Missing angles", "Near boundary", "Other"))
+                    c("Rama8000 outlier", "Not allowed", "Missing angles",
+                      "Near boundary", "Other"))
   data[order(priority, data$chain, data$resi, data$insertion_code), ,
        drop = FALSE]
 }

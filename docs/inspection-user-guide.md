@@ -85,6 +85,29 @@ comparison can exceed the alignment size limit; select shorter chains instead.
 
 Identical Ramachandran coordinates do not imply identical Cartesian structure, and an angular difference alone is not evidence of a clinically meaningful change. Distinct models from the same structure are related observations, not independent experiments.
 
+## Prediction ensembles
+
+When the loaded structure is a prediction, the **Summary** tab exposes a
+prediction-ensemble workflow even if the current coordinate file contains only
+one model. Upload additional AF2/ColabFold, ESMFold or other models whose
+B-factor field contains pLDDT. The currently loaded compatible model can be
+included as one ensemble member.
+
+RamplotR reports circular phi/psi spread, residue coverage, Rama8000 agreement
+and pLDDT spread across the uploaded models. A compact **Prediction variability
+map** ranks residues by the larger circular SD of phi or psi. Clicking a map
+cell or ensemble-table row selects the corresponding residue in the existing
+inspector and linked 2D/3D views.
+
+The variability map is a navigation tool. Model-to-model disagreement is
+described as prediction uncertainty or heterogeneity, not molecular dynamics.
+Duplicate coordinate files are rejected, and the model export records labels,
+declared source and coordinate MD5 hashes.
+
+AlphaFold 3 ensemble confidence is intentionally not inferred from B-factors in
+this first version because each AF3 model needs its matching atom/token
+confidence sidecar.
+
 ## Publication exports and reproducibility
 
 The Summary tab includes an export disclosure. **Vector SVG** produces an editable figure; **High-resolution PNG** is suitable for manuscripts; **HTML report** includes the plot, summary counts, selected residue data and analysis settings. The residue CSV exports the current table filters; the comparison CSV exports the aligned comparison.

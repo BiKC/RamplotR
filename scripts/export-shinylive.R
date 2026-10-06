@@ -28,6 +28,13 @@ ramplotr_export_shinylive <- function(args) {
       stop("Failed to copy ", entry)
     }
   }
+  # Rama8000 is compact enough to stay inside the browser bundle and is
+  # required synchronously for standard validation. The larger RamplotR RDS
+  # reference sets remain lazy-loaded below.
+  if (!file.copy(file.path(source_app, "static", "rama8000"),
+                 file.path(thin, "static"), recursive = TRUE)) {
+    stop("Failed to copy Rama8000 validation tables")
+  }
   staging <- tempfile("ramplotr-public-data-")
   dir.create(staging)
   on.exit(unlink(staging, recursive = TRUE), add = TRUE)

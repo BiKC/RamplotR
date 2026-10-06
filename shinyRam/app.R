@@ -445,6 +445,7 @@ ui <- fluidPage(
                 )
               ),
               uiOutput("predictionPanel"),
+              uiOutput("experimentalCounterpartPanel"),
               uiOutput("geometryPanel")
             ),
             tabPanel(
@@ -593,6 +594,7 @@ ui <- fluidPage(
   ),
   tags$script(src = "plotly-loader.js"),
   tags$script(src = "custom.js"),
+  tags$script(src = "experimental-search.js"),
   tags$script(src = "compare.js"),
   tags$script(src = "prediction.js"),
   tags$script(src = "density.js")
@@ -606,6 +608,9 @@ server <- function(input, output, session) {
   external_validation <- reactiveVal(NULL)
   ensemble_results <- reactiveVal(NULL)
   prediction_ensemble_results <- reactiveVal(NULL)
+  experimental_search_results <- reactiveVal(NULL)
+  experimental_search_status <- reactiveVal(NULL)
+  experimental_search_request <- reactiveVal(0L)
   selected_residue <- reactiveVal(NULL)
   selected_comparison <- reactiveVal(NULL)
   viewer_ready <- reactiveVal(FALSE)

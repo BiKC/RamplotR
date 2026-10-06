@@ -184,3 +184,74 @@ ram_wwpdb_contingency <- function(comparison) {
     result[, c("reference_group", "ramplotr", "wwpdb", "residues")]
   }))
 }
+
+
+# Direct comparison of RamplotR's Rama8000 implementation with the official
+# wwPDB categories. Unlike ram_wwpdb_label_crosswalk(), this does not remap
+# RamplotR's native four-region output: it compares the separate six-class
+# Rama8000 result produced from the vendored cctbx reference tables.
+ram_compare_rama8000_wwpdb <- function(ours, external, model = 1L) {
+  required <- c("chain","resi","insertion_code","resn","phi","psi",
+                "rama8000_group","rama8000_score","rama8000_region")
+  if (!all(required %in% names(ours)))
+    stop("Rama8000 comparison requires standard-validation columns.")
+  base <- ram_compare_wwpdb(ours, external, model = model)
+  normalize <- function(x) {
+    y <- tolower(as.character(x))
+    y[y == "favoured"] <- "favored"
+    y
+  }
+  base$rama8000_group <- ours$rama8000_group
+  base$rama8000_score <- ours$rama8000_score
+  base$rama8000_region <- normalize(ours$rama8000_region)
+  base$rama8000_comparable <- base$identifier_matched &
+    is.finite(base$ram_phi) & is.finite(base$ram_psi) &
+    !is.na(base$rama8000_region) & !is.na(base$wwpdb_region)
+  base$rama8000_agree <- NA
+  ok <- which(base$rama8000_comparable)
+  base$rama8000_agree[ok] <-
+    base$rama8000_region[ok] == base$wwpdb_region[ok]
+  base
+}
+
+ram_rama8000_wwpdb_summary <- function(comparison, accession,
+                                       min_coverage = 0.90,
+                                       min_agreement = 0.99) {
+  if (!nrow(comparison)) stop("No residues for Rama8000/wwPDB comparison.")
+  finite_ours <- is.finite(comparison$ram_phi) & is.finite(comparison$ram_psi)
+  comparable <- comparison$rama8000_comparable & finite_ours
+  coverage <- sum(comparable) / max(1L, sum(finite_ours))
+  agreement <- sum(comparison$rama8000_agree[comparable], na.rm=TRUE) /
+    max(1L, sum(comparable))
+  report <- data.frame(
+    accession=accession,
+    finite_phi_psi=sum(finite_ours),
+    comparable_rama8000=sum(comparable),
+    comparison_coverage=coverage,
+    matching_rama8000=sum(comparison$rama8000_agree[comparable], na.rm=TRUE),
+    differing_rama8000=sum(comparable) -
+      sum(comparison$rama8000_agree[comparable], na.rm=TRUE),
+    rama8000_agreement=agreement,
+    stringsAsFactors=FALSE
+  )
+  if (coverage < min_coverage)
+    stop(sprintf("Only %.1f%% of finite residues matched wwPDB for standard validation in %s.",
+                 100 * coverage, accession), call.=FALSE)
+  if (agreement < min_agreement)
+    stop(sprintf("Rama8000 category agreement with wwPDB is %.2f%% in %s.",
+                 100 * agreement, accession), call.=FALSE)
+  report
+}
+
+ram_rama8000_wwpdb_contingency <- function(comparison) {
+  data <- comparison[comparison$rama8000_comparable, , drop=FALSE]
+  if (!nrow(data)) stop("No comparable standard-validation labels.")
+  levels <- c("favored","allowed","outlier")
+  cross <- table(
+    rama8000=factor(data$rama8000_region, levels=levels),
+    wwpdb=factor(data$wwpdb_region, levels=levels)
+  )
+  result <- as.data.frame(cross, responseName="residues")
+  names(result) <- c("rama8000","wwpdb","residues")
+  result
+}

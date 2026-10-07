@@ -99,7 +99,7 @@ If atom records are inconsistent or the parser cannot extract complete multi-mod
 
 ## Pairwise structure comparison
 
-The optional **Compare** tab accepts a second PDB accession or PDB/mmCIF file. Choose one chain from each structure. Residues are paired by a bounded global amino-acid sequence alignment, **not by residue number**. The difference in each angle wraps correctly across ±180°. Gaps remain visible and do not receive invented dihedrals; classification differences are reported only for available classifications.
+The optional **Compare** tab accepts a second PDB accession or PDB/mmCIF file. Choose one chain from each structure. Residues are paired by a bounded global amino-acid sequence alignment, **not by residue number**. The comparison summary reports sequence identity plus coverage of both selected chains, so local conformational differences can be interpreted in the context of alignment quality. A caution appears when identity falls below 50% or either chain has less than 70% aligned coverage. These are interpretation guards, not statistical significance thresholds. The difference in each angle wraps correctly across ±180°. Gaps remain visible and do not receive invented dihedrals; classification differences are reported only for available classifications.
 
 The paired Ramachandran plot and the **3D superposition are side by side**
 on wide screens. The aligned-angle plot uses the **same selected Ramachandran

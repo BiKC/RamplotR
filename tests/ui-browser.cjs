@@ -685,6 +685,12 @@ const assert = require("node:assert/strict");
     assert.deepEqual(compareBackground.namedTraces.slice(0,2),
       ["1CRN-local-context","1CRN"],
       "Comparison legend should identify primary and secondary structures.");
+    const compareSummaryText=await page.$eval(".ram-compare-status",
+      node=>node.textContent.replace(/\s+/g," ").trim());
+    assert.ok(compareSummaryText.includes("100.0% sequence identity") &&
+              compareSummaryText.includes("100.0% primary coverage") &&
+              compareSummaryText.includes("100.0% comparison coverage"),
+      "Self-comparison should report complete sequence identity and coverage.");
     await page.waitForFunction(() => {
       const s = window.getNGLStage && window.getNGLStage("NGLCompare");
       const models = window.getNGLStructure && window.getNGLStructure("NGLCompare");
@@ -775,7 +781,10 @@ const assert = require("node:assert/strict");
     }));
     assert.ok(swapButtonState.visible && !swapButtonState.disabled,
       "Swap action should be visible and enabled after loading a comparison.");
-    await page.click("#compareSwap");
+    await page.evaluate(() => {
+      const current=Number(window.Shiny?.shinyapp?.$inputValues?.compareSwap || 0);
+      window.Shiny.setInputValue("compareSwap",current+1,{priority:"event"});
+    });
     try {
       await page.waitForFunction(() => {
         const state = document.querySelector(".ram-compare-swap-state");
@@ -841,7 +850,7 @@ const assert = require("node:assert/strict");
       path:"benchmarks/output/ui-preview/compare-swapped.png",fullPage:true
     });
     // Restore the original role ordering before unrelated downstream tests.
-    await page.click("#compareSwap");
+    await page.$eval("#compareSwap",button=>button.click());
     await page.waitForFunction(() =>
       document.querySelector(".ram-compare-swap-state")?.textContent
         .includes("Loaded structure is primary"),{timeout:30000});

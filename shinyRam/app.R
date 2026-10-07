@@ -1880,6 +1880,9 @@ server <- function(input, output, session) {
     result <- req(comparison_data())
     if (!nrow(result)) return(tags$p("Select two nonempty protein chains."))
     aligned <- result$alignment %in% c("Match", "Substitution")
+    quality <- ram_comparison_alignment_quality(result)
+    pct <- function(value) if(is.finite(value))
+      sprintf("%.1f%%",100*value) else "n/a"
     standard_changes <- if ("rama8000_changed" %in% names(result))
       sum(result$rama8000_changed, na.rm=TRUE) else 0L
     standard_outliers <- if (all(c("rama8000_region_a","rama8000_region_b") %in%
@@ -1887,16 +1890,28 @@ server <- function(input, output, session) {
       sum(result$rama8000_region_a == "Outlier" |
           result$rama8000_region_b == "Outlier", na.rm=TRUE) else 0L
     shifts <- result$angular_displacement[is.finite(result$angular_displacement)]
-    tags$div(class="ram-compare-metrics",
-      tags$span(tags$strong(sum(aligned)), " aligned residues"),
-      tags$span(tags$strong(sum(shifts>=30)), " pairs with ≥30° combined shift"),
-      tags$span(tags$strong(if(length(shifts)) sprintf("%.1f°",max(shifts)) else "n/a"),
-                " largest combined shift"),
-      tags$span(tags$strong(sum(result$class_changed)), " RamplotR region changes"),
-      tags$span(tags$strong(standard_changes), " Rama8000 category changes"),
-      tags$span(tags$strong(standard_outliers), " pairs with a Rama8000 outlier"),
-      tags$span(tags$strong(sum(!aligned)), " insertions / deletions"),
-      tags$span("Angular differences account for the -180° / +180° boundary.")
+    weak_alignment <- (is.finite(quality$identity) && quality$identity < 0.50) ||
+      (is.finite(quality$coverage_a) && quality$coverage_a < 0.70) ||
+      (is.finite(quality$coverage_b) && quality$coverage_b < 0.70)
+    tags$div(
+      class="ram-compare-summary-block",
+      tags$div(class="ram-compare-metrics",
+        tags$span(tags$strong(quality$aligned), " aligned residues"),
+        tags$span(tags$strong(pct(quality$identity)), " sequence identity"),
+        tags$span(tags$strong(pct(quality$coverage_a)), " primary coverage"),
+        tags$span(tags$strong(pct(quality$coverage_b)), " comparison coverage"),
+        tags$span(tags$strong(sum(shifts>=30)), " pairs with ≥30° combined shift"),
+        tags$span(tags$strong(if(length(shifts)) sprintf("%.1f°",max(shifts)) else "n/a"),
+                  " largest combined shift"),
+        tags$span(tags$strong(sum(result$class_changed)), " RamplotR region changes"),
+        tags$span(tags$strong(standard_changes), " Rama8000 category changes"),
+        tags$span(tags$strong(standard_outliers), " pairs with a Rama8000 outlier"),
+        tags$span(tags$strong(sum(!aligned)), " insertions / deletions"),
+        tags$span("Angular differences account for the -180° / +180° boundary.")
+      ),
+      if(weak_alignment)
+        tags$p(class="ram-compare-alignment-warning",
+          "Alignment identity or coverage is limited. Interpret local conformational shifts cautiously and inspect the aligned sequence context.")
     )
   })
   output$compareChangeTrack <- renderUI({

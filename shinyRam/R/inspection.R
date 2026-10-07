@@ -516,6 +516,35 @@ ram_compare_torsions <- function(a, b) {
   result
 }
 
+ram_comparison_alignment_quality <- function(data) {
+  empty <- list(
+    aligned=0L,matches=0L,substitutions=0L,
+    residues_a=0L,residues_b=0L,
+    identity=NA_real_,coverage_a=NA_real_,coverage_b=NA_real_
+  )
+  if (!is.data.frame(data) || !nrow(data) ||
+      !all(c("residue_a","residue_b","alignment") %in% names(data)))
+    return(empty)
+  has_a <- !is.na(data$residue_a)
+  has_b <- !is.na(data$residue_b)
+  aligned <- has_a & has_b
+  n_aligned <- sum(aligned)
+  matches <- sum(aligned & data$alignment=="Match",na.rm=TRUE)
+  substitutions <- sum(aligned & data$alignment=="Substitution",na.rm=TRUE)
+  residues_a <- sum(has_a)
+  residues_b <- sum(has_b)
+  list(
+    aligned=as.integer(n_aligned),
+    matches=as.integer(matches),
+    substitutions=as.integer(substitutions),
+    residues_a=as.integer(residues_a),
+    residues_b=as.integer(residues_b),
+    identity=if(n_aligned) matches/n_aligned else NA_real_,
+    coverage_a=if(residues_a) n_aligned/residues_a else NA_real_,
+    coverage_b=if(residues_b) n_aligned/residues_b else NA_real_
+  )
+}
+
 
 # Keep all selected chains available in one navigator, in first-appearance
 # order. This is intentionally independent of any "active chain" input.

@@ -504,6 +504,9 @@ body > .container-fluid { max-width: none; padding: 0; }
   gap:9px 20px; color:#4b6671; font-size:12px;
   background:#f0f7f4; border:1px solid #deebe6; border-radius:8px; padding:13px; }
 .ram-compare-metrics strong { color:#175d62; font-size:17px; }
+.ram-compare-alignment-warning { margin:7px 0 0; padding:7px 10px;
+  border-radius:7px; border:1px solid #efd6b1; background:#fff8e8;
+  color:#7a5924; font-size:10px; line-height:1.4; }
 .ram-compare-plot { width:100%; min-height:370px; margin:12px 0 20px;
   border:1px solid #e3edeb; border-radius:10px; background:#fff; }
 @media(max-width:800px) {

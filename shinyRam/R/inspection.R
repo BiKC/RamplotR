@@ -489,6 +489,12 @@ ram_compare_torsions <- function(a, b) {
   result$angular_displacement <- ram_backbone_angular_displacement(
     result$delta_phi, result$delta_psi)
   result$shift_band <- ram_backbone_shift_band(result$angular_displacement)
+  if (exists("ram_backbone_basin", mode="function")) {
+    result$basin_a <- ram_backbone_basin(result$phi_a,result$psi_a)
+    result$basin_b <- ram_backbone_basin(result$phi_b,result$psi_b)
+    result$basin_changed <- !is.na(result$basin_a) & !is.na(result$basin_b) &
+      result$basin_a != result$basin_b
+  }
   result$class_changed <- !is.na(result$region_a) &
     !is.na(result$region_b) & result$region_a != result$region_b
   optional_value <- function(data, indices, key, missing) {

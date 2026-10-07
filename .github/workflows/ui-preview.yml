@@ -6,6 +6,7 @@ on:
       - "shinyRam/app.R"
       - "shinyRam/www/**"
       - "tests/ui-browser.cjs"
+      - "tests/prediction-browser.cjs"
       - "tests/structure-verification-browser.cjs"
       - "tests/reports.R"
       - "tests/model-integration.R"

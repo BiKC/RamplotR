@@ -15,7 +15,7 @@ RamplotR is an open-source R Shiny application that brings backbone geometry, a 
 | Workflow | Capabilities |
 | --- | --- |
 | **Explore a structure** | Interactive φ/ψ plots with several reference-density datasets, native RamplotR density regions and a parallel six-class Rama8000 standard validation that matches the current cctbx/Phenix categories. |
-| **Inspect residues in context** | Synchronized Ramachandran plot, searchable residue table, all-chain sequence navigator and NGL 3D viewer. The issue queue distinguishes Rama8000 outliers from native RamplotR `Not allowed` regions and missing angles. |
+| **Inspect residues in context** | Synchronized Ramachandran plot, searchable residue table, all-chain sequence navigator and NGL 3D viewer. For PDB/AlphaFold DB inputs, available canonical UniProt coordinates are shown alongside the original structure numbering. The issue queue distinguishes Rama8000 outliers from native RamplotR `Not allowed` regions and missing angles. |
 | **Work with predicted models** | Import AlphaFold DB models or upload AlphaFold 2/3, ColabFold and ESMFold structures. Examine pLDDT/PAE, analyse AF2/ColabFold, AF3 or ESMFold model/seed ensembles with residue-level backbone-state and confidence agreement, and search experimental PDB counterparts for direct comparison. |
 | **Examine structural geometry** | Explore peptide ω, side-chain χ1 and descriptive Cβ measurements. Optionally attach the matching deposited structure's official wwPDB validation report for independent rotamer, clash and geometry annotations. |
 | **Inspect experimental evidence** | Overlay a local CCP4/MRC cryo-EM map in the 3D viewer as a qualitative aid, without uploading the map to a separate service. |
@@ -110,6 +110,8 @@ The default RamplotR teal contour palette provides consistent, recognisable publ
 - [Prediction ensemble analysis](docs/prediction-ensembles.md)
 - [Structure-group conformational comparison](docs/group-conformation-comparison.md)
 - [Experimental counterpart discovery for predicted models](docs/experimental-counterparts.md)
+- [Canonical UniProt residue coordinates](docs/canonical-coordinates.md)
+- [Conformational Atlas roadmap](docs/conformational-atlas-roadmap.md)
 - [Independent wwPDB angle-validation protocol](docs/wwpdb-validation.md) · [Results](docs/validation-results.md)
 - [Performance and large-structure benchmarks](docs/benchmark-results.md) · [Scaling results](docs/scaling-results.md)
 - [Shinylive browser deployment and one.com caching](docs/shinylive-deployment.md)

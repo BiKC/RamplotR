@@ -56,8 +56,24 @@ assert(r1$angular_displacement>=34.9 && r1$angular_displacement<=35.1,
        "Combined group shift should reflect the wrapped phi difference.")
 assert(isTRUE(r1$consistent_shift),
        "Low-dispersion groups with a >=30° shift should be flagged for navigation.")
+assert(isTRUE(r1$high_support_shift) &&
+       isTRUE(all.equal(r1$a_coverage,1)) &&
+       isTRUE(all.equal(r1$b_coverage,1)) &&
+       identical(as.character(r1$evidence_profile),"Low-dispersion shift"),
+       "Fully covered low-dispersion shifts should receive a high-support evidence profile.")
 assert(isTRUE(r1$rama8000_mode_changed),
        "Different standard-validation modes should remain visible.")
+
+
+sparse_a <- prepared_a$models
+sparse_a[[2L]] <- sparse_a[[2L]][sparse_a[[2L]]$resi!=1L,,drop=FALSE]
+sparse_cmp <- ram_group_conformation_compare(
+  reference,sparse_a,prepared_b$models,"apo","holo")
+sparse_r1 <- sparse_cmp[sparse_cmp$resi==1L,,drop=FALSE]
+assert(isTRUE(all.equal(sparse_r1$a_coverage,0.5)) &&
+       identical(as.character(sparse_r1$evidence_profile),"Sparse coverage") &&
+       !isTRUE(sparse_r1$high_support_shift),
+       "Sparse group coverage must be explicit and must not be promoted as high support.")
 
 bad <- with_decoy(make_chain("Y",c(0,0,0),c(0,0,0),"Favored"))
 bad$resn[bad$chain=="Y"] <- c("GLY","GLY","GLY")

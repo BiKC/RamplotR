@@ -497,7 +497,30 @@ ui <- fluidPage(
                     placeholder = "e.g. 1CRN")),
                   tags$div(id = "ram-compare-upload", class = "is-hidden",
                     fileInput("compareFile", "Second PDB/mmCIF file",
-                      accept = c(".pdb", ".ent", ".cif", ".mmcif", ".mcif"))),
+                      accept = c(".pdb", ".ent", ".cif", ".mmcif", ".mcif")),
+                    selectInput("comparePredictionSource",
+                      "Comparison structure type",
+                      choices=c(
+                        "Experimental / unknown"="experimental",
+                        "AlphaFold 2 / ColabFold"="alphafold2",
+                        "AlphaFold 3"="alphafold3",
+                        "ESMFold"="esmfold",
+                        "Other prediction with pLDDT in B-factor"="other_prediction"
+                      ),selected="experimental",selectize=FALSE),
+                    conditionalPanel(
+                      condition="input.comparePredictionSource == 'alphafold3'",
+                      fileInput("comparePredictionJson",
+                        "Matching AF3 full confidences JSON",
+                        accept=c(".json")),
+                      fileInput("comparePredictionSummaryJson",
+                        "AF3 summary confidences JSON (optional)",
+                        accept=c(".json")),
+                      tags$p(class="ram-field-hint",
+                        "Use confidence files from the same AF3 seed/sample as the uploaded coordinates.")
+                    ),
+                    tags$p(class="ram-field-hint",
+                      "Prediction confidence is interpreted only after an explicit prediction source is selected. Experimental B-factors are never treated as pLDDT.")
+                  ),
                   actionButton("compareSubmit", "Load comparison", class="btn-primary"),
                   actionButton("compareSwap", "Swap primary ↔ comparison",
                     class="btn-default",
@@ -549,6 +572,7 @@ ui <- fluidPage(
                       "Rama8000 outlier in either structure" = "standard_outlier",
                       "Combined backbone shift ≥ 30°" = "shift_large",
                       "Either angle difference ≥ 30°" = "large",
+                      "|ΔpLDDT| ≥ 20" = "confidence_large",
                       "Insertions / deletions" = "gaps"), selected = "All"),
                   downloadButton("downloadComparison", "Export comparison CSV")
                 ),
@@ -895,7 +919,10 @@ server <- function(input, output, session) {
   load_comparison_structure <- function(path = NULL, original_name = NULL,
                                         pdb_id = NULL,
                                         preferred_chain_a = NULL,
-                                        preferred_chain_b = NULL) {
+                                        preferred_chain_b = NULL,
+                                        declared_source = "experimental",
+                                        sidecar = NULL,
+                                        summary_file = NULL) {
     is_upload <- !is.null(path)
     source_id <- if (is_upload) path else toupper(trimws(pdb_id))
     source_name <- if (is_upload) original_name else source_id
@@ -916,12 +943,48 @@ server <- function(input, output, session) {
         NULL
       })
     if (is.null(torsions)) return(FALSE)
+    if (!is_upload) declared_source <- "experimental"
+    permitted_sources <- c("experimental","alphafold2","alphafold3",
+                           "esmfold","other_prediction")
+    if (length(declared_source)!=1L || !declared_source %in% permitted_sources)
+      declared_source <- "experimental"
+    if (identical(declared_source,"alphafold3") &&
+        (is.null(sidecar) || !nzchar(sidecar) || !file.exists(sidecar))) {
+      showNotification(
+        "AlphaFold 3 comparison requires the matching full confidences JSON.",
+        type="error",duration=14)
+      return(FALSE)
+    }
+    comparison_name <- tools::file_path_sans_ext(basename(source_name))
+    prediction <- NULL
+    if (!identical(declared_source,"experimental")) {
+      prediction <- tryCatch(
+        ram_prepare_prediction(
+          ram_model_at(data,1L),torsions,declared_source,
+          sidecar=if(!is.null(sidecar) && nzchar(sidecar)) sidecar else NULL,
+          summary_file=if(!is.null(summary_file) && nzchar(summary_file))
+            summary_file else NULL,
+          model_id=comparison_name
+        ),
+        error=function(e) {
+          showNotification(paste("Comparison confidence:",
+            conditionMessage(e)),type="error",duration=15)
+          NULL
+        }
+      )
+      if (is.null(prediction)) return(FALSE)
+      if (length(prediction$notes))
+        showNotification(paste(prediction$notes,collapse=" "),
+          type="warning",duration=14)
+    }
     comparison_loaded(list(
       pdb=data, torsions=torsions,
-      name=tools::file_path_sans_ext(basename(source_name)),
+      name=comparison_name,
       source_id=source_id,
       viewer_format=if (is_upload) ram_detect_format(source_name) else NULL,
       nmodels=ram_model_count(data),
+      prediction=prediction,
+      declared_source=declared_source,
       preferred_chain_a=preferred_chain_a,
       preferred_chain_b=preferred_chain_b
     ))
@@ -938,9 +1001,21 @@ server <- function(input, output, session) {
       return()
     }
     if (is_upload) {
+      declared_source <- input$comparePredictionSource
+      if (is.null(declared_source) || !nzchar(declared_source))
+        declared_source <- "experimental"
+      sidecar <- if (identical(declared_source,"alphafold3") &&
+                        !is.null(input$comparePredictionJson))
+        input$comparePredictionJson$datapath else NULL
+      summary_file <- if (identical(declared_source,"alphafold3") &&
+                             !is.null(input$comparePredictionSummaryJson))
+        input$comparePredictionSummaryJson$datapath else NULL
       load_comparison_structure(
         path=input$compareFile$datapath,
-        original_name=input$compareFile$name
+        original_name=input$compareFile$name,
+        declared_source=declared_source,
+        sidecar=sidecar,
+        summary_file=summary_file
       )
     } else {
       pdb_id <- toupper(trimws(input$comparePDB))
@@ -1738,6 +1813,15 @@ server <- function(input, output, session) {
       threshold_fn=ram_density_thresholds)
     secondary_data <- ram_rama8000_classify(
       secondary_data, file.path("static", "rama8000"))
+    comparison <- comparison_loaded()
+    comparison_model <- if (is.null(input$compareModel)) 1L else
+      suppressWarnings(as.integer(input$compareModel))
+    if (length(comparison_model)!=1L || is.na(comparison_model) ||
+        comparison_model<1L || comparison_model>comparison$nmodels)
+      comparison_model <- 1L
+    if (!is.null(comparison$prediction) && comparison_model==1L)
+      secondary_data <- ram_apply_prediction(
+        secondary_data,comparison$prediction)
 
     if (isTRUE(compare_swapped())) {
       first <- secondary_data[
@@ -1871,6 +1955,12 @@ server <- function(input, output, session) {
       result <- result[(!is.na(result$delta_phi) & abs(result$delta_phi)>=30) |
                        (!is.na(result$delta_psi) & abs(result$delta_psi)>=30),
                        , drop=FALSE]
+    else if (identical(criterion, "confidence_large")) {
+      if ("delta_plddt" %in% names(result))
+        result <- result[is.finite(result$delta_plddt) &
+                         abs(result$delta_plddt)>=20,,drop=FALSE]
+      else result <- result[0,,drop=FALSE]
+    }
     else if (identical(criterion, "gaps"))
       result <- result[result$alignment %in% c("Insertion","Deletion"),
                        , drop=FALSE]
@@ -1890,6 +1980,10 @@ server <- function(input, output, session) {
       sum(result$rama8000_region_a == "Outlier" |
           result$rama8000_region_b == "Outlier", na.rm=TRUE) else 0L
     shifts <- result$angular_displacement[is.finite(result$angular_displacement)]
+    confidence_pairs <- if ("delta_plddt" %in% names(result))
+      sum(is.finite(result$delta_plddt)) else 0L
+    confidence_large <- if ("delta_plddt" %in% names(result))
+      sum(is.finite(result$delta_plddt) & abs(result$delta_plddt)>=20) else 0L
     weak_alignment <- (is.finite(quality$identity) && quality$identity < 0.50) ||
       (is.finite(quality$coverage_a) && quality$coverage_a < 0.70) ||
       (is.finite(quality$coverage_b) && quality$coverage_b < 0.70)
@@ -1906,6 +2000,10 @@ server <- function(input, output, session) {
         tags$span(tags$strong(sum(result$class_changed)), " RamplotR region changes"),
         tags$span(tags$strong(standard_changes), " Rama8000 category changes"),
         tags$span(tags$strong(standard_outliers), " pairs with a Rama8000 outlier"),
+        if(confidence_pairs>0L)
+          tags$span(tags$strong(confidence_pairs), " pairs with pLDDT on both sides"),
+        if(confidence_pairs>0L)
+          tags$span(tags$strong(confidence_large), " pairs with |ΔpLDDT| ≥20"),
         tags$span(tags$strong(sum(!aligned)), " insertions / deletions"),
         tags$span("Angular differences account for the -180° / +180° boundary.")
       ),
@@ -1946,6 +2044,10 @@ server <- function(input, output, session) {
           type="button",
           class=paste("ram-change-cell","ram-change-pick",
             band_class(data$shift_band[[i]]),
+            if ("delta_plddt" %in% names(data) &&
+                is.finite(data$delta_plddt[[i]]) &&
+                abs(data$delta_plddt[[i]])>=20)
+              "has-confidence-shift" else "",
             if (!is.null(selected) && identical(data$row_id[[i]],selected))
               "is-selected" else ""),
           "data-row-id"=data$row_id[[i]],
@@ -1969,7 +2071,11 @@ server <- function(input, output, session) {
           tags$span(class="ram-change-small","<15°"),
           tags$span(class="ram-change-moderate","15–30°"),
           tags$span(class="ram-change-large","30–60°"),
-          tags$span(class="ram-change-very-large","≥60°")
+          tags$span(class="ram-change-very-large","≥60°"),
+          if ("delta_plddt" %in% names(data) &&
+              any(is.finite(data$delta_plddt)))
+            tags$span(class="ram-change-confidence-key",
+              "outline = |ΔpLDDT| ≥20")
         )
       ),
       tags$div(class="ram-change-track",role="group",
@@ -1990,35 +2096,65 @@ server <- function(input, output, session) {
 
   output$comparison <- DT::renderDT({
     result <- filtered_comparison()
-    fields <- c("chain_a", "residue_a", "insertion_a", "amino_a",
-      "chain_b", "residue_b", "insertion_b", "amino_b",
-      "delta_phi", "delta_psi", "angular_displacement", "shift_band",
-      "class_changed", "rama8000_region_a", "rama8000_region_b",
-      "rama8000_changed", "alignment")
-    if (!all(fields %in% names(result)))
+    required <- c("chain_a","residue_a","insertion_a","amino_a",
+      "chain_b","residue_b","insertion_b","amino_b",
+      "delta_phi","delta_psi","angular_displacement","shift_band",
+      "class_changed","rama8000_region_a","rama8000_region_b",
+      "rama8000_changed","alignment")
+    if (!all(required %in% names(result)))
       return(DT::datatable(data.frame()))
-    shown <- result[, fields, drop=FALSE]
-    shown$pos_a <- ifelse(is.na(shown$residue_a), "—",
-      paste0(shown$residue_a, shown$insertion_a))
-    shown$pos_b <- ifelse(is.na(shown$residue_b), "—",
-      paste0(shown$residue_b, shown$insertion_b))
-    shown$delta_phi <- round(shown$delta_phi, 1)
-    shown$delta_psi <- round(shown$delta_psi, 1)
-    shown$angular_displacement <- round(shown$angular_displacement, 1)
-    shown$class_changed <- ifelse(shown$class_changed, "Yes", "No")
-    shown$rama8000_changed <- ifelse(shown$rama8000_changed, "Yes", "No")
-    shown <- shown[, c("chain_a", "pos_a", "amino_a",
-      "chain_b", "pos_b", "amino_b", "delta_phi", "delta_psi",
-      "angular_displacement", "shift_band", "class_changed",
-      "rama8000_region_a", "rama8000_region_b",
-      "rama8000_changed", "alignment"), drop=FALSE]
-    DT::datatable(shown, rownames=FALSE,
-      colnames=c("Chain A", "Pos A", "AA A", "Chain B", "Pos B", "AA B",
-                 "Δφ (°)", "Δψ (°)", "Backbone shift (°)", "Shift band",
-                 "RamplotR changed", "Rama8000 A", "Rama8000 B",
-                 "Rama8000 changed", "Alignment"),
-      selection="single",
-      options=list(pageLength=15,scrollX=FALSE,autoWidth=FALSE,dom="ftip"),
+    show_conf_a <- "plddt_a" %in% names(result) &&
+      any(is.finite(result$plddt_a))
+    show_conf_b <- "plddt_b" %in% names(result) &&
+      any(is.finite(result$plddt_b))
+    show_delta <- "delta_plddt" %in% names(result) &&
+      any(is.finite(result$delta_plddt))
+    fields <- c("chain_a","residue_a","insertion_a","amino_a",
+      "chain_b","residue_b","insertion_b","amino_b",
+      "delta_phi","delta_psi","angular_displacement","shift_band")
+    if(show_conf_a) fields <- c(fields,"plddt_a","confidence_a")
+    if(show_conf_b) fields <- c(fields,"plddt_b","confidence_b")
+    if(show_delta) fields <- c(fields,"delta_plddt")
+    fields <- c(fields,"class_changed","rama8000_region_a","rama8000_region_b",
+      "rama8000_changed","alignment")
+    shown <- result[,fields,drop=FALSE]
+    shown$pos_a <- ifelse(is.na(shown$residue_a),"—",
+      paste0(shown$residue_a,shown$insertion_a))
+    shown$pos_b <- ifelse(is.na(shown$residue_b),"—",
+      paste0(shown$residue_b,shown$insertion_b))
+    shown$delta_phi <- round(shown$delta_phi,1)
+    shown$delta_psi <- round(shown$delta_psi,1)
+    shown$angular_displacement <- round(shown$angular_displacement,1)
+    if(show_conf_a) shown$plddt_a <- round(shown$plddt_a,1)
+    if(show_conf_b) shown$plddt_b <- round(shown$plddt_b,1)
+    if(show_delta) shown$delta_plddt <- round(shown$delta_plddt,1)
+    shown$class_changed <- ifelse(shown$class_changed,"Yes","No")
+    shown$rama8000_changed <- ifelse(shown$rama8000_changed,"Yes","No")
+    display <- c("chain_a","pos_a","amino_a",
+      "chain_b","pos_b","amino_b","delta_phi","delta_psi",
+      "angular_displacement","shift_band")
+    labels <- c("Chain A","Pos A","AA A","Chain B","Pos B","AA B",
+      "Δφ (°)","Δψ (°)","Backbone shift (°)","Shift band")
+    if(show_conf_a) {
+      display <- c(display,"plddt_a","confidence_a")
+      labels <- c(labels,"pLDDT A","Confidence A")
+    }
+    if(show_conf_b) {
+      display <- c(display,"plddt_b","confidence_b")
+      labels <- c(labels,"pLDDT B","Confidence B")
+    }
+    if(show_delta) {
+      display <- c(display,"delta_plddt")
+      labels <- c(labels,"ΔpLDDT")
+    }
+    display <- c(display,"class_changed","rama8000_region_a",
+      "rama8000_region_b","rama8000_changed","alignment")
+    labels <- c(labels,"RamplotR changed","Rama8000 A","Rama8000 B",
+      "Rama8000 changed","Alignment")
+    shown <- shown[,display,drop=FALSE]
+    DT::datatable(shown,rownames=FALSE,colnames=labels,selection="single",
+      options=list(pageLength=15,scrollX=show_conf_a||show_conf_b||show_delta,
+                   autoWidth=FALSE,dom="ftip"),
       class="compact stripe hover")
   }, server=FALSE)
   observe({
@@ -2425,6 +2561,16 @@ server <- function(input, output, session) {
       chainB=result$chain_b, posB=result$residue_b,
       insB=result$insertion_b, aminoB=result$amino_b,
       deltaPhi=result$delta_phi, deltaPsi=result$delta_psi,
+      plddtA=if ("plddt_a" %in% names(result)) result$plddt_a
+        else rep(NA_real_,nrow(result)),
+      plddtB=if ("plddt_b" %in% names(result)) result$plddt_b
+        else rep(NA_real_,nrow(result)),
+      deltaPlddt=if ("delta_plddt" %in% names(result)) result$delta_plddt
+        else rep(NA_real_,nrow(result)),
+      confidenceA=if ("confidence_a" %in% names(result)) result$confidence_a
+        else rep(NA_character_,nrow(result)),
+      confidenceB=if ("confidence_b" %in% names(result)) result$confidence_b
+        else rep(NA_character_,nrow(result)),
       alignment=result$alignment
     ))
     session$sendCustomMessage("ram-compare-config", list(
@@ -2514,18 +2660,30 @@ server <- function(input, output, session) {
         tags$span(class="ram-compare-primary",
           tags$small("Primary"), tags$strong(label("a")),
           tags$span(paste("φ",angle(row$phi_a[[1L]]),
-                          "· ψ",angle(row$psi_a[[1L]])))),
+                          "· ψ",angle(row$psi_a[[1L]]))),
+          if ("plddt_a" %in% names(row) && is.finite(row$plddt_a[[1L]]))
+            tags$span(sprintf("pLDDT %.1f%s",row$plddt_a[[1L]],
+              if ("confidence_a" %in% names(row) &&
+                  !is.na(row$confidence_a[[1L]]))
+                paste0(" · ",row$confidence_a[[1L]]) else ""))),
         tags$span(class="ram-compare-pair-arrow", "↔", "aria-hidden"="true"),
         tags$span(class="ram-compare-secondary",
           tags$small("Comparison"), tags$strong(label("b")),
           tags$span(paste("φ",angle(row$phi_b[[1L]]),
-                          "· ψ",angle(row$psi_b[[1L]]))))
+                          "· ψ",angle(row$psi_b[[1L]]))),
+          if ("plddt_b" %in% names(row) && is.finite(row$plddt_b[[1L]]))
+            tags$span(sprintf("pLDDT %.1f%s",row$plddt_b[[1L]],
+              if ("confidence_b" %in% names(row) &&
+                  !is.na(row$confidence_b[[1L]]))
+                paste0(" · ",row$confidence_b[[1L]]) else "")))
       ),
       tags$div(class="ram-compare-selection-deltas",
         tags$span(paste("Δφ",angle(row$delta_phi[[1L]]))),
         tags$span(paste("Δψ",angle(row$delta_psi[[1L]]))),
         tags$span(paste("Combined",angle(row$angular_displacement[[1L]]),
                         "·",row$shift_band[[1L]])),
+        if ("delta_plddt" %in% names(row) && is.finite(row$delta_plddt[[1L]]))
+          tags$span(sprintf("ΔpLDDT %+.1f",row$delta_plddt[[1L]])),
         tags$span(row$alignment[[1L]]),
         if (isTRUE(row$class_changed[[1L]])) tags$span(
           class="ram-compare-change", "RamplotR region changed"),

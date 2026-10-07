@@ -491,6 +491,22 @@ ram_compare_torsions <- function(a, b) {
   result$shift_band <- ram_backbone_shift_band(result$angular_displacement)
   result$class_changed <- !is.na(result$region_a) &
     !is.na(result$region_b) & result$region_a != result$region_b
+  optional_value <- function(data, indices, key, missing) {
+    if (!key %in% names(data)) return(rep(missing,nrow(pairing)))
+    value(data,indices,key,missing)
+  }
+  if ("plddt" %in% names(a) || "plddt" %in% names(b)) {
+    result$plddt_a <- optional_value(a,pairing$index_a,"plddt",NA_real_)
+    result$plddt_b <- optional_value(b,pairing$index_b,"plddt",NA_real_)
+    result$confidence_a <- optional_value(
+      a,pairing$index_a,"confidence_category",NA_character_)
+    result$confidence_b <- optional_value(
+      b,pairing$index_b,"confidence_category",NA_character_)
+    result$delta_plddt <- result$plddt_b-result$plddt_a
+    result$confidence_changed <- !is.na(result$confidence_a) &
+      !is.na(result$confidence_b) &
+      result$confidence_a != result$confidence_b
+  }
   if (all(c("rama8000_region","rama8000_group","rama8000_score") %in% names(a)) &&
       all(c("rama8000_region","rama8000_group","rama8000_score") %in% names(b))) {
     result$rama8000_region_a <- value(

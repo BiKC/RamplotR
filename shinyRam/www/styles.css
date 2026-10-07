@@ -284,6 +284,12 @@ body > .container-fluid { max-width: none; padding: 0; }
 }
 .ram-summary-metric small { font-size: 11px; line-height: 1.45; color: var(--ram-muted); }
 .ram-summary-note { color: var(--ram-muted); font-size: 12px; margin: 0 0 14px; }
+.ram-canonical-summary {
+  display:flex; flex-wrap:wrap; gap:7px 10px; align-items:baseline;
+  margin:4px 0 14px; padding:9px 11px; border:1px solid #dbe8e8;
+  border-radius:8px; background:#f8fbfb; color:#587078; font-size:11px;
+}
+.ram-canonical-summary strong { color:#24565e; font-size:11px; }
 .ram-summary-table-wrap { max-width: 720px; width: 100%; overflow-x: auto; }
 .ram-summary-table { border-collapse: collapse; width: 100%; font-size: 13px; }
 .ram-main .ram-summary-table th {

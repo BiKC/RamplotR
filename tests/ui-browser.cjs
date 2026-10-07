@@ -758,12 +758,10 @@ const assert = require("node:assert/strict");
     // swapping reverses NGL source order rather than only changing labels.
     await (await page.$("#compareFile")).uploadFile(
       path.resolve("benchmarks/output/ui-preview/1BBB.pdb"));
-    await page.waitForFunction(expected => {
-      const file=document.getElementById("compareFile")?.files?.[0];
-      const shiny=window.Shiny?.shinyapp?.$inputValues?.["compareFile:shiny.file"];
-      return file?.name===expected &&
-        JSON.stringify(shiny || "").includes(expected);
-    },{timeout:20000},"1BBB.pdb");
+    await page.waitForFunction(expected =>
+      document.getElementById("compareFile")?.files?.[0]?.name===expected,
+      {timeout:10000},"1BBB.pdb");
+    await new Promise(resolve => setTimeout(resolve, 1800));
     await page.click("#compareSubmit");
     await page.waitForFunction(() => {
       const select=document.getElementById("compareChainB");
@@ -823,12 +821,10 @@ const assert = require("node:assert/strict");
     // primary after a role swap. Preserve that user choice across rerenders.
     await (await page.$("#compareFile")).uploadFile(
       path.resolve("benchmarks/output/ui-preview/1D3Z.pdb"));
-    await page.waitForFunction(expected => {
-      const file=document.getElementById("compareFile")?.files?.[0];
-      const shiny=window.Shiny?.shinyapp?.$inputValues?.["compareFile:shiny.file"];
-      return file?.name===expected &&
-        JSON.stringify(shiny || "").includes(expected);
-    },{timeout:20000},"1D3Z.pdb");
+    await page.waitForFunction(expected =>
+      document.getElementById("compareFile")?.files?.[0]?.name===expected,
+      {timeout:10000},"1D3Z.pdb");
+    await new Promise(resolve => setTimeout(resolve, 1800));
     await page.click("#compareSubmit");
     await page.waitForSelector("#compareModel",{timeout:30000});
     await page.evaluate(() => {

@@ -761,14 +761,9 @@ const assert = require("node:assert/strict");
     await page.waitForFunction(expected =>
       document.getElementById("compareFile")?.files?.[0]?.name===expected,
       {timeout:10000},"1BBB.pdb");
-    // Shiny uploads the local file asynchronously. Wait until its progress
-    // widget is idle before submitting instead of inspecting private
-    // Shiny input-value internals, which vary between Shiny versions.
-    await new Promise(resolve => setTimeout(resolve, 400));
-    await page.waitForFunction(() => {
-      const progress=document.getElementById("compareFile_progress");
-      return !progress || getComputedStyle(progress).display==="none";
-    },{timeout:20000});
+    // Give Shiny's file-upload transport time to finish, then assert the
+    // parsed comparison result rather than the framework-specific progress DOM.
+    await new Promise(resolve => setTimeout(resolve, 3000));
     await page.click("#compareSubmit");
     // Chain controls are server-rendered from comparison_loaded(), so this
     // proves the new file—not the previous 1CRN upload—has been parsed.
@@ -837,11 +832,7 @@ const assert = require("node:assert/strict");
     await page.waitForFunction(expected =>
       document.getElementById("compareFile")?.files?.[0]?.name===expected,
       {timeout:10000},"1D3Z.pdb");
-    await new Promise(resolve => setTimeout(resolve, 400));
-    await page.waitForFunction(() => {
-      const progress=document.getElementById("compareFile_progress");
-      return !progress || getComputedStyle(progress).display==="none";
-    },{timeout:20000});
+    await new Promise(resolve => setTimeout(resolve, 3000));
     await page.click("#compareSubmit");
     await page.waitForSelector("#compareModel",{timeout:30000});
     await page.evaluate(() => {

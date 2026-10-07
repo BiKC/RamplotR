@@ -63,13 +63,23 @@
   }
 
   async function fetchJson(url) {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {Accept: "application/json"},
-      credentials: "omit"
-    });
-    if (!response.ok) throw new Error("PDBe mapping request returned " + response.status);
-    return response.json();
+    const controller = typeof AbortController !== "undefined"
+      ? new AbortController() : null;
+    const timer = controller
+      ? setTimeout(() => controller.abort(), 10000) : null;
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {Accept: "application/json"},
+        credentials: "omit",
+        signal: controller ? controller.signal : undefined
+      });
+      if (!response.ok)
+        throw new Error("PDBe mapping request returned " + response.status);
+      return response.json();
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   async function fetchMapping(pdbId) {

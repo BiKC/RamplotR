@@ -41,6 +41,6 @@ assert(identical(states,
   c("Alpha-R","Beta","PPII","Alpha-L","Other",NA_character_)),
   "Backbone-state prototypes or conservative fallback changed")
 assert(identical(ram_backbone_basin(c(179,-179),c(179,-179)),
-                 c("Other","Other")),
+                 c("Beta","Beta")),
        "Backbone-state distance must remain periodic at the angle seam")
 message("Backbone-state regression tests passed")

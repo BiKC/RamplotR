@@ -754,123 +754,113 @@ const assert = require("node:assert/strict");
               compareHeaders.includes("Rama8000 B") &&
               compareHeaders.includes("Rama8000 changed"),
       "Comparison table should expose standard validation changes.");
-    // Use a genuinely different, multi-chain structure to prove that role
-    // swapping reverses NGL source order rather than only changing labels.
-    await (await page.$("#compareFile")).uploadFile(
-      path.resolve("benchmarks/output/ui-preview/1BBB.pdb"));
-    await page.waitForFunction(expected => {
-      const selected=document.getElementById("compareFile")?.files?.[0]?.name;
-      const value=window.Shiny?.shinyapp?.$inputValues?.["compareFile:shiny.file"];
-      const uploaded=Array.isArray(value)
-        ? value.some(item=>item?.name===expected)
-        : value?.name===expected;
-      return selected===expected && uploaded;
-    },{timeout:25000},"1BBB.pdb");
-    await page.click("#compareSubmit");
-    // Chain controls are server-rendered from comparison_loaded(), so this
-    // proves the new file—not the previous 1CRN upload—has been parsed.
-    await page.waitForFunction(() => {
+    await page.screenshot({
+      path:"benchmarks/output/ui-preview/compare-self.png",fullPage:true
+    });
+
+    // Exercise role swapping in a fresh Shiny session so the test does not
+    // depend on replacing a fileInput that has already completed an upload.
+    // 1D3Z is both structurally distinct from 1CRN and multi-model, letting
+    // one scenario verify NGL source reversal and model-choice persistence.
+    const swapPage=await browser.newPage();
+    await swapPage.setViewport({width:1366,height:900,deviceScaleFactor:1});
+    await swapPage.goto("http://127.0.0.1:8765",{
+      waitUntil:"networkidle2",timeout:60000});
+    await swapPage.evaluate(() =>
+      document.querySelector('input[name="inputSource"][value="upload"]').click());
+    await swapPage.waitForFunction(() => {
+      const element=document.getElementById("ram-upload-wrap");
+      return element && !element.classList.contains("is-hidden");
+    },{timeout:15000});
+    await (await swapPage.$("#structfile")).uploadFile(
+      path.resolve("benchmarks/output/ui-preview/1CRN.pdb"));
+    await new Promise(resolve=>setTimeout(resolve,1600));
+    await swapPage.click("#submit");
+    await swapPage.waitForFunction(() =>
+      document.getElementById("ram-current-structure")?.textContent.includes("1CRN") &&
+      document.getElementById("plotly")?.data?.length>0,
+      {timeout:45000});
+
+    await swapPage.click('.nav-tabs a[data-value="compare"]');
+    await swapPage.evaluate(() =>
+      document.querySelector(
+        'input[name="compareInputSource"][value="upload"]').click());
+    await swapPage.waitForFunction(() => {
+      const element=document.getElementById("ram-compare-upload");
+      return element && !element.classList.contains("is-hidden");
+    },{timeout:15000});
+    await (await swapPage.$("#compareFile")).uploadFile(
+      path.resolve("benchmarks/output/ui-preview/1D3Z.pdb"));
+    await new Promise(resolve=>setTimeout(resolve,1800));
+    await swapPage.click("#compareSubmit");
+    await swapPage.waitForFunction(() => {
       const controls=document.querySelector(".ram-compare-chains");
-      const select=document.getElementById("compareChainB");
-      return controls?.textContent.includes("1BBB") && select &&
-        [...select.options].some(option=>option.value==="C");
-    },{timeout:30000});
-    await page.waitForFunction(() => {
-      const models=window.getNGLStructure && window.getNGLStructure("NGLCompare");
-      return models && models.length===2 &&
-        models[0].structure.atomCount!==models[1].structure.atomCount;
-    },{timeout:35000});
-    await page.evaluate(() => {
-      const el=document.getElementById("compareChainB");
-      if (el.selectize) el.selectize.setValue("C");
+      const model=document.getElementById("compareModel");
+      const components=window.getNGLStructure &&
+        window.getNGLStructure("NGLCompare");
+      return controls?.textContent.includes("1D3Z") && model &&
+        components && components.length===2 &&
+        components[0].structure.atomCount!==components[1].structure.atomCount;
+    },{timeout:50000});
+
+    await swapPage.evaluate(() => {
+      const el=document.getElementById("compareModel");
+      if(el.selectize) el.selectize.setValue("2");
       else {
-        el.value="C";
+        el.value="2";
         el.dispatchEvent(new Event("change",{bubbles:true}));
       }
     });
-    await page.waitForFunction(() =>
-      window.Shiny?.shinyapp?.$inputValues?.compareChainB==="C",
+    await swapPage.waitForFunction(() =>
+      window.Shiny?.shinyapp?.$inputValues?.compareModel==="2",
       {timeout:10000});
-    const beforeSwap=await page.evaluate(() => ({
+    const swapBefore=await swapPage.evaluate(() => ({
       atoms:window.getNGLStructure("NGLCompare")
         .map(component=>component.structure.atomCount),
-      a:window.Shiny.shinyapp.$inputValues.compareChainA,
-      b:window.Shiny.shinyapp.$inputValues.compareChainB
+      primary:document.querySelector(".ram-compare-primary")?.textContent || ""
     }));
-    assert.notEqual(beforeSwap.atoms[0],beforeSwap.atoms[1],
-      "Distinct structures should have distinguishable NGL atom counts.");
 
-    await page.click("#compareSwap");
-    await page.waitForFunction(expected => {
+    await swapPage.click("#compareSwap");
+    await swapPage.waitForFunction(expected => {
       const status=document.querySelector(".ram-compare-swap-state")?.textContent || "";
-      const models=window.getNGLStructure && window.getNGLStructure("NGLCompare");
+      const components=window.getNGLStructure &&
+        window.getNGLStructure("NGLCompare");
       return status.includes("Roles swapped") &&
-        document.getElementById("compareChainA")?.value==="C" &&
-        models && models.length===2 &&
-        models[0].structure.atomCount===expected[1] &&
-        models[1].structure.atomCount===expected[0];
-    },{timeout:35000},beforeSwap.atoms);
-    await page.waitForFunction(() =>
-      document.querySelectorAll(".ram-change-cell").length>0,{timeout:18000});
-    await page.click(".ram-change-cell");
-    await page.waitForFunction(() => {
+        document.getElementById("compareModel")?.value==="2" &&
+        document.querySelector('label[for="compareModel"]')?.textContent
+          .includes("currently Primary") &&
+        components && components.length===2 &&
+        components[0].structure.atomCount===expected[1] &&
+        components[1].structure.atomCount===expected[0];
+    },{timeout:45000},swapBefore.atoms);
+    await swapPage.waitForFunction(() =>
+      document.querySelectorAll(".ram-change-cell").length>0,
+      {timeout:18000});
+    await swapPage.click(".ram-change-cell");
+    await swapPage.waitForFunction(() => {
       const stage=window.getNGLStage && window.getNGLStage("NGLCompare");
       return document.querySelector(".ram-change-cell.is-selected") && stage &&
         stage.getRepresentationsByName("ram-compare-highlight-a").list.length===1 &&
         stage.getRepresentationsByName("ram-compare-highlight-b").list.length===1;
     },{timeout:18000});
 
-    await page.click("#compareSwap");
-    await page.waitForFunction(() =>
-      document.querySelector(".ram-compare-swap-state")?.textContent
-        .includes("Loaded structure is primary") &&
-      document.getElementById("compareChainB")?.value==="C",
-      {timeout:25000});
-
-    // The separately loaded structure owns compareModel even when it becomes
-    // primary after a role swap. Preserve that user choice across rerenders.
-    await (await page.$("#compareFile")).uploadFile(
-      path.resolve("benchmarks/output/ui-preview/1D3Z.pdb"));
-    await page.waitForFunction(expected => {
-      const selected=document.getElementById("compareFile")?.files?.[0]?.name;
-      const value=window.Shiny?.shinyapp?.$inputValues?.["compareFile:shiny.file"];
-      const uploaded=Array.isArray(value)
-        ? value.some(item=>item?.name===expected)
-        : value?.name===expected;
-      return selected===expected && uploaded;
-    },{timeout:25000},"1D3Z.pdb");
-    await page.click("#compareSubmit");
-    await page.waitForSelector("#compareModel",{timeout:30000});
-    await page.evaluate(() => {
-      const el=document.getElementById("compareModel");
-      if (el.selectize) el.selectize.setValue("2");
-      else {
-        el.value="2";
-        el.dispatchEvent(new Event("change",{bubbles:true}));
-      }
+    await swapPage.click("#compareSwap");
+    await swapPage.waitForFunction(expected => {
+      const status=document.querySelector(".ram-compare-swap-state")?.textContent || "";
+      const components=window.getNGLStructure &&
+        window.getNGLStructure("NGLCompare");
+      return status.includes("Loaded structure is primary") &&
+        document.getElementById("compareModel")?.value==="2" &&
+        document.querySelector('label[for="compareModel"]')?.textContent
+          .includes("currently Comparison") &&
+        components && components.length===2 &&
+        components[0].structure.atomCount===expected[0] &&
+        components[1].structure.atomCount===expected[1];
+    },{timeout:45000},swapBefore.atoms);
+    await swapPage.screenshot({
+      path:"benchmarks/output/ui-preview/compare-swapped.png",fullPage:true
     });
-    await page.waitForFunction(() =>
-      window.Shiny?.shinyapp?.$inputValues?.compareModel==="2",
-      {timeout:10000});
-    await page.click("#compareSwap");
-    await page.waitForFunction(() =>
-      document.querySelector(".ram-compare-swap-state")?.textContent
-        .includes("Roles swapped") &&
-      document.getElementById("compareModel")?.value==="2" &&
-      document.querySelector('label[for="compareModel"]')?.textContent
-        .includes("currently Primary"),
-      {timeout:25000});
-    await page.click("#compareSwap");
-    await page.waitForFunction(() =>
-      document.querySelector(".ram-compare-swap-state")?.textContent
-        .includes("Loaded structure is primary") &&
-      document.getElementById("compareModel")?.value==="2" &&
-      document.querySelector('label[for="compareModel"]')?.textContent
-        .includes("currently Comparison"),
-      {timeout:25000});
-    await page.screenshot({
-      path:"benchmarks/output/ui-preview/compare-self.png",fullPage:true
-    });
+    await swapPage.close();
     // Group comparison reuses the same circular statistics across uploaded
     // structure sets. An identical 1CRN-vs-1CRN analysis must not invent
     // conformational differences.

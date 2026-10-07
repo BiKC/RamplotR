@@ -92,16 +92,6 @@ const puppeteer = require("puppeteer-core");
       .classList.contains("is-hidden"));
     const upload=await page.$("#structfile");
     await upload.uploadFile(fixture);
-    // Puppeteer's uploadFile() updates the native file input reliably, but
-    // Shiny's private $inputValues key/progress DOM is implementation-specific
-    // and can disappear or change before the browser test observes it. Wait on
-    // the public browser state here; the subsequent prediction-panel assertion
-    // verifies that the server actually received and processed the upload.
-    await page.waitForFunction(id => {
-      const input=document.getElementById(id);
-      return !!input && !!input.files && input.files.length===1;
-    },{timeout:10000},"structfile");
-    await new Promise(done=>setTimeout(done,1000));
     // Select prediction provenance through the same visible native dropdown a
     // researcher uses. A Selectize-backed hidden input may silently revert
     // scripted changes and analyse an AF/ESM prediction as experimental.
@@ -118,7 +108,10 @@ const puppeteer = require("puppeteer-core");
     await chooseSource("esmfold");
     await page.waitForFunction(()=>document.getElementById("ram-confidence-sidecars")
       .classList.contains("is-hidden"));
-    await new Promise(done=>setTimeout(done,250));
+    // Let Shiny finish the file upload after the prediction source is set.
+    // Waiting before changing the source can allow the reactive upload UI to
+    // re-render and discard the selected file.
+    await new Promise(done=>setTimeout(done,1300));
     await page.click("#submit");
     try {
       await page.waitForFunction(() => {

@@ -899,6 +899,76 @@ const assert = require("node:assert/strict");
     await page.waitForFunction(() =>
       document.querySelector(".ram-compare-swap-state")?.textContent
         .includes("Loaded structure is primary"),{timeout:30000});
+
+    // Post-merge responsive audit: the integrated Compare workflow must remain
+    // usable on a phone-sized viewport without document-level horizontal scroll.
+    await page.setViewport({width:390,height:844,deviceScaleFactor:1});
+    await page.waitForFunction(() => {
+      const plot=document.getElementById("comparePlot");
+      const workspace=document.querySelector(".ram-compare-workspace");
+      return plot && plot._fullLayout && workspace &&
+        Math.abs(plot._fullLayout.width-plot.clientWidth)<=3 &&
+        getComputedStyle(workspace).gridTemplateColumns.split(" ").length===1;
+    },{timeout:18000});
+    const mobileCompare=await page.evaluate(() => {
+      const viewport=document.documentElement.clientWidth;
+      const rect=selector=>document.querySelector(selector)
+        ?.getBoundingClientRect().toJSON();
+      const workspace=document.querySelector(".ram-compare-workspace");
+      const cards=[...document.querySelectorAll(".ram-compare-card")]
+        .map(node=>node.getBoundingClientRect().toJSON());
+      const groups=[...document.querySelectorAll(".ram-compare-summary-group")]
+        .map(node=>node.getBoundingClientRect().toJSON());
+      const source=document.querySelector("#ram-compare-source-panel");
+      return {
+        viewport,
+        bodyWidth:document.body.scrollWidth,
+        rootWidth:document.documentElement.scrollWidth,
+        columns:getComputedStyle(workspace).gridTemplateColumns,
+        cards,
+        groups,
+        source:source?.getBoundingClientRect().toJSON(),
+        sourceOpen:source?.open,
+        swap:rect("#compareSwap"),
+        toolbar:rect(".ram-compare-toolbar"),
+        plot:rect("#comparePlot"),
+        viewer:rect(".ram-compare-viewer"),
+        chainActions:rect(".ram-compare-chain-actions")
+      };
+    });
+    assert.ok(mobileCompare.bodyWidth<=mobileCompare.viewport+3 &&
+              mobileCompare.rootWidth<=mobileCompare.viewport+3,
+      "Compare must not introduce document-level horizontal scrolling on mobile.");
+    assert.equal(mobileCompare.cards.length,2,
+      "Both linked comparison cards should remain present on mobile.");
+    assert.ok(mobileCompare.cards[1].top>mobileCompare.cards[0].top+100,
+      "The 2D and 3D comparison cards should stack on a narrow viewport.");
+    assert.ok(mobileCompare.groups.length>=3 &&
+              mobileCompare.groups.slice(1).every((group,index)=>
+                group.top>=mobileCompare.groups[index].bottom-2),
+      "Comparison evidence groups should stack into a readable single column.");
+    for(const [label,box] of Object.entries({
+      source:mobileCompare.source,swap:mobileCompare.swap,
+      toolbar:mobileCompare.toolbar,plot:mobileCompare.plot,
+      viewer:mobileCompare.viewer,chainActions:mobileCompare.chainActions
+    })) {
+      assert.ok(box && box.left>=-2 && box.right<=mobileCompare.viewport+2,
+        `Compare ${label} should fit inside the mobile viewport.`);
+    }
+    assert.equal(mobileCompare.sourceOpen,false,
+      "Loaded comparison source should remain collapsed on mobile.");
+    await page.screenshot({
+      path:"benchmarks/output/ui-preview/compare-mobile.png",fullPage:true
+    });
+    await page.setViewport({width:1440,height:940,deviceScaleFactor:1});
+    await page.waitForFunction(() => {
+      const workspace=document.querySelector(".ram-compare-workspace");
+      const plot=document.getElementById("comparePlot");
+      return workspace && plot && plot._fullLayout &&
+        getComputedStyle(workspace).gridTemplateColumns.split(" ").length===2 &&
+        Math.abs(plot._fullLayout.width-plot.clientWidth)<=3;
+    },{timeout:18000});
+
     // Group comparison reuses the same circular statistics across uploaded
     // structure sets. An identical 1CRN-vs-1CRN analysis must not invent
     // conformational differences.

@@ -2018,40 +2018,55 @@ server <- function(input, output, session) {
 
   output$comparison <- DT::renderDT({
     result <- filtered_comparison()
-    fields <- c("chain_a", "residue_a", "insertion_a", "amino_a",
-      "chain_b", "residue_b", "insertion_b", "amino_b",
-      "delta_phi", "delta_psi", "angular_displacement", "shift_band",
-      "plddt_a", "confidence_a", "plddt_b", "confidence_b",
-      "class_changed", "rama8000_region_a", "rama8000_region_b",
-      "rama8000_changed", "alignment")
-    if (!all(fields %in% names(result)))
+    required <- c("chain_a","residue_a","insertion_a","amino_a",
+      "chain_b","residue_b","insertion_b","amino_b",
+      "delta_phi","delta_psi","angular_displacement","shift_band",
+      "class_changed","rama8000_region_a","rama8000_region_b",
+      "rama8000_changed","alignment")
+    if (!all(required %in% names(result)))
       return(DT::datatable(data.frame()))
-    shown <- result[, fields, drop=FALSE]
-    shown$pos_a <- ifelse(is.na(shown$residue_a), "—",
-      paste0(shown$residue_a, shown$insertion_a))
-    shown$pos_b <- ifelse(is.na(shown$residue_b), "—",
-      paste0(shown$residue_b, shown$insertion_b))
-    shown$delta_phi <- round(shown$delta_phi, 1)
-    shown$delta_psi <- round(shown$delta_psi, 1)
-    shown$angular_displacement <- round(shown$angular_displacement, 1)
-    shown$plddt_a <- round(shown$plddt_a,1)
-    shown$plddt_b <- round(shown$plddt_b,1)
-    shown$class_changed <- ifelse(shown$class_changed, "Yes", "No")
-    shown$rama8000_changed <- ifelse(shown$rama8000_changed, "Yes", "No")
-    shown <- shown[, c("chain_a", "pos_a", "amino_a",
-      "chain_b", "pos_b", "amino_b", "delta_phi", "delta_psi",
-      "angular_displacement", "shift_band",
-      "plddt_a", "confidence_a", "plddt_b", "confidence_b",
-      "class_changed", "rama8000_region_a", "rama8000_region_b",
-      "rama8000_changed", "alignment"), drop=FALSE]
-    DT::datatable(shown, rownames=FALSE,
-      colnames=c("Chain A", "Pos A", "AA A", "Chain B", "Pos B", "AA B",
-                 "Δφ (°)", "Δψ (°)", "Backbone shift (°)", "Shift band",
-                 "pLDDT A", "Confidence A", "pLDDT B", "Confidence B",
-                 "RamplotR changed", "Rama8000 A", "Rama8000 B",
-                 "Rama8000 changed", "Alignment"),
-      selection="single",
-      options=list(pageLength=15,scrollX=FALSE,autoWidth=FALSE,dom="ftip"),
+    show_conf_a <- "plddt_a" %in% names(result) && any(is.finite(result$plddt_a))
+    show_conf_b <- "plddt_b" %in% names(result) && any(is.finite(result$plddt_b))
+    fields <- c("chain_a","residue_a","insertion_a","amino_a",
+      "chain_b","residue_b","insertion_b","amino_b",
+      "delta_phi","delta_psi","angular_displacement","shift_band")
+    if(show_conf_a) fields <- c(fields,"plddt_a","confidence_a")
+    if(show_conf_b) fields <- c(fields,"plddt_b","confidence_b")
+    fields <- c(fields,"class_changed","rama8000_region_a","rama8000_region_b",
+      "rama8000_changed","alignment")
+    shown <- result[,fields,drop=FALSE]
+    shown$pos_a <- ifelse(is.na(shown$residue_a),"—",
+      paste0(shown$residue_a,shown$insertion_a))
+    shown$pos_b <- ifelse(is.na(shown$residue_b),"—",
+      paste0(shown$residue_b,shown$insertion_b))
+    shown$delta_phi <- round(shown$delta_phi,1)
+    shown$delta_psi <- round(shown$delta_psi,1)
+    shown$angular_displacement <- round(shown$angular_displacement,1)
+    if(show_conf_a) shown$plddt_a <- round(shown$plddt_a,1)
+    if(show_conf_b) shown$plddt_b <- round(shown$plddt_b,1)
+    shown$class_changed <- ifelse(shown$class_changed,"Yes","No")
+    shown$rama8000_changed <- ifelse(shown$rama8000_changed,"Yes","No")
+    display <- c("chain_a","pos_a","amino_a",
+      "chain_b","pos_b","amino_b","delta_phi","delta_psi",
+      "angular_displacement","shift_band")
+    labels <- c("Chain A","Pos A","AA A","Chain B","Pos B","AA B",
+      "Δφ (°)","Δψ (°)","Backbone shift (°)","Shift band")
+    if(show_conf_a) {
+      display <- c(display,"plddt_a","confidence_a")
+      labels <- c(labels,"pLDDT A","Confidence A")
+    }
+    if(show_conf_b) {
+      display <- c(display,"plddt_b","confidence_b")
+      labels <- c(labels,"pLDDT B","Confidence B")
+    }
+    display <- c(display,"class_changed","rama8000_region_a",
+      "rama8000_region_b","rama8000_changed","alignment")
+    labels <- c(labels,"RamplotR changed","Rama8000 A","Rama8000 B",
+      "Rama8000 changed","Alignment")
+    shown <- shown[,display,drop=FALSE]
+    DT::datatable(shown,rownames=FALSE,colnames=labels,selection="single",
+      options=list(pageLength=15,scrollX=show_conf_a||show_conf_b,
+                   autoWidth=FALSE,dom="ftip"),
       class="compact stripe hover")
   }, server=FALSE)
   observe({

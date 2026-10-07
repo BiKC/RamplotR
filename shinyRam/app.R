@@ -2453,6 +2453,62 @@ server <- function(input, output, session) {
         number, row[[paste0("insertion_",side)]][[1L]])
     }
     angle <- function(x) if (is.finite(x)) sprintf("%.1f°",x) else "N/A"
+
+    main <- req(loaded())
+    comparison <- req(comparison_loaded())
+    swapped <- isTRUE(compare_swapped())
+    comparison_model <- if (is.null(input$compareModel)) 1L else
+      suppressWarnings(as.integer(input$compareModel))
+    if (!is.finite(comparison_model) || comparison_model < 1L ||
+        comparison_model > comparison$nmodels) comparison_model <- 1L
+
+    first_structure <- if (swapped) comparison else main
+    second_structure <- if (swapped) main else comparison
+    first_model <- if (swapped) comparison_model else current_model()
+    second_model <- if (swapped) current_model() else comparison_model
+
+    pair_row <- function(side) {
+      number <- row[[paste0("residue_",side)]][[1L]]
+      if (is.na(number)) return(NULL)
+      data.frame(
+        chain=as.character(row[[paste0("chain_",side)]][[1L]]),
+        resi=as.integer(number),
+        insertion_code=as.character(row[[paste0("insertion_",side)]][[1L]]),
+        resn=as.character(row[[paste0("amino_",side)]][[1L]]),
+        stringsAsFactors=FALSE
+      )
+    }
+    local_context <- function(structure, model, side) {
+      residue <- pair_row(side)
+      if (is.null(residue)) return(list(available=FALSE,data=NULL,
+        reason="Alignment gap"))
+      if (structure$nmodels>1L && !identical(as.integer(model),1L))
+        return(list(available=FALSE,data=NULL,
+          reason="Hetero context is retained conservatively for model 1 only"))
+      data <- ram_nearby_hetero_context(
+        ram_model_at(structure$pdb,as.integer(model)),residue,
+        max_distance=6,max_hits=3L)
+      list(available=TRUE,data=data,reason=NULL)
+    }
+    context_a <- local_context(first_structure,first_model,"a")
+    context_b <- local_context(second_structure,second_model,"b")
+    context_label <- function(context) {
+      if (!isTRUE(context$available))
+        return(tags$span(class="ram-compare-context-muted",context$reason))
+      data <- context$data
+      if (is.null(data) || !nrow(data))
+        return(tags$span(class="ram-compare-context-muted",
+          "No non-water hetero residue within 6 Å"))
+      labels <- vapply(seq_len(nrow(data)),function(i) {
+        chain <- as.character(data$chain[[i]])
+        insertion <- as.character(data$insertion_code[[i]])
+        position <- paste0(if(nzchar(chain)) paste0(chain,":") else "",
+          data$resi[[i]],ifelse(is.na(insertion),"",insertion))
+        sprintf("%s %s · %.1f Å",data$resn[[i]],position,data$distance[[i]])
+      },character(1L))
+      tags$span(paste(labels,collapse="; "))
+    }
+
     tags$div(class="ram-compare-selection",
       tags$div(class="ram-compare-selection-pair",
         tags$span(class="ram-compare-primary",
@@ -2480,6 +2536,16 @@ server <- function(input, output, session) {
         if ("rama8000_changed" %in% names(row) &&
             isTRUE(row$rama8000_changed[[1L]]))
           tags$span(class="ram-compare-change", "Standard category changed")
+      ),
+      tags$div(class="ram-compare-local-context",
+        tags$div(class="ram-compare-context-side",
+          tags$strong("Primary local context"),
+          context_label(context_a)),
+        tags$div(class="ram-compare-context-side",
+          tags$strong("Comparison local context"),
+          context_label(context_b)),
+        tags$p(class="ram-compare-context-note",
+          "Nearest heavy-atom distances to non-water hetero residues within 6 Å. Proximity is structural context, not evidence of biochemical binding.")
       )
     )
   })

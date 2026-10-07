@@ -5,10 +5,11 @@
 
 ## Current baseline
 
-- Current `main` baseline: `860ee1bb95f5af336db42528be7ef81aa2d3db53`.
+- Current `main` baseline: `9681c8c4132b9201185ee512e86f69e8a4664ecf` (PR #43 merged).
 - Manuscript work remains separate on `arxiv-preprint` / PR #20.
 - The roadmap deliberately focuses RamplotR on backbone conformation, predicted-model confidence and comparative structural analysis rather than recreating a full MolProbity/Phenix validation suite.
-- Active implementation PR: #43 — Compare workflow progressive-disclosure polish.
+- PR #43 — Compare workflow progressive-disclosure polish — is merged.
+- Active implementation branch: `chore/post-compare-responsive-audit` for post-merge laptop/mobile regression coverage only.
 - Manuscript PR #20 remains open separately.
 
 ## Roadmap features already merged
@@ -32,6 +33,10 @@
 - PR #40 — compare prediction confidence across aligned residues.
   - Explicit prediction provenance for uploaded comparison structures.
   - pLDDT on both sides, signed delta-pLDDT, confidence-change filtering and plot/table/inspector integration.
+- PR #43 — integrated Compare workflow polish.
+  - comparison source/provenance uses progressive disclosure and auto-collapses after load;
+  - Swap remains next to chain-role controls;
+  - summary evidence is grouped into Alignment, Backbone, Validation and conditional Prediction confidence.
 
 Do **not** reimplement these features on old feature branches; several merged branches still exist.
 
@@ -52,20 +57,17 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 
 ## Active work
 
-- PR #43 — Compare workflow polish.
-  - comparison source/provenance moved into an auto-collapsing setup disclosure;
-  - loaded source remains identified in the collapsed header;
-  - Swap remains always available beside chain-role controls;
-  - summary evidence grouped into Alignment, Backbone, Validation and conditional Prediction confidence;
-  - browser regression coverage added for disclosure state and evidence hierarchy;
-  - no scientific calculations changed.
+- `chore/post-compare-responsive-audit` — responsive regression audit after PR #43.
+  - do not change scientific calculations;
+  - verify Compare at normal laptop width and narrow/mobile width;
+  - add browser assertions/screenshots for layout, swap accessibility and overflow;
+  - only patch CSS if the browser regression demonstrates a concrete responsive defect.
 
 ## Next implementation steps
 
-1. Run/review PR #43 browser and scientific workflows; merge only after the integrated Compare workflow is green.
-2. Verify the post-merge `main` browser experience at normal laptop width and mobile width.
-3. Only start a new scientific feature after checking open PRs, recent main commits and branch names.
-4. Synchronize the manuscript only after the implementation/UI settles.
+1. Complete the post-merge Compare responsive audit and merge only if its browser/scientific workflows are green.
+2. Re-read this worklog and inspect open/recent PRs before starting another feature; merged feature branches must not be reused as active work.
+3. Synchronize the manuscript only after the implementation/UI settles.
    - Describe current Rama8000 standard validation, not old/native outlier interpretations.
    - Position RamplotR around residue-centred backbone comparison, predicted-model confidence and linked structural context.
 

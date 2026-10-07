@@ -10,7 +10,7 @@
 - The roadmap deliberately focuses RamplotR on backbone conformation, predicted-model confidence and comparative structural analysis rather than recreating a full MolProbity/Phenix validation suite.
 - PR #43 — Compare workflow progressive-disclosure polish — is merged.
 - PR #44 — post-merge mobile Compare regression audit — is merged and green; no CSS changes were required.
-- Active implementation branch: `feature/backbone-conformational-basins`.
+- PR #45 — coarse backbone-state transitions — is merged.
 - Manuscript PR #20 remains open separately.
 
 ## Roadmap features already merged
@@ -58,14 +58,12 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 
 ## Active work
 
-- `feature/backbone-conformational-basins` adds a transparent, comparison-only
-  coarse phi/psi state (Alpha-R, Beta, PPII, Alpha-L or Other).
-- Pairwise Compare reports and filters state transitions.
-- Prediction/NMR ensembles report modal state and model agreement.
-- Group comparison reports modal state in each group and state transitions.
-- The residue evidence inspector explains ensemble state disagreement without
-  treating it as validation, secondary structure or molecular dynamics.
-- Regression coverage is being added before merge.
+- No active implementation branch or PR.
+- PR #45 added a transparent, comparison-only coarse phi/psi state
+  (Alpha-R, Beta, PPII, Alpha-L or Other) across pairwise comparison,
+  prediction/NMR ensembles, group comparison, residue evidence and exports.
+- The state is explicitly not a validation category, DSSP secondary-structure
+  assignment, statistical significance test or claim of molecular dynamics.
 - The integrated Compare workflow is covered at desktop/laptop and 390x844 mobile widths.
 - Before starting anything new, inspect open/recent PRs and branch names to avoid rebuilding merged work.
 

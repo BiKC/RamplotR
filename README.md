@@ -16,10 +16,10 @@ RamplotR is an open-source R Shiny application that brings backbone geometry, a 
 | --- | --- |
 | **Explore a structure** | Interactive φ/ψ plots with several reference-density datasets, native RamplotR density regions and a parallel six-class Rama8000 standard validation that matches the current cctbx/Phenix categories. |
 | **Inspect residues in context** | Synchronized Ramachandran plot, searchable residue table, all-chain sequence navigator and NGL 3D viewer. The issue queue distinguishes Rama8000 outliers from native RamplotR `Not allowed` regions and missing angles. |
-| **Work with predicted models** | Import AlphaFold DB models or upload AlphaFold 2/3, ColabFold and ESMFold structures. Examine pLDDT/PAE, analyse AF2/ColabFold, AF3 or ESMFold model/seed ensembles with residue-level backbone and confidence agreement, and search experimental PDB counterparts for direct comparison. |
+| **Work with predicted models** | Import AlphaFold DB models or upload AlphaFold 2/3, ColabFold and ESMFold structures. Examine pLDDT/PAE, analyse AF2/ColabFold, AF3 or ESMFold model/seed ensembles with residue-level backbone-state and confidence agreement, and search experimental PDB counterparts for direct comparison. |
 | **Examine structural geometry** | Explore peptide ω, side-chain χ1 and descriptive Cβ measurements. Optionally attach the matching deposited structure's official wwPDB validation report for independent rotamer, clash and geometry annotations. |
 | **Inspect experimental evidence** | Overlay a local CCP4/MRC cryo-EM map in the 3D viewer as a qualitative aid, without uploading the map to a separate service. |
-| **Compare models** | Sequence-align two structures with the Conformational Change Explorer using the same Ramachandran density background as the main plot; swap primary/comparison roles instantly, or compare biologically defined structure sets (for example apo/holo or WT/mutant) using residue-level circular φ/ψ means, dispersion and between-group backbone shifts. |
+| **Compare models** | Sequence-align two structures with the Conformational Change Explorer using the same Ramachandran density background as the main plot; inspect wrapped φ/ψ shifts and broad backbone-state transitions, swap primary/comparison roles instantly, or compare biologically defined structure sets (for example apo/holo or WT/mutant) using residue-level circular φ/ψ means, dispersion and between-group backbone shifts. |
 | **Publish or automate** | Export SVG and high-resolution PNG figures, filtered CSV tables and standalone HTML reports. Run the offline R command-line tool on individual files or a directory of structures. |
 
 Advanced analysis stays in collapsible panels or dedicated comparison/summary views, keeping the everyday 2D/3D inspection screen uncluttered.
@@ -96,6 +96,8 @@ For standard structure validation, RamplotR also evaluates every residue with th
 Native RamplotR `Not allowed` and Rama8000/wwPDB `Outlier` therefore remain separate concepts in the interface and exports. For deposited experimental structures, an official wwPDB report for the **same structure and model** can additionally be attached as independent evidence.
 
 For predictions, pLDDT and PAE describe model confidence rather than experimental verification. ESMFold normally provides pLDDT but not PAE; experimental thermal B-factors are **never** automatically interpreted as prediction confidence. The native ω, χ1 and Cβ measurements are descriptive, and visualising a density map is not a quantitative map–model fit measurement.
+
+For comparison workflows, RamplotR also assigns finite φ/ψ pairs to one of four coarse backbone states (Alpha-R, Beta, PPII or Alpha-L) by wrapped angular distance to fixed canonical centres, with remote points labelled Other. These state labels make model/ensemble disagreement easier to scan. They are descriptive comparison bins, not secondary-structure assignments, validation categories or evidence of molecular motion.
 
 The default RamplotR teal contour palette provides consistent, recognisable publication figures; changing colours never changes the scientific reference distribution or classification thresholds. Figure and report exports include relevant analysis settings and provenance.
 

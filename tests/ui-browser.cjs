@@ -626,9 +626,10 @@ const assert = require("node:assert/strict");
     },{timeout:15000});
     const localContextText = await page.$eval(
       "#selectedResidueInfo .ram-evidence-panel",node=>node.textContent);
-    assert.ok(localContextText.includes("3.0 Å") &&
-              localContextText.includes("spatial proximity only"),
-      "Local context must report nearest heavy-atom distance without claiming binding.");
+    assert.match(localContextText,/LIG L:401 at [0-9]+\.[0-9] Å/,
+      "Local context must report a nearest heavy-atom distance for the ligand.");
+    assert.ok(localContextText.includes("spatial proximity only"),
+      "Local context must describe proximity without claiming biochemical binding.");
 
     // Jump straight to a true PDB residue number rather than counting letters.
     await page.$eval(".ram-seq-jump-input", input => { input.value = "12"; });

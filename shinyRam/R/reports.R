@@ -107,6 +107,7 @@ ram_save_html_report <- function(path, data, metadata, svg_path,
   shown <- utils::head(data[,intersect(c(
     "chain","resi","insertion_code","resn","phi","psi","region",
     "density","rama8000_region","rama8000_group","rama8000_score",
+    "uniprot_accession","uniprot_resi","canonical_status","canonical_source",
     "omega","omega_status","chi1","cb_ca_distance",
     "cb_signed_volume","plddt","confidence_category"),
     names(data)),drop=FALSE],max_report_rows)

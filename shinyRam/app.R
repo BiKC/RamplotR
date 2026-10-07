@@ -28,6 +28,7 @@ source(file.path("R", "ramachandran.R"), local = TRUE)
 source(file.path("R", "rama8000.R"), local = TRUE)
 source(file.path("R", "backbone.R"), local = TRUE)
 source(file.path("R", "conformation.R"), local = TRUE)
+source(file.path("R", "canonical.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
 source(file.path("R", "inspection.R"), local = TRUE)
 source(file.path("R", "reports.R"), local = TRUE)
@@ -678,6 +679,7 @@ ui <- fluidPage(
   ),
   tags$script(src = "plotly-loader.js"),
   tags$script(src = "custom.js"),
+  tags$script(src = "canonical-mapping.js"),
   tags$script(src = "experimental-search.js"),
   tags$script(src = "compare.js"),
   tags$script(src = "prediction.js"),
@@ -696,6 +698,10 @@ server <- function(input, output, session) {
   experimental_search_results <- reactiveVal(NULL)
   experimental_search_status <- reactiveVal(NULL)
   experimental_search_request <- reactiveVal(0L)
+  canonical_segments <- reactiveVal(ram_canonical_empty_segments())
+  canonical_mapping <- reactiveVal(ram_canonical_empty_map())
+  canonical_status <- reactiveVal(NULL)
+  canonical_request <- reactiveVal(0L)
   selected_residue <- reactiveVal(NULL)
   selected_comparison <- reactiveVal(NULL)
   compare_swapped <- reactiveVal(FALSE)
@@ -919,10 +925,110 @@ server <- function(input, output, session) {
       loaded(list(key = key, name = name, torsions = torsions, chains = chains,
                   pdb = pdb, nmodels = ram_model_count(pdb), source_id = source_id,
                   viewer_format = viewer_format, prediction = prediction,
-                  declared_source = declared_source, input_source = source_type))
+                  declared_source = declared_source, input_source = source_type,
+                  pdb_accession = if (identical(source_type,"pdb"))
+                    toupper(source_label) else NULL,
+                  uniprot_accession = if (is_afdb)
+                    ram_uniprot_accession(source_label) else NULL))
       incProgress(0.25, detail = "Preparing interactive views")
     })
   }, ignoreInit = TRUE)
+
+  # Canonical UniProt coordinates are an additive annotation. PDB author
+  # numbering remains the local coordinate system used by selection and NGL.
+  # Public PDB entries request SIFTS mappings client-side so Shinylive keeps
+  # working without a server HTTP dependency. AlphaFold DB models already use
+  # the requested UniProt sequence numbering.
+  observeEvent(loaded(), {
+    structure <- loaded()
+    canonical_segments(ram_canonical_empty_segments())
+    canonical_mapping(ram_canonical_empty_map())
+    request_id <- isolate(canonical_request()) + 1L
+    canonical_request(request_id)
+
+    if (is.null(structure)) {
+      canonical_status(NULL)
+      return()
+    }
+    if (identical(structure$input_source,"afdb") &&
+        !is.null(structure$uniprot_accession)) {
+      mapping <- tryCatch(
+        ram_afdb_canonical_map(structure$torsions,
+                               structure$uniprot_accession),
+        error=function(e) {
+          canonical_status(list(state="error",
+            message=conditionMessage(e)))
+          NULL
+        }
+      )
+      if (!is.null(mapping)) {
+        canonical_mapping(mapping)
+        canonical_status(list(
+          state="mapped",source="AlphaFold DB",
+          expanded_mapping_rows=nrow(mapping),
+          accessions=unique(mapping$uniprot_accession)
+        ))
+      }
+      return()
+    }
+    if (identical(structure$input_source,"pdb") &&
+        !is.null(structure$pdb_accession)) {
+      canonical_status(list(state="searching",source="PDBe SIFTS",
+        pdb_id=structure$pdb_accession))
+      session$sendCustomMessage("ram-canonical-map",list(
+        request_id=as.character(request_id),
+        pdb_id=structure$pdb_accession
+      ))
+      return()
+    }
+    canonical_status(list(state="unavailable",
+      message="Canonical mapping is not inferred automatically for uploaded structures."))
+  },ignoreInit=TRUE)
+
+  observeEvent(input$ramCanonicalMapping, {
+    value <- input$ramCanonicalMapping
+    if (!is.list(value) || is.null(value$request_id)) return()
+    if (!identical(as.character(value$request_id),
+                   as.character(isolate(canonical_request())))) return()
+    structure <- isolate(loaded())
+    if (is.null(structure) || !identical(structure$input_source,"pdb"))
+      return()
+    if (!is.null(value$pdb_id) &&
+        !identical(toupper(as.character(value$pdb_id)),
+                   toupper(as.character(structure$pdb_accession)))) return()
+
+    if (!identical(as.character(value$state),"ok")) {
+      canonical_status(list(state="error",source="PDBe SIFTS",
+        message=if(is.null(value$message)) "Canonical mapping unavailable."
+          else as.character(value$message)))
+      return()
+    }
+
+    segments <- tryCatch(
+      ram_sifts_normalize_segments(value$segments,
+                                   pdb_id=structure$pdb_accession),
+      error=function(e) {
+        canonical_status(list(state="error",source="PDBe SIFTS",
+          message=conditionMessage(e)))
+        NULL
+      }
+    )
+    if (is.null(segments)) return()
+    mapping <- ram_sifts_expand_safe(segments)
+    canonical_segments(segments)
+    canonical_mapping(mapping)
+    safe_n <- sum(segments$safe_linear,na.rm=TRUE)
+    canonical_status(list(
+      state=if(nrow(segments) && safe_n==nrow(segments) && nrow(mapping))
+        "mapped" else "partial",
+      source="PDBe SIFTS",
+      endpoint=if(is.null(value$endpoint)) "" else as.character(value$endpoint),
+      segments=nrow(segments),
+      safe_segments=safe_n,
+      expanded_mapping_rows=nrow(mapping),
+      accessions=unique(segments$uniprot_accession)
+    ))
+  },ignoreInit=TRUE)
 
   # Comparison loading is a separate, deliberate action, so changing plot
   # settings does not repeatedly refetch the secondary structure. The helper is
@@ -1193,6 +1299,7 @@ server <- function(input, output, session) {
     if(!is.null(official) && identical(official$key,structure$key))
       result <- ram_external_validation_join(result,official$records,
                                                model=current_model())
+    result <- ram_canonical_join(result,canonical_mapping())
     result
   })
   displayed <- reactive({
@@ -1236,6 +1343,10 @@ server <- function(input, output, session) {
     columns <- c("chain", "resi", "insertion_code", "resn",
                  "phi", "psi", "region", "density",
                  "rama8000_region", "rama8000_group", "rama8000_score")
+    has_canonical <- all(c("uniprot_accession","uniprot_resi") %in% names(data)) &&
+      any(!is.na(data$uniprot_accession) & is.finite(data$uniprot_resi))
+    if (has_canonical)
+      columns <- c(columns,"uniprot_accession","uniprot_resi")
     if ("plddt" %in% names(data))
       columns <- c(columns, "plddt", "confidence_category")
     shown <- data[, columns, drop = FALSE]
@@ -1249,6 +1360,7 @@ server <- function(input, output, session) {
       colnames = c("Chain", "Residue", "Ins.", "AA", "Phi (°)", "Psi (°)",
                    "RamplotR region", "Percentile", "Rama8000", "Rama8000 class",
                    "Rama8000 score (%)",
+                   if (has_canonical) c("UniProt","UniProt residue"),
                    if ("plddt" %in% names(shown)) c("pLDDT", "Confidence")),
       selection = list(mode = "single",
                        selected = if (length(marked)) marked[[1L]] else integer(0)),
@@ -1342,6 +1454,24 @@ server <- function(input, output, session) {
         provenance$official_wwPDB_report <- ext$name
         provenance$official_wwPDB_md5 <- ext$md5
         provenance$official_wwPDB_model <- current_model()
+      }
+      mapping <- canonical_status()
+      if(!is.null(mapping)) {
+        provenance$canonical_mapping_state <- mapping$state
+        provenance$canonical_mapping_source <- if(is.null(mapping$source))
+          "none" else mapping$source
+        if(!is.null(mapping$accessions) && length(mapping$accessions))
+          provenance$canonical_uniprot_accessions <-
+            paste(mapping$accessions,collapse=",")
+        provenance$canonical_mapped_residues <-
+          if("canonical_status" %in% names(data))
+            sum(data$canonical_status=="mapped",na.rm=TRUE) else 0L
+        if(!is.null(mapping$segments))
+          provenance$canonical_mapping_segments <- mapping$segments
+        if(!is.null(mapping$safe_segments))
+          provenance$canonical_safe_linear_segments <- mapping$safe_segments
+        if(!is.null(mapping$endpoint) && nzchar(mapping$endpoint))
+          provenance$canonical_mapping_endpoint <- mapping$endpoint
       }
       provenance$extended_native_geometry <- "Omega and descriptive chi1; not MolProbity-equivalent"
       ram_save_html_report(file, data, provenance, image)
@@ -3526,14 +3656,45 @@ server <- function(input, output, session) {
       tags$td(class="ram-numeric", standard_pct(n))
     )
     standard_outliers <- standard_count("Outlier")
+    mapped_n <- if ("canonical_status" %in% names(data))
+      sum(data$canonical_status=="mapped",na.rm=TRUE) else 0L
+    canonical_accessions <- if ("uniprot_accession" %in% names(data))
+      unique(na.omit(as.character(data$uniprot_accession))) else character()
+    mapping_state <- canonical_status()
 
     tags$div(class = "ram-summary",
       tags$div(class = "ram-summary-metrics",
         metric("Selected residues", nrow(data), "Across selected chains"),
         metric("RamplotR not allowed", outlier, "Native density regions"),
         metric("Rama8000 outliers", standard_outliers,
-               "Six-class standard validation")
+               "Six-class standard validation"),
+        if (!is.null(mapping_state) &&
+            mapping_state$state %in% c("mapped","partial"))
+          metric("UniProt mapped", mapped_n,
+            if(length(canonical_accessions))
+              paste(canonical_accessions,collapse=", ")
+            else "Canonical coordinates")
       ),
+      if (!is.null(mapping_state))
+        tags$div(class="ram-canonical-summary",
+          tags$strong("Canonical coordinates"),
+          if (identical(mapping_state$state,"searching"))
+            tags$span("Retrieving PDBe SIFTS mapping…")
+          else if (identical(mapping_state$state,"mapped"))
+            tags$span(sprintf("%d selected residues currently map to UniProt%s.",
+              mapped_n,
+              if(length(canonical_accessions))
+                paste0(" ",paste(canonical_accessions,collapse=", "))
+              else ""))
+          else if (identical(mapping_state$state,"partial"))
+            tags$span(paste0(
+              "SIFTS ranges were found, but only unambiguous one-to-one ",
+              "author-number ranges are expanded. Nonlinear ranges remain unresolved."))
+          else if (identical(mapping_state$state,"unavailable"))
+            tags$span(mapping_state$message)
+          else if (identical(mapping_state$state,"error"))
+            tags$span("Canonical mapping could not be retrieved; local PDB numbering remains available.")
+        ),
       tags$h3("RamplotR density regions"),
       tags$p(class = "ram-summary-note",
         "Percentages use classified residues other than glycine and proline as the denominator."),
@@ -3751,6 +3912,16 @@ server <- function(input, output, session) {
         if (nzchar(row$chain[[1L]])) paste("Chain", row$chain[[1L]]) else "Chain",
         as.integer(row$resi[[1L]]), row$insertion_code[[1L]],
         row$resn[[1L]])),
+        if ("canonical_status" %in% names(row) &&
+            identical(as.character(row$canonical_status[[1L]]),"mapped"))
+          tags$span(class="ram-inspector-canonical",
+            sprintf("UniProt %s:%d",
+              row$uniprot_accession[[1L]],
+              as.integer(row$uniprot_resi[[1L]]))),
+        if ("canonical_status" %in% names(row) &&
+            identical(as.character(row$canonical_status[[1L]]),"ambiguous"))
+          tags$span(class="ram-inspector-warning",
+            "UniProt mapping ambiguous"),
         tags$span(class = "ram-inspector-classification",
           if (is.na(row$region[[1L]])) "Missing angles" else row$region[[1L]])),
       tags$div(class = "ram-inspector-angles",

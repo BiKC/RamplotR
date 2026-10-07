@@ -284,6 +284,12 @@ body > .container-fluid { max-width: none; padding: 0; }
 }
 .ram-summary-metric small { font-size: 11px; line-height: 1.45; color: var(--ram-muted); }
 .ram-summary-note { color: var(--ram-muted); font-size: 12px; margin: 0 0 14px; }
+.ram-canonical-summary {
+  display:flex; flex-wrap:wrap; gap:7px 10px; align-items:baseline;
+  margin:4px 0 14px; padding:9px 11px; border:1px solid #dbe8e8;
+  border-radius:8px; background:#f8fbfb; color:#587078; font-size:11px;
+}
+.ram-canonical-summary strong { color:#24565e; font-size:11px; }
 .ram-summary-table-wrap { max-width: 720px; width: 100%; overflow-x: auto; }
 .ram-summary-table { border-collapse: collapse; width: 100%; font-size: 13px; }
 .ram-main .ram-summary-table th {
@@ -349,6 +355,11 @@ body > .container-fluid { max-width: none; padding: 0; }
 .ram-inspector-classification {
   border: 1px solid #bdd4d1; color: #19575b; background:#fff;
   padding:3px 7px; border-radius: 7px; font-size: 11px; font-weight:700;
+}
+.ram-inspector-canonical {
+  border:1px solid #d5e4e6; color:#315b64; background:#f7fbfb;
+  padding:3px 7px; border-radius:7px; font-size:11px; font-weight:700;
+  font-variant-numeric:tabular-nums;
 }
 .ram-inspector-angles { display:flex; flex-wrap:wrap; gap: 8px 18px;
   color:#466570; font-size:12px; font-variant-numeric:tabular-nums; }

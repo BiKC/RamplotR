@@ -74,6 +74,21 @@ message explaining that its selection is blocked by current plot filters.
 
 For every structure, the expanded navigator keeps the native RamplotR density region as the letter background and shows the independent **Rama8000 standard-validation category** as a small corner marker (Favored, Allowed or Outlier). For predicted models, each residue button additionally shows its numerical **pLDDT** below the amino-acid letter. A separate coloured underline and legend distinguish high, confident, low and very low pLDDT from both geometry classifications. Positions with unavailable confidence show a dash, never an invented zero.
 
+## Canonical UniProt coordinates
+
+For structures loaded by PDB accession, RamplotR can retrieve PDBe SIFTS
+PDB-to-UniProt mapping segments in the browser. AlphaFold DB models already
+carry the requested UniProt accession and sequence numbering. When an
+unambiguous mapping is available, the residue inspector shows the canonical
+position alongside the original PDB author number, and the residue table adds
+UniProt columns.
+
+PDB numbering is never replaced. It remains the coordinate system used by the
+molecular viewer and local structure inspection. SIFTS segments with insertion
+codes or nonlinear author/UniProt ranges are not interpolated; they remain
+unresolved until exact residue-level mapping is available. See
+[canonical coordinates](canonical-coordinates.md) for the mapping rules.
+
 ## The residue table
 
 The table uses a single HTML table for headings and rows, without separate DataTables horizontal-scrolling header clones. Columns and angles are readable; displayed angles and density-percentile values are rounded to one decimal place. Exported CSV retains the unrounded values. **Region** and **Review** filters can be combined; selecting a row updates the shared inspector and both visualisations.

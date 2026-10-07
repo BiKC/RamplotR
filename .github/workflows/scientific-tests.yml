@@ -39,6 +39,7 @@ jobs:
       - name: Test browser message handler and source selection
         run: |
           node --check shinyRam/www/custom.js
+          node --check shinyRam/www/canonical-mapping.js
           node --check shinyRam/www/experimental-search.js
           node --check shinyRam/www/compare.js
           node --check shinyRam/www/prediction.js
@@ -47,6 +48,7 @@ jobs:
           node --check shinyRam/www/plotly-loader.js
           node tests/plotly-loader.test.cjs
           node tests/density-ui.test.cjs
+          node tests/canonical-mapping.test.cjs
           node tests/ui.test.cjs
           node tests/prediction-ui.test.cjs
         shell: bash
@@ -67,10 +69,11 @@ jobs:
       - name: Verify residue review, sequence, pairwise alignment and model selection
         run: Rscript tests/inspection.R
         shell: bash
-      - name: Verify residue classifications and density thresholds
+      - name: Verify residue classifications, canonical coordinates and density thresholds
         run: |
           Rscript tests/scientific.R
           Rscript tests/rama8000.R
+          Rscript tests/canonical.R
         shell: bash
       - name: Verify peptide continuity and torsion calculations
         run: Rscript tests/peptide.R

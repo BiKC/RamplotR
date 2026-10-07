@@ -92,10 +92,17 @@ const puppeteer = require("puppeteer-core");
       .classList.contains("is-hidden"));
     const upload=await page.$("#structfile");
     await upload.uploadFile(fixture);
-    await page.waitForFunction(() => {
-      const value=window.Shiny?.shinyapp?.$inputValues?.["structfile:shiny.file"];
-      return value && JSON.stringify(value).length>5;
-    },{timeout:30000});
+    await page.waitForFunction(id => {
+      const input=document.getElementById(id);
+      if (!input || !input.files || input.files.length!==1) return false;
+      const shiny=window.Shiny?.shinyapp?.$inputValues?.[id + ":shiny.file"];
+      const progress=document.getElementById(id + "_progress");
+      const bar=progress && progress.querySelector(".progress-bar");
+      const aria=Number(bar && bar.getAttribute("aria-valuenow"));
+      const width=parseFloat((bar && bar.style.width) || "0");
+      return !!shiny || aria>=100 || width>=99;
+    },{timeout:30000},"structfile");
+    await new Promise(done=>setTimeout(done,500));
     // Select prediction provenance through the same visible native dropdown a
     // researcher uses. A Selectize-backed hidden input may silently revert
     // scripted changes and analyse an AF/ESM prediction as experimental.

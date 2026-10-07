@@ -767,15 +767,49 @@ const assert = require("node:assert/strict");
     // The comparison roles can be reversed without reloading either input.
     // The loaded main structure remains the app-wide inspector structure,
     // while the Compare tab flips A/B plot and 3D roles.
+    const swapButtonState = await page.$eval("#compareSwap", button => ({
+      visible: !!(button.offsetWidth || button.offsetHeight ||
+        button.getClientRects().length),
+      rect: button.getBoundingClientRect().toJSON(),
+      disabled: button.disabled
+    }));
+    assert.ok(swapButtonState.visible && !swapButtonState.disabled,
+      "Swap action should be visible and enabled after loading a comparison.");
     await page.click("#compareSwap");
-    await page.waitForFunction(() => {
-      const state = document.querySelector(".ram-compare-swap-state");
-      const plot = document.getElementById("comparePlot");
-      const names = (plot?.data || []).filter(trace => trace.name)
-        .map(trace => trace.name);
-      return state && state.textContent.includes("Roles swapped") &&
-        names[0] === "1CRN" && names[1] === "1CRN-local-context";
-    },{timeout:30000});
+    try {
+      await page.waitForFunction(() => {
+        const state = document.querySelector(".ram-compare-swap-state");
+        return state && state.textContent.includes("Roles swapped");
+      },{timeout:15000});
+      await page.waitForFunction(() => {
+        const plot = document.getElementById("comparePlot");
+        const names = (plot?.data || []).filter(trace => trace.name)
+          .map(trace => trace.name);
+        return names[0] === "1CRN" && names[1] === "1CRN-local-context";
+      },{timeout:20000});
+    } catch (error) {
+      const diagnostic = await page.evaluate(() => {
+        const plot = document.getElementById("comparePlot");
+        const button = document.getElementById("compareSwap");
+        return {
+          inputValue: window.Shiny?.shinyapp?.$inputValues?.compareSwap,
+          state: document.querySelector(".ram-compare-swap-state")?.textContent,
+          names: (plot?.data || []).filter(trace => trace.name)
+            .map(trace => trace.name),
+          chainA: window.Shiny?.shinyapp?.$inputValues?.compareChainA,
+          chainB: window.Shiny?.shinyapp?.$inputValues?.compareChainB,
+          buttonRect: button?.getBoundingClientRect().toJSON(),
+          buttonDisabled: button?.disabled,
+          notifications: Array.from(document.querySelectorAll(".shiny-notification"))
+            .map(node => node.textContent)
+        };
+      });
+      console.error("Comparison swap diagnostics:",JSON.stringify(diagnostic));
+      await page.screenshot({
+        path:"benchmarks/output/ui-preview/compare-swap-debug.png",fullPage:true
+      });
+      throw error;
+    }
     const swappedComparison = await page.evaluate(() => {
       const plot = document.getElementById("comparePlot");
       const roles = Array.from(document.querySelectorAll(".ram-compare-role"))

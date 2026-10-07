@@ -1453,6 +1453,19 @@ server <- function(input, output, session) {
         provenance$official_wwPDB_md5 <- ext$md5
         provenance$official_wwPDB_model <- current_model()
       }
+      mapping <- canonical_status()
+      if(!is.null(mapping)) {
+        provenance$canonical_mapping_state <- mapping$state
+        provenance$canonical_mapping_source <- if(is.null(mapping$source))
+          "none" else mapping$source
+        if(!is.null(mapping$accessions) && length(mapping$accessions))
+          provenance$canonical_uniprot_accessions <-
+            paste(mapping$accessions,collapse=",")
+        if(!is.null(mapping$mapped_residues))
+          provenance$canonical_mapped_residues <- mapping$mapped_residues
+        if(!is.null(mapping$endpoint) && nzchar(mapping$endpoint))
+          provenance$canonical_mapping_endpoint <- mapping$endpoint
+      }
       provenance$extended_native_geometry <- "Omega and descriptive chi1; not MolProbity-equivalent"
       ram_save_html_report(file, data, provenance, image)
     }

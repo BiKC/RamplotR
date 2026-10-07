@@ -726,11 +726,17 @@
           String(partner.amino[i] || "") + " " + String(partner.chain[i] || "") +
           ":" + String(partner.pos[i]) + String(partner.ins[i] || "");
         const dphi = array(obj.deltaPhi)[i], dpsi = array(obj.deltaPsi)[i];
+        const plddt = array(side === "a" ? obj.plddtA : obj.plddtB)[i];
+        const confidence = array(
+          side === "a" ? obj.confidenceA : obj.confidenceB)[i];
         const fmt = v => Number.isFinite(v) ? v.toFixed(1) + "°" : "N/A";
         x.push(phi[i]); y.push(psi[i]);
         text.push(escapeText(label) + " ↔ " + escapeText(other) +
           "<br>φ " + fmt(phi[i]) + " · ψ " + fmt(psi[i]) +
-          "<br>Δφ " + fmt(dphi) + " · Δψ " + fmt(dpsi));
+          "<br>Δφ " + fmt(dphi) + " · Δψ " + fmt(dpsi) +
+          (Number.isFinite(plddt) ?
+            "<br>pLDDT " + plddt.toFixed(1) +
+            (confidence ? " · " + escapeText(String(confidence)) : "") : ""));
         customdata.push([Number(ids[i]), side]);
       }
       return {type:"scattergl",mode:"markers",name:name,x:x,y:y,

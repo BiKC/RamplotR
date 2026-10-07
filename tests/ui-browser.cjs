@@ -812,6 +812,37 @@ const assert = require("node:assert/strict");
         .includes("Loaded structure is primary") &&
       document.getElementById("compareChainB")?.value==="C",
       {timeout:25000});
+
+    // The separately loaded structure owns compareModel even when it becomes
+    // primary after a role swap. Preserve that user choice across rerenders.
+    await (await page.$("#compareFile")).uploadFile(
+      path.resolve("benchmarks/output/ui-preview/1D3Z.pdb"));
+    await new Promise(resolve => setTimeout(resolve,900));
+    await page.click("#compareSubmit");
+    await page.waitForSelector("#compareModel",{timeout:30000});
+    await page.evaluate(() => {
+      const el=document.getElementById("compareModel");
+      if (el.selectize) el.selectize.setValue("2");
+      else {
+        el.value="2";
+        el.dispatchEvent(new Event("change",{bubbles:true}));
+      }
+    });
+    await page.waitForFunction(() =>
+      window.Shiny?.shinyapp?.$inputValues?.compareModel==="2",
+      {timeout:10000});
+    await page.click("#compareSwap");
+    await page.waitForFunction(() =>
+      document.querySelector(".ram-compare-swap-state")?.textContent
+        .includes("Roles swapped") &&
+      document.getElementById("compareModel")?.value==="2",
+      {timeout:25000});
+    await page.click("#compareSwap");
+    await page.waitForFunction(() =>
+      document.querySelector(".ram-compare-swap-state")?.textContent
+        .includes("Loaded structure is primary") &&
+      document.getElementById("compareModel")?.value==="2",
+      {timeout:25000});
     await page.screenshot({
       path:"benchmarks/output/ui-preview/compare-self.png",fullPage:true
     });

@@ -27,6 +27,7 @@ source(file.path("R", "reference-loader.R"), local = TRUE)
 source(file.path("R", "ramachandran.R"), local = TRUE)
 source(file.path("R", "rama8000.R"), local = TRUE)
 source(file.path("R", "backbone.R"), local = TRUE)
+source(file.path("R", "conformation.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
 source(file.path("R", "inspection.R"), local = TRUE)
 source(file.path("R", "reports.R"), local = TRUE)
@@ -578,6 +579,7 @@ ui <- fluidPage(
                     choices = c("All aligned residues" = "All",
                       "Changed RamplotR region" = "changed",
                       "Changed Rama8000 category" = "standard_changed",
+                      "Changed backbone state" = "basin_changed",
                       "Rama8000 outlier in either structure" = "standard_outlier",
                       "Combined backbone shift ≥ 30°" = "shift_large",
                       "Either angle difference ≥ 30°" = "large",
@@ -1981,6 +1983,9 @@ server <- function(input, output, session) {
     else if (identical(criterion, "standard_changed") &&
              "rama8000_changed" %in% names(result))
       result <- result[result$rama8000_changed, , drop=FALSE]
+    else if (identical(criterion, "basin_changed") &&
+             "basin_changed" %in% names(result))
+      result <- result[result$basin_changed, , drop=FALSE]
     else if (identical(criterion, "standard_outlier") &&
              all(c("rama8000_region_a","rama8000_region_b") %in% names(result)))
       result <- result[
@@ -2013,6 +2018,8 @@ server <- function(input, output, session) {
       sprintf("%.1f%%",100*value) else "n/a"
     standard_changes <- if ("rama8000_changed" %in% names(result))
       sum(result$rama8000_changed, na.rm=TRUE) else 0L
+    basin_changes <- if ("basin_changed" %in% names(result))
+      sum(result$basin_changed, na.rm=TRUE) else 0L
     standard_outliers <- if (all(c("rama8000_region_a","rama8000_region_b") %in%
                                  names(result)))
       sum(result$rama8000_region_a == "Outlier" |
@@ -2046,6 +2053,7 @@ server <- function(input, output, session) {
         ),
         group("Backbone",
           metric(sum(shifts>=30),"pairs with ≥30° combined shift"),
+          metric(basin_changes,"broad backbone-state changes"),
           metric(if(length(shifts)) sprintf("%.1f°",max(shifts)) else "n/a",
                  "largest combined shift")
         ),
@@ -2168,6 +2176,8 @@ server <- function(input, output, session) {
     fields <- c("chain_a","residue_a","insertion_a","amino_a",
       "chain_b","residue_b","insertion_b","amino_b",
       "delta_phi","delta_psi","angular_displacement","shift_band")
+    if(all(c("basin_a","basin_b","basin_changed") %in% names(result)))
+      fields <- c(fields,"basin_a","basin_b","basin_changed")
     if(show_conf_a) fields <- c(fields,"plddt_a","confidence_a")
     if(show_conf_b) fields <- c(fields,"plddt_b","confidence_b")
     if(show_delta) fields <- c(fields,"delta_plddt")
@@ -2191,6 +2201,11 @@ server <- function(input, output, session) {
       "angular_displacement","shift_band")
     labels <- c("Chain A","Pos A","AA A","Chain B","Pos B","AA B",
       "Δφ (°)","Δψ (°)","Backbone shift (°)","Shift band")
+    if(all(c("basin_a","basin_b","basin_changed") %in% names(shown))) {
+      shown$basin_changed <- ifelse(shown$basin_changed,"Yes","No")
+      display <- c(display,"basin_a","basin_b","basin_changed")
+      labels <- c(labels,"State A","State B","State changed")
+    }
     if(show_conf_a) {
       display <- c(display,"plddt_a","confidence_a")
       labels <- c(labels,"pLDDT A","Confidence A")
@@ -2394,7 +2409,10 @@ server <- function(input, output, session) {
             sum(data$evidence_profile=="Sparse coverage",na.rm=TRUE))),
         tags$span(class="ram-confidence-metric",
           sprintf("%d Rama8000 mode changes",
-            sum(data$rama8000_mode_changed,na.rm=TRUE)))
+            sum(data$rama8000_mode_changed,na.rm=TRUE))),
+        tags$span(class="ram-confidence-metric",
+          sprintf("%d backbone-state changes",
+            sum(data$basin_mode_changed,na.rm=TRUE)))
       ),
       tags$p(class="ram-confidence-explainer",
         "Between-group displacement compares circular mean φ/ψ values. A high-support shift combines ≥30° displacement, ≤15° within-group circular SD and ≥75% residue coverage in both groups. These are transparent navigation criteria, not statistical significance tests.")
@@ -2504,6 +2522,15 @@ server <- function(input, output, session) {
           tags$strong(sprintf("%s / %s",
             fmt_pct(row$a_coverage[[1L]]),fmt_pct(row$b_coverage[[1L]]))),
           tags$span(sprintf("%s / %s",result$label_a,result$label_b))),
+        tags$div(tags$small("Backbone state"),
+          tags$strong(sprintf("%s → %s",
+            ifelse(is.na(row$a_basin_mode[[1L]]),"n/a",
+              row$a_basin_mode[[1L]]),
+            ifelse(is.na(row$b_basin_mode[[1L]]),"n/a",
+              row$b_basin_mode[[1L]]))),
+          tags$span(if(isTRUE(row$basin_mode_changed[[1L]]))
+            "modal state differs between groups"
+            else "modal state retained")),
         tags$div(tags$small("Rama8000"),
           tags$strong(sprintf("%s → %s",
             ifelse(is.na(row$a_rama8000_mode[[1L]]),"n/a",
@@ -2530,7 +2557,8 @@ server <- function(input, output, session) {
       "a_psi_mean","b_psi_mean","delta_psi",
       "angular_displacement","max_within_group_sd",
       "a_coverage","b_coverage","min_rama8000_consistency",
-      "evidence_profile","a_rama8000_mode","b_rama8000_mode",
+      "evidence_profile","a_basin_mode","b_basin_mode","basin_mode_changed",
+      "a_rama8000_mode","b_rama8000_mode",
       "high_support_shift","consistent_shift","rama8000_mode_changed"
     ),drop=FALSE]
     for(field in c("a_phi_mean","b_phi_mean","delta_phi",
@@ -2540,6 +2568,7 @@ server <- function(input, output, session) {
     shown$a_coverage <- round(100*shown$a_coverage,1L)
     shown$b_coverage <- round(100*shown$b_coverage,1L)
     shown$min_rama8000_consistency <- round(100*shown$min_rama8000_consistency,1L)
+    shown$basin_mode_changed <- ifelse(shown$basin_mode_changed,"Yes","No")
     shown$high_support_shift <- ifelse(shown$high_support_shift,"Yes","No")
     shown$consistent_shift <- ifelse(shown$consistent_shift,"Yes","No")
     shown$rama8000_mode_changed <- ifelse(shown$rama8000_mode_changed,
@@ -2549,6 +2578,7 @@ server <- function(input, output, session) {
         "φ A","φ B","Δφ","ψ A","ψ B","Δψ",
         "Mean shift","Max within SD","Coverage A (%)","Coverage B (%)",
         "Min Rama8000 agreement (%)","Evidence profile",
+        "State A","State B","State changed",
         "Rama8000 A","Rama8000 B","High support",
         "Consistent shift","Rama8000 changed"),
       options=list(pageLength=12,scrollX=TRUE,autoWidth=FALSE,dom="ftip"),
@@ -2738,6 +2768,10 @@ server <- function(input, output, session) {
         tags$span(paste("Δψ",angle(row$delta_psi[[1L]]))),
         tags$span(paste("Combined",angle(row$angular_displacement[[1L]]),
                         "·",row$shift_band[[1L]])),
+        if ("basin_a" %in% names(row) &&
+            !is.na(row$basin_a[[1L]]) && !is.na(row$basin_b[[1L]]))
+          tags$span(sprintf("Backbone state %s → %s",
+            row$basin_a[[1L]],row$basin_b[[1L]])),
         if ("delta_plddt" %in% names(row) && is.finite(row$delta_plddt[[1L]]))
           tags$span(sprintf("ΔpLDDT %+.1f",row$delta_plddt[[1L]])),
         tags$span(row$alignment[[1L]]),
@@ -2749,7 +2783,10 @@ server <- function(input, output, session) {
             row$rama8000_region_a[[1L]], row$rama8000_region_b[[1L]])),
         if ("rama8000_changed" %in% names(row) &&
             isTRUE(row$rama8000_changed[[1L]]))
-          tags$span(class="ram-compare-change", "Standard category changed")
+          tags$span(class="ram-compare-change", "Standard category changed"),
+        if ("basin_changed" %in% names(row) &&
+            isTRUE(row$basin_changed[[1L]]))
+          tags$span(class="ram-compare-change", "Backbone state changed")
       ),
       tags$div(class="ram-compare-local-context",
         tags$div(class="ram-compare-context-side",
@@ -3271,6 +3308,10 @@ server <- function(input, output, session) {
         tags$span(class="ram-confidence-metric",
           sprintf("%s residues with Rama8000 disagreement",standard_changes)),
         tags$span(class="ram-confidence-metric",
+          sprintf("%s residues with backbone-state disagreement",
+            if("basin_changes" %in% names(data))
+              sum(data$basin_changes,na.rm=TRUE) else 0L)),
+        tags$span(class="ram-confidence-metric",
           sprintf("%s residues with ≥20° angular SD",angular_variable)),
         tags$span(class="ram-confidence-metric",
           sprintf("%s residues with pLDDT SD ≥10",confidence_variable))
@@ -3332,10 +3373,16 @@ server <- function(input, output, session) {
       standard <- if("rama8000_changes" %in% names(data) &&
                      isTRUE(data$rama8000_changes[[i]]))
         " · Rama8000 category differs across models" else ""
+      basin <- if("basin_changes" %in% names(data) &&
+                  isTRUE(data$basin_changes[[i]]))
+        paste0(" · backbone state differs across models",
+          if("basin_mode" %in% names(data) && !is.na(data$basin_mode[[i]]))
+            paste0(" (mode ",data$basin_mode[[i]],")") else "") else ""
       tags$button(type="button",
         class=paste("ram-ensemble-cell",
           paste0("ram-ensemble-",band[[i]]),
-          if(nzchar(standard)) "has-standard-change" else ""),
+          if(nzchar(standard)) "has-standard-change" else "",
+          if(nzchar(basin)) "has-basin-change" else ""),
         "data-chain"=data$chain[[i]],
         "data-resi"=data$resi[[i]],
         "data-insertion"=data$insertion_code[[i]],
@@ -3343,7 +3390,7 @@ server <- function(input, output, session) {
           if(is.finite(spread[[i]])) sprintf("%.1f°",spread[[i]]) else "N/A",
           if("plddt_mean" %in% names(data) && is.finite(data$plddt_mean[[i]]))
             sprintf(" · mean pLDDT %.1f",data$plddt_mean[[i]]) else "",
-          standard),
+          basin,standard),
         "aria-label"=paste("Inspect",label,"from prediction ensemble")
       )
     })
@@ -3359,8 +3406,10 @@ server <- function(input, output, session) {
         tags$span(class="ram-ensemble-moderate","5–15°"),
         tags$span(class="ram-ensemble-variable","15–30°"),
         tags$span(class="ram-ensemble-high","≥30°"),
+        tags$span(class="ram-ensemble-basin-mark",
+          "double outline = backbone-state disagreement"),
         tags$span(class="ram-ensemble-standard-mark",
-          "outline = Rama8000 disagreement"))
+          "inner outline = Rama8000 disagreement"))
     )
   })
 
@@ -3370,18 +3419,23 @@ server <- function(input, output, session) {
     data <- result$summary
     if(!nrow(data)) return(DT::datatable(data,rownames=FALSE))
     fields <- c("chain","resi","insertion_code","resn","models_present",
-      "phi_sd","psi_sd","rama8000_mode","rama8000_consistency",
+      "phi_sd","psi_sd","basin_mode","basin_consistency",
+      "rama8000_mode","rama8000_consistency",
       "plddt_mean","plddt_sd","plddt_min","plddt_max")
     fields <- fields[fields %in% names(data)]
     shown <- data[,fields,drop=FALSE]
     for(field in intersect(c("phi_sd","psi_sd","plddt_mean","plddt_sd",
                              "plddt_min","plddt_max"),names(shown)))
       shown[[field]] <- round(shown[[field]],1L)
+    if("basin_consistency" %in% names(shown))
+      shown$basin_consistency <- round(100*shown$basin_consistency,1L)
     if("rama8000_consistency" %in% names(shown))
       shown$rama8000_consistency <- round(100*shown$rama8000_consistency,1L)
     names(shown) <- c(
       chain="Chain",resi="Residue",insertion_code="Ins.",resn="AA",
       models_present="Models",phi_sd="φ SD (°)",psi_sd="ψ SD (°)",
+      basin_mode="Backbone state",
+      basin_consistency="State agreement (%)",
       rama8000_mode="Rama8000 mode",
       rama8000_consistency="Rama8000 agreement (%)",
       plddt_mean="pLDDT mean",plddt_sd="pLDDT SD",
@@ -3743,6 +3797,11 @@ server <- function(input, output, session) {
           psd <- if ("plddt_sd" %in% names(ensemble_context))
             suppressWarnings(as.numeric(ensemble_context$plddt_sd[[1L]]))
             else NA_real_
+          basin_mode <- if ("basin_mode" %in% names(ensemble_context))
+            as.character(ensemble_context$basin_mode[[1L]]) else NA_character_
+          basin_consistency <- if ("basin_consistency" %in% names(ensemble_context))
+            suppressWarnings(as.numeric(ensemble_context$basin_consistency[[1L]]))
+            else NA_real_
           models <- suppressWarnings(as.integer(
             ensemble_context$models_present[[1L]]))
           total <- suppressWarnings(as.integer(
@@ -3751,6 +3810,9 @@ server <- function(input, output, session) {
             paste0("Prediction ensemble · ",models,"/",total," models",
               if(is.finite(phi_sd)) sprintf(" · φ SD %.1f°",phi_sd) else "",
               if(is.finite(psi_sd)) sprintf(" · ψ SD %.1f°",psi_sd) else "",
+              if(!is.na(basin_mode)) paste0(" · state ",basin_mode) else "",
+              if(is.finite(basin_consistency))
+                sprintf(" %.0f%% agreement",100*basin_consistency) else "",
               if(is.finite(pmean)) sprintf(" · pLDDT %.1f",pmean) else "",
               if(is.finite(psd)) sprintf(" ± %.1f",psd) else ""))
         }

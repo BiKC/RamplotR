@@ -1,3 +1,4 @@
+source("shinyRam/R/conformation.R")
 source("shinyRam/R/ensemble.R")
 assert <- function(x,msg) if(!isTRUE(x)) stop(msg,call.=FALSE)
 mean <- ram_ensemble_circular(c(179,-179))
@@ -22,6 +23,17 @@ assert(one$phi_models==2L && one$psi_models==2L &&
 assert(two$changes_class && two$class_consistency==0.5 &&
        two$classified_models==2L,
        "Classification changes across models must be explicit.")
+
+state_a <- data.frame(chain="A",resi=1L,insertion_code="",resn="ALA",
+  phi=-63,psi=-43,region="Favoured",stringsAsFactors=FALSE)
+state_b <- state_a
+state_b$phi <- -135; state_b$psi <- 135
+state_summary <- ram_ensemble_summary(list(state_a,state_b))
+assert(state_summary$basin_mode %in% c("Alpha-R","Beta") &&
+       state_summary$basin_consistency==0.5 &&
+       isTRUE(state_summary$basin_changes) &&
+       state_summary$basin_models==2L,
+       "Ensembles must report explicit backbone-state disagreement.")
 
 m$rama8000_region <- c("Favored","Allowed")
 m$plddt <- c(95,88)

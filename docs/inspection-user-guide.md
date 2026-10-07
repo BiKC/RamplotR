@@ -43,7 +43,11 @@ model-to-model evidence for the selected residue. It can flag strong circular
 phi/psi spread, Rama8000 category disagreement, variable pLDDT, or incomplete
 residue coverage across models. A useful discordant case is high mean pLDDT
 combined with substantial backbone spread: the predictions are individually
-confident but do not converge on one local backbone conformation. Ensemble
+confident but do not converge on one local backbone conformation. The ensemble
+table and inspector also report a coarse backbone-state mode and its agreement,
+so a residue can be recognized immediately when models move between broad
+Alpha-R, Beta, PPII, Alpha-L or Other regions. These are comparison bins, not
+DSSP secondary-structure assignments. Ensemble
 spread remains prediction uncertainty/heterogeneity and is never presented as
 experimental molecular motion.
 
@@ -120,7 +124,10 @@ Above the paired 2D/3D workspace, the **Conformational change explorer** represe
 
 Use **Find aligned pair** to jump by the true residue number in either
 selected chain (for example 104), then inspect the primary/comparison
-amino acids, φ/ψ angles, wrapped Δφ/Δψ, combined backbone displacement and Rama8000 categories directly below the views.
+amino acids, φ/ψ angles, wrapped Δφ/Δψ, combined backbone displacement,
+coarse backbone-state transition and Rama8000 categories directly below the
+views. The comparison table can be filtered directly to residues that change
+broad backbone state.
 
 The same selected-pair card also reports nearby non-water hetero residues
 for **both** structures when model-appropriate coordinates are available.
@@ -156,8 +163,8 @@ as one ensemble member. For AlphaFold 3, upload at least two official sample
 files and optional `*_summary_confidences.json` files. AF3 pairing uses the
 seed/sample filename stem rather than upload order.
 
-RamplotR reports circular phi/psi spread, residue coverage, Rama8000 agreement
-and pLDDT spread across the uploaded models. A compact **Prediction variability
+RamplotR reports circular phi/psi spread, residue coverage, coarse backbone-state
+agreement, Rama8000 agreement and pLDDT spread across the uploaded models. A compact **Prediction variability
 map** ranks residues by the larger circular SD of phi or psi. Clicking a map
 cell or ensemble-table row selects the corresponding residue in the existing
 inspector and linked 2D/3D views.

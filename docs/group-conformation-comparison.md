@@ -36,6 +36,7 @@ For each residue and each group RamplotR calculates:
 - number of models contributing phi and psi;
 - circular mean phi and psi;
 - circular standard deviation of phi and psi;
+- modal coarse backbone state and its within-group consistency;
 - modal Rama8000 category and its within-group consistency.
 
 The between-group effect is reported as wrapped differences between the two
@@ -82,8 +83,10 @@ These thresholds are transparent navigation criteria, not a hypothesis test,
 p-value or claim of biological significance. The exact group means, angular
 differences, coverage and within-group dispersion remain visible in the table.
 
-A separate marker indicates when the modal Rama8000 category differs between
-the two groups.
+The table also reports whether the modal coarse backbone state differs between
+the groups. These Alpha-R/Beta/PPII/Alpha-L/Other labels are broad phi/psi
+comparison bins, not secondary-structure assignments. A separate marker
+indicates when the modal Rama8000 category differs between the two groups.
 
 ## Interpretation
 
@@ -113,7 +116,7 @@ meaningful sets such as apo/holo or WT/mutant.
 The group comparison can export:
 
 - one residue-level CSV containing circular means, SDs, wrapped differences,
-  combined displacement and Rama8000 mode changes;
+  combined displacement, backbone-state changes and Rama8000 mode changes;
 - one member CSV recording each structure label, selected chain, identity,
   reference coverage, candidate coverage and aligned residue count.
 
@@ -127,6 +130,7 @@ Unit tests cover:
 - wrapped between-group differences;
 - low-dispersion and high-support shift detection;
 - sparse-coverage downgrading;
+- modal backbone-state changes;
 - Rama8000 modal-category changes.
 
 The browser test additionally compares 1CRN against an identical uploaded

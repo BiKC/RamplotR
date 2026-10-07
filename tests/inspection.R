@@ -1,4 +1,5 @@
 # Pure unit coverage; no Shiny session or network required.
+source(file.path("shinyRam","R","conformation.R"))
 source(file.path("shinyRam","R","inspection.R"))
 source(file.path("shinyRam","R","io.R"))
 assert <- function(test, message) if (!isTRUE(test)) stop(message)
@@ -68,6 +69,16 @@ other <- rbind(ref[1,,drop=FALSE], transform(ref[1,,drop=FALSE],
   resn="ASP",resi=88L,phi=-110,psi=85), ref[2:4,,drop=FALSE])
 pair <- ram_compare_torsions(ref,other)
 assert(nrow(pair)==5L, "Alignment should preserve inserted residues")
+assert(all(c("basin_a","basin_b","basin_changed") %in% names(pair)),
+       "Pairwise comparison must expose coarse backbone-state transitions")
+state_ref <- ref[1,,drop=FALSE]
+state_other <- state_ref
+state_ref$phi <- -63; state_ref$psi <- -43
+state_other$phi <- -135; state_other$psi <- 135
+state_pair <- ram_compare_torsions(state_ref,state_other)
+assert(state_pair$basin_a=="Alpha-R" && state_pair$basin_b=="Beta" &&
+       isTRUE(state_pair$basin_changed),
+       "Pairwise comparison must flag a broad backbone-state transition")
 assert(sum(pair$alignment=="Insertion")==1L, "Expected insertion")
 quality <- ram_comparison_alignment_quality(pair)
 assert(quality$aligned==4L && quality$matches==4L &&
@@ -207,6 +218,7 @@ ensemble_context <- data.frame(
   models_present=4L,ensemble_models_total=5L,
   phi_sd=34,psi_sd=12,
   rama8000_changes=TRUE,rama8000_consistency=0.75,
+  basin_changes=TRUE,basin_consistency=0.75,basin_mode="Alpha-R",
   plddt_mean=94,plddt_sd=12,
   stringsAsFactors=FALSE
 )
@@ -215,6 +227,7 @@ ensemble_ev <- ram_residue_evidence(
 assert(all(c(
   "High-confidence predictions disagree on local backbone",
   "Rama8000 category differs across prediction models",
+  "Prediction models choose different backbone states",
   "Prediction confidence varies across ensemble",
   "Residue is absent from some prediction models"
 ) %in% ensemble_ev$title),

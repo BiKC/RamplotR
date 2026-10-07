@@ -2374,7 +2374,7 @@ server <- function(input, output, session) {
       file,row.names=FALSE,na="")
   )
 
-  observeEvent(comparison_data(), {
+  observeEvent(list(comparison_data(),active_palette(),plot_reference()), {
     result <- comparison_data()
     if (!nrow(result)) return()
     main <- req(loaded()); comparison <- req(comparison_loaded())

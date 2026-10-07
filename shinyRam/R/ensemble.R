@@ -2,6 +2,64 @@
 # angular statistics; an average of +179° and -179° is 180°, not zero.
 # Does not infer prediction confidence or a single "best" model.
 
+ram_af3_sample_stem <- function(name, role=c("model","confidence","summary")) {
+  role <- match.arg(role)
+  value <- basename(as.character(name))
+  pattern <- switch(role,
+    model="(?i)_model\\.(cif|mmcif|mcif)$",
+    confidence="(?i)_confidences\\.json$",
+    summary="(?i)_summary_confidences\\.json$")
+  stem <- sub(pattern,"",value,perl=TRUE)
+  if(identical(stem,value) || !nzchar(stem)) return(NA_character_)
+  tolower(stem)
+}
+
+ram_af3_pair_files <- function(model_names,model_paths,
+                               confidence_names,confidence_paths,
+                               summary_names=character(),
+                               summary_paths=character()) {
+  if(length(model_names)!=length(model_paths) ||
+     length(confidence_names)!=length(confidence_paths))
+    stop("AF3 upload names and paths are inconsistent.")
+  if(length(model_names)<2L)
+    stop("Upload at least two AlphaFold 3 sample models.")
+  model_stem <- vapply(model_names,ram_af3_sample_stem,character(1),role="model")
+  confidence_stem <- vapply(confidence_names,ram_af3_sample_stem,
+                            character(1),role="confidence")
+  if(anyNA(model_stem) || anyNA(confidence_stem))
+    stop("Use official AF3 sample filenames ending in _model.cif and _confidences.json.")
+  if(anyDuplicated(model_stem) || anyDuplicated(confidence_stem))
+    stop("AF3 sample filenames must identify each seed/sample uniquely.")
+  if(length(setdiff(model_stem,confidence_stem)) ||
+     length(setdiff(confidence_stem,model_stem)))
+    stop("Every AF3 model must have exactly one matching full confidences JSON.")
+
+  summary_path <- rep("",length(model_stem))
+  if(length(summary_names) || length(summary_paths)) {
+    if(length(summary_names)!=length(summary_paths))
+      stop("AF3 summary upload names and paths are inconsistent.")
+    summary_stem <- vapply(summary_names,ram_af3_sample_stem,
+                           character(1),role="summary")
+    if(anyNA(summary_stem) || anyDuplicated(summary_stem))
+      stop("AF3 summary files must use unique *_summary_confidences.json names.")
+    extras <- setdiff(summary_stem,model_stem)
+    if(length(extras))
+      stop("An AF3 summary-confidence file has no matching model.")
+    summary_path[match(summary_stem,model_stem)] <- as.character(summary_paths)
+  }
+  data.frame(
+    label=model_stem,
+    model_name=as.character(model_names),
+    model_path=as.character(model_paths),
+    confidence_name=as.character(confidence_names[
+      match(model_stem,confidence_stem)]),
+    confidence_path=as.character(confidence_paths[
+      match(model_stem,confidence_stem)]),
+    summary_path=summary_path,
+    stringsAsFactors=FALSE
+  )
+}
+
 ram_ensemble_circular <- function(values) {
   z <- as.numeric(values[is.finite(values)])
   if(!length(z)) return(c(mean=NA_real_,sd=NA_real_))
@@ -156,12 +214,30 @@ ram_ensemble_summary <- function(models) {
 
 ram_prediction_ensemble_analyze <- function(pdbs, classifier, source,
                                             labels = NULL,
-                                            max_models = 30L) {
+                                            max_models = 30L,
+                                            sidecars = NULL,
+                                            summary_files = NULL) {
   if(!is.list(pdbs) || length(pdbs) < 2L)
     stop("A prediction ensemble requires at least two predicted structures.")
-  permitted <- c("alphafold2","esmfold","other_prediction")
+  permitted <- c("alphafold2","alphafold3","esmfold","other_prediction")
   if(length(source)!=1L || !source %in% permitted)
-    stop("Prediction ensembles currently support AF2/ColabFold, ESMFold or other pLDDT-in-B-factor models.")
+    stop("Unsupported prediction-ensemble source.")
+  if(identical(source,"alphafold3")) {
+    if(!exists("ram_prepare_prediction",mode="function"))
+      stop("Load prediction-confidence functions before analysing AlphaFold 3 ensembles.")
+    if(is.null(sidecars) || length(sidecars)!=length(pdbs) ||
+       any(!nzchar(as.character(sidecars))) ||
+       any(!file.exists(as.character(sidecars))))
+      stop("Every AlphaFold 3 ensemble model needs its matching full confidences JSON.")
+    if(is.null(summary_files))
+      summary_files <- rep("",length(pdbs))
+    if(length(summary_files)!=length(pdbs))
+      stop("AlphaFold 3 summary-confidence files must align one-to-one with models.")
+    summary_files <- as.character(summary_files)
+    present <- nzchar(summary_files)
+    if(any(present & !file.exists(summary_files)))
+      stop("An AlphaFold 3 summary-confidence file is unavailable.")
+  }
   max_models <- suppressWarnings(as.integer(max_models))
   if(length(max_models)!=1L || is.na(max_models) ||
      max_models < 2L || max_models > 30L)
@@ -172,11 +248,24 @@ ram_prediction_ensemble_analyze <- function(pdbs, classifier, source,
   if(length(labels)!=length(pdbs) || any(!nzchar(labels)))
     stop("Every prediction model needs a label.")
 
+  prediction_meta <- vector("list",count)
   models <- lapply(seq_len(count),function(i) {
     pdb <- ram_model_at(pdbs[[i]],1L)
     torsions <- ram_extract_torsions(pdb)
     classified <- classifier(torsions)
-    confidence <- ram_prediction_from_atoms(pdb,torsions,source)
+    confidence <- if(identical(source,"alphafold3")) {
+      prepared <- ram_prepare_prediction(
+        pdb,torsions,source,
+        sidecar=as.character(sidecars[[i]]),
+        summary_file=if(nzchar(summary_files[[i]]))
+          summary_files[[i]] else NULL,
+        model_id=labels[[i]]
+      )
+      prediction_meta[[i]] <<- prepared
+      prepared$residues
+    } else {
+      ram_prediction_from_atoms(pdb,torsions,source)
+    }
     keys <- ram_prediction_key(classified$chain,classified$resi,
                                classified$insertion_code)
     confidence_keys <- ram_prediction_key(confidence$chain,confidence$resi,
@@ -202,6 +291,18 @@ ram_prediction_ensemble_analyze <- function(pdbs, classifier, source,
         base::mean(table$plddt[is.finite(table$plddt)]) else NA_real_,
       plddt_min=if ("plddt" %in% names(table) && any(is.finite(table$plddt)))
         base::min(table$plddt[is.finite(table$plddt)]) else NA_real_,
+      ptm=if(!is.null(prediction_meta[[i]])) prediction_meta[[i]]$ptm else NA_real_,
+      iptm=if(!is.null(prediction_meta[[i]])) prediction_meta[[i]]$iptm else NA_real_,
+      ranking_score=if(!is.null(prediction_meta[[i]]))
+        prediction_meta[[i]]$ranking_score else NA_real_,
+      fraction_disordered=if(!is.null(prediction_meta[[i]]))
+        prediction_meta[[i]]$fraction_disordered else NA_real_,
+      has_clash=if(!is.null(prediction_meta[[i]]))
+        prediction_meta[[i]]$has_clash else NA,
+      confidence_file=if(!is.null(prediction_meta[[i]]))
+        prediction_meta[[i]]$confidence_file else "",
+      summary_file=if(!is.null(prediction_meta[[i]]))
+        prediction_meta[[i]]$summary_file else "",
       stringsAsFactors=FALSE
     )
   }))
@@ -214,6 +315,7 @@ ram_prediction_ensemble_analyze <- function(pdbs, classifier, source,
     available_models=length(pdbs),
     common_residues=sum(summary$models_present==count),
     source=source,
+    prediction_meta=prediction_meta,
     limited=count<length(pdbs)
   )
 }

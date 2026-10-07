@@ -2511,33 +2511,53 @@ server <- function(input, output, session) {
           tags$div(class="ram-prediction-ensemble-head",
             tags$h4("Prediction ensemble"),
             tags$p(class="ram-confidence-explainer",
-              "Upload independently generated AF2/ColabFold, ESMFold or other pLDDT-in-B-factor models. RamplotR compares model-to-model geometry and confidence; this variation is prediction uncertainty/heterogeneity, not experimental dynamics.")
+              "Compare independently generated prediction models or seeds. RamplotR keeps residue-level backbone variation, pLDDT and standard validation separate from model-level ranking metrics; prediction disagreement is not experimental dynamics.")
           ),
           tags$div(class="ram-prediction-ensemble-controls",
             selectInput("predictionEnsembleSource","Prediction model type",
               choices=c("AlphaFold 2 / ColabFold"="alphafold2",
+                        "AlphaFold 3 sample set"="alphafold3",
                         "ESMFold"="esmfold",
                         "Other model with pLDDT in B-factor"="other_prediction"),
               selected=if(structure$declared_source %in%
-                c("esmfold","other_prediction")) structure$declared_source
-                else "alphafold2",
+                c("alphafold3","esmfold","other_prediction"))
+                  structure$declared_source else "alphafold2",
               selectize=FALSE),
             fileInput("predictionEnsembleFiles",
-              "Additional prediction models",
+              "Prediction model files",
               multiple=TRUE,
               accept=c(".pdb",".ent",".cif",".mmcif",".mcif")),
+            conditionalPanel(
+              condition="input.predictionEnsembleSource === 'alphafold3'",
+              fileInput("predictionEnsembleConfidenceFiles",
+                "AF3 full confidences JSON",
+                multiple=TRUE,accept=c(".json")),
+              fileInput("predictionEnsembleSummaryFiles",
+                "AF3 summary confidences JSON (optional)",
+                multiple=TRUE,accept=c(".json")),
+              tags$p(class="ram-field-hint",
+                "AF3 files are paired by their official seed/sample filename stem: *_model.cif ↔ *_confidences.json ↔ optional *_summary_confidences.json. Upload order is ignored.")
+            ),
             if(!identical(structure$declared_source,"alphafold3"))
-              checkboxInput("includeLoadedPrediction",
-                paste("Include currently loaded model:",structure$name),value=TRUE)
+              conditionalPanel(
+                condition="input.predictionEnsembleSource !== 'alphafold3'",
+                checkboxInput("includeLoadedPrediction",
+                  paste("Include currently loaded model:",structure$name),value=TRUE)
+              )
             else
-              tags$p(class="ram-confidence-warning",
-                "The loaded AlphaFold 3 model is not auto-added: matching atom-confidence JSON is required for ensemble confidence analysis."),
+              tags$p(class="ram-field-hint",
+                "The currently loaded AlphaFold 3 model is not auto-included in another ensemble type. Upload it again with its matching full-confidence JSON when analysing an AF3 sample set."),
             actionButton("calculatePredictionEnsemble",
               "Analyse prediction ensemble",class="btn-primary btn-sm")
           ),
           tags$p(class="ram-field-hint",
-            "AlphaFold 3 ensembles are not accepted in this first version because per-model atom confidence needs its matching JSON sidecar; they are not silently treated as AF2."),
+            "AF3 requires each sample's matching full confidence JSON. pTM, ipTM and ranking score remain model-level provenance and are not folded into the residue variability measure."),
           uiOutput("predictionEnsembleSummary"),
+          tags$details(class="ram-confidence-panel ram-ensemble-model-panel",
+            tags$summary("Model-level confidence and provenance"),
+            tags$div(class="ram-residue-table",
+              DT::DTOutput("predictionEnsembleModelRows"))
+          ),
           uiOutput("predictionEnsembleTrack"),
           tags$div(class="ram-residue-table",
             DT::DTOutput("predictionEnsembleRows")),
@@ -2644,16 +2664,23 @@ server <- function(input, output, session) {
   prediction_ensemble_input_key <- reactive({
     structure <- req(loaded())
     uploaded <- input$predictionEnsembleFiles
-    file_signature <- if(is.null(uploaded) || !nrow(uploaded)) "" else
-      paste(uploaded$name,uploaded$size,uploaded$type,uploaded$datapath,
+    signature <- function(files) if(is.null(files) || !nrow(files)) "" else
+      paste(files$name,files$size,files$type,files$datapath,
             sep=":",collapse="|")
+    source <- if(is.null(input$predictionEnsembleSource)) "" else
+      input$predictionEnsembleSource
     include_loaded <- isTRUE(input$includeLoadedPrediction) &&
+      !identical(source,"alphafold3") &&
       !identical(structure$declared_source,"alphafold3")
     paste(
-      if(is.null(input$predictionEnsembleSource)) "" else input$predictionEnsembleSource,
+      source,
       include_loaded,
       if(include_loaded) current_model() else "",
-      file_signature,
+      signature(uploaded),
+      if(identical(source,"alphafold3"))
+        signature(input$predictionEnsembleConfidenceFiles) else "",
+      if(identical(source,"alphafold3"))
+        signature(input$predictionEnsembleSummaryFiles) else "",
       sep="::"
     )
   })
@@ -2678,11 +2705,12 @@ server <- function(input, output, session) {
   observeEvent(input$calculatePredictionEnsemble, {
     structure <- req(loaded())
     source <- req(input$predictionEnsembleSource)
-    permitted <- c("alphafold2","esmfold","other_prediction")
+    permitted <- c("alphafold2","alphafold3","esmfold","other_prediction")
     if(!source %in% permitted) return()
 
     uploaded <- input$predictionEnsembleFiles
     include_loaded <- isTRUE(input$includeLoadedPrediction) &&
+      !identical(source,"alphafold3") &&
       !identical(structure$declared_source,"alphafold3")
     source_loaded <- if(identical(structure$declared_source,"alphafold_db"))
       "alphafold2" else structure$declared_source
@@ -2696,7 +2724,29 @@ server <- function(input, output, session) {
       return()
     }
 
-    file_count <- if(is.null(uploaded)) 0L else nrow(uploaded)
+    af3_pairs <- NULL
+    if(identical(source,"alphafold3")) {
+      confidences <- input$predictionEnsembleConfidenceFiles
+      summaries <- input$predictionEnsembleSummaryFiles
+      af3_pairs <- tryCatch(
+        ram_af3_pair_files(
+          model_names=if(is.null(uploaded)) character() else uploaded$name,
+          model_paths=if(is.null(uploaded)) character() else uploaded$datapath,
+          confidence_names=if(is.null(confidences)) character() else confidences$name,
+          confidence_paths=if(is.null(confidences)) character() else confidences$datapath,
+          summary_names=if(is.null(summaries)) character() else summaries$name,
+          summary_paths=if(is.null(summaries)) character() else summaries$datapath
+        ),
+        error=function(e) {
+          showNotification(conditionMessage(e),type="error",duration=16)
+          NULL
+        }
+      )
+      if(is.null(af3_pairs)) return()
+    }
+
+    file_count <- if(identical(source,"alphafold3")) nrow(af3_pairs) else
+      if(is.null(uploaded)) 0L else nrow(uploaded)
     if(file_count + as.integer(include_loaded) < 2L) {
       showNotification(
         "A prediction ensemble needs at least two models. Upload another model or include the loaded prediction.",
@@ -2708,8 +2758,12 @@ server <- function(input, output, session) {
       pdbs <- list()
       labels <- character()
       hashes <- character()
+      confidence_hashes <- character()
+      summary_hashes <- character()
       structure_models <- integer()
       input_roles <- character()
+      sidecars <- character()
+      summary_files <- character()
 
       if(include_loaded) {
         selected_model <- current_model()
@@ -2723,40 +2777,59 @@ server <- function(input, output, session) {
              length(structure$source_id)==1L &&
              file.exists(structure$source_id))
             unname(tools::md5sum(structure$source_id)) else NA_character_)
+        confidence_hashes <- c(confidence_hashes,NA_character_)
+        summary_hashes <- c(summary_hashes,NA_character_)
         structure_models <- c(structure_models,selected_model)
         input_roles <- c(input_roles,"loaded")
       }
 
       if(file_count) {
         for(i in seq_len(file_count)) {
+          model_name <- if(identical(source,"alphafold3"))
+            af3_pairs$model_name[[i]] else uploaded$name[[i]]
+          model_path <- if(identical(source,"alphafold3"))
+            af3_pairs$model_path[[i]] else uploaded$datapath[[i]]
           incProgress(0.35/max(1L,file_count),
-            detail=paste("Loading",uploaded$name[[i]]))
+            detail=paste("Loading",model_name))
           model <- tryCatch(
-            ram_load_structure(
-              path=uploaded$datapath[[i]],
-              original_name=uploaded$name[[i]]
-            ),
+            ram_load_structure(path=model_path,original_name=model_name),
             error=function(e) e
           )
           if(inherits(model,"error")) {
             showNotification(
-              paste(uploaded$name[[i]],conditionMessage(model),sep=": "),
+              paste(model_name,conditionMessage(model),sep=": "),
               type="error",duration=14)
             return()
           }
           if(ram_model_count(model)!=1L) {
             showNotification(
-              paste(uploaded$name[[i]],
+              paste(model_name,
                 "contains multiple structural models. Prediction-ensemble uploads must contain one model per file."),
               type="error",duration=14)
             return()
           }
           pdbs[[length(pdbs)+1L]] <- model
           labels <- c(labels,
-            tools::file_path_sans_ext(basename(uploaded$name[[i]])))
-          hashes <- c(hashes,unname(tools::md5sum(uploaded$datapath[[i]])))
+            if(identical(source,"alphafold3")) af3_pairs$label[[i]]
+            else tools::file_path_sans_ext(basename(model_name)))
+          hashes <- c(hashes,unname(tools::md5sum(model_path)))
           structure_models <- c(structure_models,1L)
-          input_roles <- c(input_roles,"uploaded")
+          input_roles <- c(input_roles,
+            if(identical(source,"alphafold3")) "uploaded-af3" else "uploaded")
+          if(identical(source,"alphafold3")) {
+            confidence_path <- af3_pairs$confidence_path[[i]]
+            summary_path <- af3_pairs$summary_path[[i]]
+            sidecars <- c(sidecars,confidence_path)
+            summary_files <- c(summary_files,summary_path)
+            confidence_hashes <- c(confidence_hashes,
+              unname(tools::md5sum(confidence_path)))
+            summary_hashes <- c(summary_hashes,
+              if(nzchar(summary_path)) unname(tools::md5sum(summary_path))
+              else NA_character_)
+          } else {
+            confidence_hashes <- c(confidence_hashes,NA_character_)
+            summary_hashes <- c(summary_hashes,NA_character_)
+          }
         }
       }
 
@@ -2771,6 +2844,8 @@ server <- function(input, output, session) {
       result <- tryCatch(
         ram_prediction_ensemble_analyze(
           pdbs,source=source,labels=labels,max_models=30L,
+          sidecars=if(identical(source,"alphafold3")) sidecars else NULL,
+          summary_files=if(identical(source,"alphafold3")) summary_files else NULL,
           classifier=function(torsions) {
             classified <- ram_classify_torsions(
               torsions,
@@ -2789,12 +2864,15 @@ server <- function(input, output, session) {
         }
       )
       if(is.null(result)) return()
+      n_used <- result$analyzed_models
       result$provenance <- data.frame(
         model=result$labels,
         source=result$source,
-        input_role=input_roles[seq_len(result$analyzed_models)],
-        structure_model=structure_models[seq_len(result$analyzed_models)],
-        coordinate_md5=hashes[seq_len(result$analyzed_models)],
+        input_role=input_roles[seq_len(n_used)],
+        structure_model=structure_models[seq_len(n_used)],
+        coordinate_md5=hashes[seq_len(n_used)],
+        confidence_md5=confidence_hashes[seq_len(n_used)],
+        summary_md5=summary_hashes[seq_len(n_used)],
         stringsAsFactors=FALSE
       )
       prediction_ensemble_results(list(
@@ -2832,12 +2910,45 @@ server <- function(input, output, session) {
           sprintf("%s residues with pLDDT SD ≥10",confidence_variable))
       ),
       tags$p(class="ram-confidence-explainer",
-        "These values quantify disagreement among prediction models/seeds. They do not demonstrate molecular motion or experimental conformational heterogeneity."),
+        if(identical(result$source,"alphafold3"))
+          "Residue-level disagreement is calculated from backbone geometry, Rama8000 and pLDDT. AF3 pTM, ipTM and ranking score are retained separately per sample and do not modify the residue variability map."
+        else
+          "These values quantify disagreement among prediction models/seeds. They do not demonstrate molecular motion or experimental conformational heterogeneity."),
       if(result$limited)
         tags$p(class="ram-confidence-warning",
           "Only the first 30 models were analysed.")
     )
   })
+
+  output$predictionEnsembleModelRows <- DT::renderDT({
+    result <- prediction_ensemble_matches()
+    req(result)
+    data <- result$model_summary
+    if(!nrow(data)) return(DT::datatable(data,rownames=FALSE))
+    fields <- c("model","residues","finite_phi_psi","rama8000_outliers",
+      "plddt_mean","plddt_min","ptm","iptm","ranking_score",
+      "fraction_disordered","has_clash")
+    fields <- fields[fields %in% names(data)]
+    shown <- data[,fields,drop=FALSE]
+    for(field in intersect(c("plddt_mean","plddt_min"),names(shown)))
+      shown[[field]] <- round(shown[[field]],1L)
+    for(field in intersect(c("ptm","iptm","ranking_score",
+                             "fraction_disordered"),names(shown)))
+      shown[[field]] <- round(shown[[field]],3L)
+    if("has_clash" %in% names(shown))
+      shown$has_clash <- ifelse(is.na(shown$has_clash),"",
+        ifelse(shown$has_clash,"Yes","No"))
+    names(shown) <- c(
+      model="Model/sample",residues="Residues",
+      finite_phi_psi="Finite φ/ψ",rama8000_outliers="Rama8000 outliers",
+      plddt_mean="pLDDT mean",plddt_min="pLDDT min",
+      ptm="pTM",iptm="ipTM",ranking_score="AF3 ranking score",
+      fraction_disordered="Disordered fraction",has_clash="AF3 clash flag"
+    )[names(shown)]
+    DT::datatable(shown,rownames=FALSE,selection="none",
+      options=list(pageLength=8,scrollX=TRUE,autoWidth=FALSE,dom="tip"),
+      class="compact stripe")
+  },server=FALSE)
 
   output$predictionEnsembleTrack <- renderUI({
     result <- prediction_ensemble_matches()
@@ -2943,10 +3054,8 @@ server <- function(input, output, session) {
         provenance <- result$provenance
         if(nrow(provenance)!=nrow(models))
           stop("Prediction ensemble provenance no longer matches model order.")
-        models$source <- provenance$source
-        models$input_role <- provenance$input_role
-        models$structure_model <- provenance$structure_model
-        models$coordinate_md5 <- provenance$coordinate_md5
+        for(field in setdiff(names(provenance),"model"))
+          models[[field]] <- provenance[[field]]
       }
       utils::write.csv(models,file,row.names=FALSE,na="")
     }

@@ -81,12 +81,21 @@ ram_prediction_json <- function(json, torsions, atoms = NULL,
   n <- nrow(torsions)
   result <- list(pae = NULL, pae_rows = integer(),
                  plddt = rep(NA_real_, n), notes = character(),
-                 ptm = NA_real_, iptm = NA_real_)
-  for (field in c("ptm", "iptm")) {
+                 ptm = NA_real_, iptm = NA_real_,
+                 ranking_score = NA_real_, fraction_disordered = NA_real_,
+                 has_clash = NA)
+  for (field in c("ptm", "iptm", "fraction_disordered")) {
     value <- suppressWarnings(as.numeric(unlist(json[[field]])))
     if (length(value) == 1L && is.finite(value) && value >= 0 && value <= 1)
       result[[field]] <- value
   }
+  ranking <- suppressWarnings(as.numeric(unlist(json$ranking_score)))
+  if (length(ranking)==1L && is.finite(ranking) &&
+      ranking >= -100 && ranking <= 1.5)
+    result$ranking_score <- ranking
+  clash <- unlist(json$has_clash,use.names=FALSE)
+  if (length(clash)==1L && !is.na(clash))
+    result$has_clash <- isTRUE(as.logical(clash))
   # AFDB confidenceScore contains per-residue pLDDT. Avoid matching arrays
   # to multimeric structures unless all residue rows align unambiguously.
   score <- json$confidenceScore
@@ -289,13 +298,24 @@ ram_prepare_prediction <- function(pdb, torsions, source, sidecar = NULL,
     if (!is.null(mapped) && is.finite(mapped[[key]])) return(mapped[[key]])
     NA_real_
   }
+  logical_metric <- function(key) {
+    if (!is.null(summary) && length(summary[[key]])==1L &&
+        !is.na(summary[[key]])) return(isTRUE(summary[[key]]))
+    if (!is.null(mapped) && length(mapped[[key]])==1L &&
+        !is.na(mapped[[key]])) return(isTRUE(mapped[[key]]))
+    NA
+  }
   list(source = source, residues = baseline,
        pae = if (!is.null(mapped)) mapped$pae else NULL,
        pae_rows = if (!is.null(mapped)) mapped$pae_rows else integer(),
        ptm = metric("ptm"), iptm = metric("iptm"),
+       ranking_score = metric("ranking_score"),
+       fraction_disordered = metric("fraction_disordered"),
+       has_clash = logical_metric("has_clash"),
        notes = c(notes, if (!is.null(mapped)) mapped$notes),
        model_id = model_id,
-       confidence_file = if (!is.null(sidecar)) basename(sidecar) else "")
+       confidence_file = if (!is.null(sidecar)) basename(sidecar) else "",
+       summary_file = if (!is.null(summary_file)) basename(summary_file) else "")
 }
 
 # Cap Plotly payload size. Sampling is explicitly labelled: never report

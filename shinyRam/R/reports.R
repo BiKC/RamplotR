@@ -282,6 +282,9 @@ ram_save_prediction_ensemble_report <- function(path, result, metadata=list(),
   }
   for(field in intersect(c("plddt_mean","plddt_min"),names(models)))
     models[[field]] <- round(models[[field]],2L)
+  for(field in intersect(c("ptm","iptm","ranking_score",
+                           "fraction_disordered"),names(models)))
+    models[[field]] <- round(models[[field]],4L)
 
   provenance <- c(metadata,list(
     prediction_source=if(is.null(result$source)) "unknown" else result$source,

@@ -57,6 +57,16 @@ assert(identical(dim(mapped$pae), c(3L, 3L)) &&
 assert(mapped$pae[3, 1] == 11 && mapped$pae[1, 3] == 11,
        "AF3 PAE must retain token orientation and original numeric data")
 
+af3_summary <- ram_prediction_json(list(
+  ptm=0.82,iptm=0.71,ranking_score=0.77,
+  fraction_disordered=0.13,has_clash=TRUE
+),torsions,source="alphafold3")
+assert(af3_summary$ptm==0.82 && af3_summary$iptm==0.71 &&
+       af3_summary$ranking_score==0.77 &&
+       af3_summary$fraction_disordered==0.13 &&
+       isTRUE(af3_summary$has_clash),
+       "AF3 per-sample summary metrics must be retained without changing residue confidence.")
+
 altered <- af3
 altered$atom_chain_ids[[1L]] <- "B"
 mismatch <- ram_prediction_json(altered, torsions, atoms = atom,

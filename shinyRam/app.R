@@ -498,7 +498,10 @@ ui <- fluidPage(
                   tags$div(id = "ram-compare-upload", class = "is-hidden",
                     fileInput("compareFile", "Second PDB/mmCIF file",
                       accept = c(".pdb", ".ent", ".cif", ".mmcif", ".mcif"))),
-                  actionButton("compareSubmit", "Load comparison", class="btn-primary")
+                  actionButton("compareSubmit", "Load comparison", class="btn-primary"),
+                  actionButton("compareSwap", "Swap primary ↔ comparison",
+                    class="btn-default",
+                    title="Swap A/B roles without reloading either structure")
                 ),
                 uiOutput("compareChainControls"),
                 tags$div(class = "ram-compare-status", uiOutput("compareSummary")),
@@ -660,6 +663,7 @@ server <- function(input, output, session) {
   experimental_search_request <- reactiveVal(0L)
   selected_residue <- reactiveVal(NULL)
   selected_comparison <- reactiveVal(NULL)
+  compare_swapped <- reactiveVal(FALSE)
   viewer_ready <- reactiveVal(FALSE)
   current_model <- reactive({
     value <- input$modelChoice
@@ -920,6 +924,7 @@ server <- function(input, output, session) {
       preferred_chain_a=preferred_chain_a,
       preferred_chain_b=preferred_chain_b
     ))
+    compare_swapped(FALSE)
     TRUE
   }
 
@@ -945,24 +950,47 @@ server <- function(input, output, session) {
     }
   }, ignoreInit=TRUE)
 
+  observeEvent(input$compareSwap, {
+    req(comparison_loaded(), loaded())
+    compare_swapped(!isTRUE(isolate(compare_swapped())))
+    selected_comparison(NULL)
+  }, ignoreInit=TRUE)
+
   output$compareChainControls <- renderUI({
-    first <- req(loaded())
-    second <- req(comparison_loaded())
-    chains_b <- unique(second$torsions$chain)
-    preferred_a <- second$preferred_chain_a
-    preferred_b <- second$preferred_chain_b
-    selected_a <- if (!is.null(preferred_a) && preferred_a %in% first$chains)
-      preferred_a else first$chains[[1L]]
-    selected_b <- if (!is.null(preferred_b) && preferred_b %in% chains_b)
-      preferred_b else chains_b[[1L]]
+    main <- req(loaded())
+    comparison <- req(comparison_loaded())
+    swapped <- isTRUE(compare_swapped())
+    first <- if (swapped) comparison else main
+    second <- if (swapped) main else comparison
+    first_chains <- if (!is.null(first$chains)) first$chains else
+      unique(first$torsions$chain)
+    second_chains <- if (!is.null(second$chains)) second$chains else
+      unique(second$torsions$chain)
+    preferred_first <- if (swapped) comparison$preferred_chain_b
+      else comparison$preferred_chain_a
+    preferred_second <- if (swapped) comparison$preferred_chain_a
+      else comparison$preferred_chain_b
+    selected_a <- if (!is.null(preferred_first) &&
+                      preferred_first %in% first_chains)
+      preferred_first else first_chains[[1L]]
+    selected_b <- if (!is.null(preferred_second) &&
+                      preferred_second %in% second_chains)
+      preferred_second else second_chains[[1L]]
+
     tags$div(class="ram-compare-chains",
-      selectInput("compareChainA", paste("Chain in", first$name),
-        choices=first$chains, selected=selected_a),
-      selectInput("compareChainB", paste("Chain in", second$name),
-        choices=chains_b, selected=selected_b),
-      if (second$nmodels > 1L)
-        selectInput("compareModel", "Second structure model",
-          choices=as.character(seq_len(second$nmodels)), selected="1")
+      tags$div(class="ram-compare-role",
+        tags$span(class="ram-compare-role-label","Primary · coral"),
+        selectInput("compareChainA", paste("Chain in", first$name),
+          choices=first_chains, selected=selected_a)),
+      tags$div(class="ram-compare-role",
+        tags$span(class="ram-compare-role-label","Comparison · blue"),
+        selectInput("compareChainB", paste("Chain in", second$name),
+          choices=second_chains, selected=selected_b)),
+      if (comparison$nmodels > 1L)
+        selectInput("compareModel", paste("Model in", comparison$name),
+          choices=as.character(seq_len(comparison$nmodels)), selected="1"),
+      tags$span(class="ram-compare-swap-state",
+        if (swapped) "Roles swapped" else "Loaded structure is primary")
     )
   })
 

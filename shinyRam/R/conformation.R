@@ -16,7 +16,7 @@ ram_backbone_basin_centers <- data.frame(
   stringsAsFactors = FALSE
 )
 
-ram_backbone_basin <- function(phi, psi, max_distance = 65) {
+ram_backbone_basin <- function(phi, psi, max_distance = 70) {
   phi <- as.numeric(phi)
   psi <- as.numeric(psi)
   if (length(phi) != length(psi))

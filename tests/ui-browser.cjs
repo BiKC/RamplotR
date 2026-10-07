@@ -661,9 +661,30 @@ const assert = require("node:assert/strict");
     await page.waitForSelector("#comparison tbody tr", {timeout:25000});
     await page.waitForFunction(() => {
       const p = document.getElementById("comparePlot");
-      return p && p.data && p.data.length >= 4 &&
-        p.data[0].customdata.length > 10;
+      return p && p.data && p.data.length >= 8 &&
+        p.data.some(trace => trace.customdata && trace.customdata.length > 10);
     }, {timeout:18000});
+    const compareBackground = await page.evaluate(() => {
+      const compare = document.getElementById("comparePlot");
+      const main = document.getElementById("plotly");
+      const contours = traces => traces.filter(trace => trace.type === "contour");
+      return {
+        compareContours: contours(compare.data).length,
+        compareFills: contours(compare.data).map(trace => trace.fillcolor),
+        mainFills: contours(main.data).map(trace => trace.fillcolor),
+        annotation: (compare.layout.annotations || []).map(item => item.text || ""),
+        namedTraces: compare.data.filter(trace => trace.name).map(trace => trace.name)
+      };
+    });
+    assert.equal(compareBackground.compareContours,4,
+      "Comparison Ramachandran plot should reuse all four density layers.");
+    assert.deepEqual(compareBackground.compareFills,compareBackground.mainFills,
+      "Comparison and individual Ramachandran plots should use the same background palette.");
+    assert.ok(compareBackground.annotation.some(text => text.includes("Background:")),
+      "Comparison plot should identify the active Ramachandran background.");
+    assert.deepEqual(compareBackground.namedTraces.slice(0,2),
+      ["1CRN-local-context","1CRN"],
+      "Comparison legend should identify primary and secondary structures.");
     await page.waitForFunction(() => {
       const s = window.getNGLStage && window.getNGLStage("NGLCompare");
       const models = window.getNGLStructure && window.getNGLStructure("NGLCompare");
@@ -742,6 +763,88 @@ const assert = require("node:assert/strict");
     await page.screenshot({
       path:"benchmarks/output/ui-preview/compare-self.png",fullPage:true
     });
+
+    // The comparison roles can be reversed without reloading either input.
+    // The loaded main structure remains the app-wide inspector structure,
+    // while the Compare tab flips A/B plot and 3D roles.
+    const swapButtonState = await page.$eval("#compareSwap", button => ({
+      visible: !!(button.offsetWidth || button.offsetHeight ||
+        button.getClientRects().length),
+      rect: button.getBoundingClientRect().toJSON(),
+      disabled: button.disabled
+    }));
+    assert.ok(swapButtonState.visible && !swapButtonState.disabled,
+      "Swap action should be visible and enabled after loading a comparison.");
+    await page.click("#compareSwap");
+    try {
+      await page.waitForFunction(() => {
+        const state = document.querySelector(".ram-compare-swap-state");
+        return state && state.textContent.includes("Roles swapped");
+      },{timeout:15000});
+      await page.waitForFunction(() => {
+        const plot = document.getElementById("comparePlot");
+        const names = (plot?.data || []).filter(trace => trace.name)
+          .map(trace => trace.name);
+        return names[0] === "1CRN" && names[1] === "1CRN-local-context";
+      },{timeout:20000});
+    } catch (error) {
+      const diagnostic = await page.evaluate(() => {
+        const plot = document.getElementById("comparePlot");
+        const button = document.getElementById("compareSwap");
+        return {
+          inputValue: window.Shiny?.shinyapp?.$inputValues?.compareSwap,
+          state: document.querySelector(".ram-compare-swap-state")?.textContent,
+          names: (plot?.data || []).filter(trace => trace.name)
+            .map(trace => trace.name),
+          chainA: window.Shiny?.shinyapp?.$inputValues?.compareChainA,
+          chainB: window.Shiny?.shinyapp?.$inputValues?.compareChainB,
+          buttonRect: button?.getBoundingClientRect().toJSON(),
+          buttonDisabled: button?.disabled,
+          notifications: Array.from(document.querySelectorAll(".shiny-notification"))
+            .map(node => node.textContent)
+        };
+      });
+      console.error("Comparison swap diagnostics:",JSON.stringify(diagnostic));
+      await page.screenshot({
+        path:"benchmarks/output/ui-preview/compare-swap-debug.png",fullPage:true
+      });
+      throw error;
+    }
+    const swappedComparison = await page.evaluate(() => {
+      const plot = document.getElementById("comparePlot");
+      const roles = Array.from(document.querySelectorAll(".ram-compare-role"))
+        .map(node => node.textContent.replace(/\s+/g," ").trim());
+      const stage = window.getNGLStage && window.getNGLStage("NGLCompare");
+      const structures = window.getNGLStructure &&
+        window.getNGLStructure("NGLCompare");
+      return {
+        names: plot.data.filter(trace => trace.name).map(trace => trace.name),
+        roles,
+        structures: structures ? structures.length : 0,
+        highlightA: stage ?
+          stage.getRepresentationsByName("ram-compare-highlight-a").list.length : 0,
+        highlightB: stage ?
+          stage.getRepresentationsByName("ram-compare-highlight-b").list.length : 0
+      };
+    });
+    assert.deepEqual(swappedComparison.names.slice(0,2),
+      ["1CRN","1CRN-local-context"],
+      "Swap should reverse primary/comparison plot roles.");
+    assert.ok(swappedComparison.roles[0].includes("Primary") &&
+              swappedComparison.roles[1].includes("Comparison"),
+      "Chain controls should make the swapped roles explicit.");
+    assert.equal(swappedComparison.structures,2,
+      "Swap should retain both structures in the comparison viewer.");
+    assert.equal(swappedComparison.highlightA,1);
+    assert.equal(swappedComparison.highlightB,1);
+    await page.screenshot({
+      path:"benchmarks/output/ui-preview/compare-swapped.png",fullPage:true
+    });
+    // Restore the original role ordering before unrelated downstream tests.
+    await page.click("#compareSwap");
+    await page.waitForFunction(() =>
+      document.querySelector(".ram-compare-swap-state")?.textContent
+        .includes("Loaded structure is primary"),{timeout:30000});
     // Group comparison reuses the same circular statistics across uploaded
     // structure sets. An identical 1CRN-vs-1CRN analysis must not invent
     // conformational differences.

@@ -93,8 +93,11 @@ If atom records are inconsistent or the parser cannot extract complete multi-mod
 The optional **Compare** tab accepts a second PDB accession or PDB/mmCIF file. Choose one chain from each structure. Residues are paired by a bounded global amino-acid sequence alignment, **not by residue number**. The difference in each angle wraps correctly across ±180°. Gaps remain visible and do not receive invented dihedrals; classification differences are reported only for available classifications.
 
 The paired Ramachandran plot and the **3D superposition are side by side**
-on wide screens. The 3D viewer initially fits both selected chains rather
-than the complete uploaded structures, even if hidden chains are very large.
+on wide screens. The aligned-angle plot uses the **same selected Ramachandran
+density background, contour thresholds and palette as the individual plot**,
+so changing reference datasets or display palettes stays consistent across
+both views. The 3D viewer initially fits both selected chains rather than the
+complete uploaded structures, even if hidden chains are very large.
 Selecting a plotted point or aligned table row highlights both corresponding
 residues in the superposition and focuses the camera on their local
 positions. Clicking a residue in either 3D structure finds its aligned
@@ -107,6 +110,14 @@ Above the paired 2D/3D workspace, the **Conformational change explorer** represe
 Use **Find aligned pair** to jump by the true residue number in either
 selected chain (for example 104), then inspect the primary/comparison
 amino acids, φ/ψ angles, wrapped Δφ/Δψ, combined backbone displacement and Rama8000 categories directly below the views.
+
+Use **Swap primary ↔ comparison** when the second structure should become the
+coral primary reference for the comparison. This reverses the A/B chain
+controls, angle traces, superposition roles and paired-residue navigation
+without reloading either structure. The structure loaded in the main RamplotR
+workspace is intentionally not replaced, so selections can still synchronize
+with its sequence navigator and shared residue inspector.
+
 **Fit both chains** resets the camera without clearing the current
 selection. The shared primary-structure inspector and sequence navigator
 follow the selected primary residue when it is visible under current plot

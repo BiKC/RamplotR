@@ -12,6 +12,7 @@ required <- c(
   "bgtype", "background", "AA", "chains", "chainColors",
   "ligands", "dna", "rna", "spinning", "rocking", "colorscheme",
   "bg1", "bg2", "bg3", "bg4", "plotly", "NGL",
+  "comparePlot", "compareSwap", "NGLCompare",
   "regionselect", "regions", "summary"
 )
 missing <- required[!vapply(required, function(id) {

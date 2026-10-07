@@ -58,16 +58,20 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 
 ## Active work
 
-- Active branch: `feature/conformational-atlas-foundation`.
+- PR #46 merged Phase 0A canonical SIFTS/UniProt residue coordinates into
+  `main`.
+- Active branch: `feature/protein-block-fingerprints`.
 - The implementation roadmap is in
   `docs/conformational-atlas-roadmap.md`.
-- Current slice: Phase 0A, canonical SIFTS/UniProt residue coordinates.
-  - normalize PDBe SIFTS mapping segments;
-  - expand only provably one-to-one author-number/UniProt ranges;
-  - preserve unresolved/nonlinear ranges instead of inventing residue mappings;
-  - add direct UniProt coordinates for AlphaFold DB models;
-  - expose canonical coordinates in residue inspection;
-  - add pure regression tests before moving to archive-scale Atlas retrieval.
+- Current slice: Phase 0B, benchmark and strengthen local conformational states.
+  - implement the published 16-state Protein Blocks pentapeptide alphabet
+    from its eight backbone dihedrals;
+  - retain the current Alpha-R/Beta/PPII/Alpha-L/Other labels as a simple
+    human-readable overview;
+  - quantify how the coarse state relates to the fragment-level assignment;
+  - expose Protein Blocks first as a research/analysis layer, not as
+    validation or secondary structure;
+  - add regression tests and provenance before integrating switch regions.
 - PR #45 added a transparent, comparison-only coarse phi/psi state
   (Alpha-R, Beta, PPII, Alpha-L or Other) across pairwise comparison,
   prediction/NMR ensembles, group comparison, residue evidence and exports.
@@ -79,10 +83,9 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 
 ## Next implementation steps
 
-1. Finish Phase 0A canonical mapping on the active Atlas branch and merge it
-   with tests.
-2. Benchmark the current coarse backbone-state layer before giving it a
-   stronger scientific interpretation.
+1. Finish Phase 0B Protein Blocks/fingerprint benchmarking and merge it with
+   tests and explicit provenance.
+2. Implement switch-region detection on the fragment representation.
 3. Implement the experimental Atlas retrieval layer around canonical UniProt
    coordinates, with explicit mapping/coverage exclusions.
 4. Only then add archive-scale state discovery, switch-region analysis and

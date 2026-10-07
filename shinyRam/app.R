@@ -997,7 +997,9 @@ server <- function(input, output, session) {
         selectInput("compareChainB",paste("Chain in",second$name),
           choices=second_chains,selected=selected_b)),
       if (comparison$nmodels > 1L)
-        selectInput("compareModel",paste("Model in",comparison$name),
+        selectInput("compareModel",
+          paste("Model in",comparison$name,
+            if(swapped) "· currently Primary" else "· currently Comparison"),
           choices=as.character(seq_len(comparison$nmodels)),
           selected=compare_choices$comparison_model),
       tags$span(class="ram-compare-swap-state",

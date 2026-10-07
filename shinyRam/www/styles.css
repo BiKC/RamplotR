@@ -472,7 +472,7 @@ body > .container-fluid { max-width: none; padding: 0; }
 
 /* Comparison is optional; keep the primary workflow compact. */
 .ram-compare-source {
-  display:grid; grid-template-columns:minmax(190px,235px) minmax(180px,1fr) auto;
+  display:grid; grid-template-columns:minmax(190px,235px) minmax(180px,1fr) auto auto;
   align-items:end; gap:14px;
   border:1px solid #e1eae8; border-radius:10px;
   background:#f8fbfa; padding:15px; margin:14px 0;
@@ -1390,4 +1390,18 @@ body > .container-fluid { max-width: none; padding: 0; }
 }
 @media(max-width:560px) {
   .ram-group-evidence-grid { grid-template-columns:1fr; }
+}
+
+.ram-compare-role { position:relative; }
+.ram-compare-role-label { display:inline-block; margin:0 0 3px; font-size:9px;
+  font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:#688086; }
+.ram-compare-swap-state { align-self:end; margin-bottom:7px; padding:4px 8px;
+  border-radius:999px; background:#eef6f4; color:#527078; font-size:9px;
+  font-weight:700; white-space:nowrap; }
+@media(max-width:900px) {
+  .ram-compare-source { grid-template-columns:1fr 1fr; }
+}
+@media(max-width:620px) {
+  .ram-compare-source { grid-template-columns:1fr; }
+  .ram-compare-source .btn { width:100%; }
 }

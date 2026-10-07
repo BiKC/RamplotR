@@ -111,9 +111,12 @@ Identical Ramachandran coordinates do not imply identical Cartesian structure, a
 
 When the loaded structure is a prediction, the **Summary** tab exposes a
 prediction-ensemble workflow even if the current coordinate file contains only
-one model. Upload additional AF2/ColabFold, ESMFold or other models whose
-B-factor field contains pLDDT. The currently loaded compatible model can be
-included as one ensemble member.
+one model. Upload additional AF2/ColabFold, ESMFold or compatible
+pLDDT-in-B-factor models; the currently loaded compatible model can be included
+as one ensemble member. For AlphaFold 3, upload at least two official sample
+`*_model.cif` files together with their matching `*_confidences.json`
+files and optional `*_summary_confidences.json` files. AF3 pairing uses the
+seed/sample filename stem rather than upload order.
 
 RamplotR reports circular phi/psi spread, residue coverage, Rama8000 agreement
 and pLDDT spread across the uploaded models. A compact **Prediction variability
@@ -126,9 +129,11 @@ described as prediction uncertainty or heterogeneity, not molecular dynamics.
 Duplicate coordinate files are rejected, and the model export records labels,
 declared source and coordinate MD5 hashes.
 
-AlphaFold 3 ensemble confidence is intentionally not inferred from B-factors in
-this first version because each AF3 model needs its matching atom/token
-confidence sidecar.
+For AlphaFold 3, atom-level pLDDT is mapped from each sample's matching full
+confidence sidecar. pTM, ipTM, ranking score, disordered fraction and clash flag
+are retained separately in the model-level table and exports; they do not
+change the residue variability map. Missing or ambiguous AF3 file pairs are
+rejected instead of being guessed.
 
 ## Publication exports and reproducibility
 

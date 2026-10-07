@@ -963,11 +963,11 @@ server <- function(input, output, session) {
     }
   }, ignoreInit=TRUE)
 
-  observeEvent(input$ramCompareSwap, {
-    req(!is.null(input$ramCompareSwap),loaded(),comparison_loaded())
+  observeEvent(input$compareSwap, {
+    req(loaded(),comparison_loaded())
     compare_swapped(!isTRUE(isolate(compare_swapped())))
     selected_comparison(NULL)
-  },ignoreInit=FALSE)
+  },ignoreInit=TRUE)
 
   output$compareChainControls <- renderUI({
     main <- req(loaded())

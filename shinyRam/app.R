@@ -1341,6 +1341,10 @@ server <- function(input, output, session) {
     columns <- c("chain", "resi", "insertion_code", "resn",
                  "phi", "psi", "region", "density",
                  "rama8000_region", "rama8000_group", "rama8000_score")
+    has_canonical <- all(c("uniprot_accession","uniprot_resi") %in% names(data)) &&
+      any(!is.na(data$uniprot_accession) & is.finite(data$uniprot_resi))
+    if (has_canonical)
+      columns <- c(columns,"uniprot_accession","uniprot_resi")
     if ("plddt" %in% names(data))
       columns <- c(columns, "plddt", "confidence_category")
     shown <- data[, columns, drop = FALSE]
@@ -1354,6 +1358,7 @@ server <- function(input, output, session) {
       colnames = c("Chain", "Residue", "Ins.", "AA", "Phi (°)", "Psi (°)",
                    "RamplotR region", "Percentile", "Rama8000", "Rama8000 class",
                    "Rama8000 score (%)",
+                   if (has_canonical) c("UniProt","UniProt residue"),
                    if ("plddt" %in% names(shown)) c("pLDDT", "Confidence")),
       selection = list(mode = "single",
                        selected = if (length(marked)) marked[[1L]] else integer(0)),
@@ -3631,14 +3636,45 @@ server <- function(input, output, session) {
       tags$td(class="ram-numeric", standard_pct(n))
     )
     standard_outliers <- standard_count("Outlier")
+    mapped_n <- if ("canonical_status" %in% names(data))
+      sum(data$canonical_status=="mapped",na.rm=TRUE) else 0L
+    canonical_accessions <- if ("uniprot_accession" %in% names(data))
+      unique(na.omit(as.character(data$uniprot_accession))) else character()
+    mapping_state <- canonical_status()
 
     tags$div(class = "ram-summary",
       tags$div(class = "ram-summary-metrics",
         metric("Selected residues", nrow(data), "Across selected chains"),
         metric("RamplotR not allowed", outlier, "Native density regions"),
         metric("Rama8000 outliers", standard_outliers,
-               "Six-class standard validation")
+               "Six-class standard validation"),
+        if (!is.null(mapping_state) &&
+            mapping_state$state %in% c("mapped","partial"))
+          metric("UniProt mapped", mapped_n,
+            if(length(canonical_accessions))
+              paste(canonical_accessions,collapse=", ")
+            else "Canonical coordinates")
       ),
+      if (!is.null(mapping_state))
+        tags$div(class="ram-canonical-summary",
+          tags$strong("Canonical coordinates"),
+          if (identical(mapping_state$state,"searching"))
+            tags$span("Retrieving PDBe SIFTS mapping…")
+          else if (identical(mapping_state$state,"mapped"))
+            tags$span(sprintf("%d selected residues currently map to UniProt%s.",
+              mapped_n,
+              if(length(canonical_accessions))
+                paste0(" ",paste(canonical_accessions,collapse=", "))
+              else ""))
+          else if (identical(mapping_state$state,"partial"))
+            tags$span(paste0(
+              "SIFTS ranges were found, but only unambiguous one-to-one ",
+              "author-number ranges are expanded. Nonlinear ranges remain unresolved."))
+          else if (identical(mapping_state$state,"unavailable"))
+            tags$span(mapping_state$message)
+          else if (identical(mapping_state$state,"error"))
+            tags$span("Canonical mapping could not be retrieved; local PDB numbering remains available.")
+        ),
       tags$h3("RamplotR density regions"),
       tags$p(class = "ram-summary-note",
         "Percentages use classified residues other than glycine and proline as the denominator."),

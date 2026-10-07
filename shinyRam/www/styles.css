@@ -1260,7 +1260,11 @@ body > .container-fluid { max-width: none; padding: 0; }
 .ram-change-cell.ram-change-moderate { background:#d4b755; }
 .ram-change-cell.ram-change-large { background:#dc8a48; }
 .ram-change-cell.ram-change-very-large { background:#cb5646; }
+.ram-change-cell.has-confidence-shift {
+  box-shadow:inset 0 0 0 2px #6d3f7c;
+}
 .ram-change-cell.is-selected { outline:2px solid #173f48; outline-offset:1px; }
+.ram-change-confidence-key { background:#fff; box-shadow:inset 0 0 0 1px #6d3f7c; }
 .ram-change-cell:hover,.ram-change-cell:focus-visible { outline:2px solid #146f76;
   outline-offset:1px; }
 .ram-change-top { display:flex; align-items:center; flex-wrap:wrap; gap:5px;

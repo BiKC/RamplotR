@@ -1,7 +1,102 @@
 # Pure residue inspection and pairwise comparison helpers.
 # Nothing in this file changes torsion extraction or scientific classification.
 
-ram_residue_evidence <- function(row, boundary_margin = 2) {
+ram_heavy_atoms <- function(atoms) {
+  if (!is.data.frame(atoms) || !nrow(atoms)) return(atoms)
+  element <- if ("elesy" %in% names(atoms))
+    toupper(trimws(as.character(atoms$elesy))) else rep("",nrow(atoms))
+  atom_name <- if ("elety" %in% names(atoms))
+    toupper(trimws(as.character(atoms$elety))) else rep("",nrow(atoms))
+  hydrogen <- element %in% c("H","D") |
+    (!nzchar(element) & grepl("^[0-9]*[HD]",atom_name))
+  atoms[!hydrogen,,drop=FALSE]
+}
+
+ram_nearby_hetero_context <- function(pdb, row, max_distance = 6,
+                                      max_hits = 3L) {
+  empty <- data.frame(
+    resn=character(),chain=character(),resi=integer(),
+    insertion_code=character(),distance=numeric(),
+    target_atom=character(),hetero_atom=character(),
+    stringsAsFactors=FALSE
+  )
+  if (!is.list(pdb) || !is.data.frame(pdb$atom) ||
+      !is.data.frame(row) || nrow(row)!=1L ||
+      is.null(pdb$hetero_atom) || !is.data.frame(pdb$hetero_atom) ||
+      !nrow(pdb$hetero_atom)) return(empty)
+  required <- c("chain","resno","resid","elety","x","y","z")
+  if (!all(required %in% names(pdb$atom)) ||
+      !all(required %in% names(pdb$hetero_atom))) return(empty)
+
+  normalize_atoms <- function(atoms) {
+    if (!"insert" %in% names(atoms)) atoms$insert <- ""
+    atoms$chain <- as.character(atoms$chain)
+    atoms$chain[is.na(atoms$chain)] <- ""
+    atoms$insert <- as.character(atoms$insert)
+    atoms$insert[is.na(atoms$insert)] <- ""
+    atoms$resid <- toupper(trimws(as.character(atoms$resid)))
+    atoms$elety <- trimws(as.character(atoms$elety))
+    atoms
+  }
+  atoms <- normalize_atoms(pdb$atom)
+  hetero <- normalize_atoms(pdb$hetero_atom)
+  chain <- as.character(row$chain[[1L]])
+  if (is.na(chain)) chain <- ""
+  insertion <- as.character(row$insertion_code[[1L]])
+  if (is.na(insertion)) insertion <- ""
+  resi <- suppressWarnings(as.integer(row$resi[[1L]]))
+  resn <- toupper(as.character(row$resn[[1L]]))
+  target <- atoms[
+    atoms$chain==chain & suppressWarnings(as.integer(atoms$resno))==resi &
+      atoms$insert==insertion & atoms$resid==resn,
+    ,drop=FALSE
+  ]
+  target <- ram_heavy_atoms(target)
+  hetero <- ram_heavy_atoms(hetero)
+  water_names <- c("HOH","WAT","DOD","H2O","SOL","TIP","TIP3","TIP3P")
+  hetero <- hetero[!hetero$resid %in% water_names,,drop=FALSE]
+  target <- target[is.finite(target$x)&is.finite(target$y)&is.finite(target$z),
+                   ,drop=FALSE]
+  hetero <- hetero[is.finite(hetero$x)&is.finite(hetero$y)&is.finite(hetero$z),
+                   ,drop=FALSE]
+  if (!nrow(target) || !nrow(hetero)) return(empty)
+
+  target_xyz <- as.matrix(target[,c("x","y","z"),drop=FALSE])
+  nearest <- vapply(seq_len(nrow(hetero)),function(i) {
+    delta <- sweep(target_xyz,2L,
+      as.numeric(hetero[i,c("x","y","z")]),FUN="-")
+    min(sqrt(rowSums(delta^2)))
+  },numeric(1))
+  hetero$.ram_distance <- nearest
+  hetero <- hetero[is.finite(hetero$.ram_distance) &
+                   hetero$.ram_distance<=max_distance,,drop=FALSE]
+  if (!nrow(hetero)) return(empty)
+
+  keys <- paste(hetero$chain,hetero$resno,hetero$insert,hetero$resid,sep="\r")
+  groups <- split(seq_len(nrow(hetero)),keys)
+  results <- lapply(groups,function(ix) {
+    local <- ix[which.min(hetero$.ram_distance[ix])]
+    atom_delta <- sweep(target_xyz,2L,
+      as.numeric(hetero[local,c("x","y","z")]),FUN="-")
+    target_index <- which.min(sqrt(rowSums(atom_delta^2)))
+    data.frame(
+      resn=hetero$resid[[local]],
+      chain=hetero$chain[[local]],
+      resi=suppressWarnings(as.integer(hetero$resno[[local]])),
+      insertion_code=hetero$insert[[local]],
+      distance=hetero$.ram_distance[[local]],
+      target_atom=target$elety[[target_index]],
+      hetero_atom=hetero$elety[[local]],
+      stringsAsFactors=FALSE
+    )
+  })
+  result <- do.call(rbind,results)
+  result <- result[order(result$distance,result$resn,result$chain,result$resi),
+                   ,drop=FALSE]
+  head(result,max(1L,as.integer(max_hits)))
+}
+
+ram_residue_evidence <- function(row, boundary_margin = 2, local_context = NULL) {
   if (!is.data.frame(row) || nrow(row) != 1L)
     stop("Residue evidence expects exactly one residue row.")
   evidence <- list()
@@ -107,6 +202,28 @@ ram_residue_evidence <- function(row, boundary_margin = 2) {
           ifelse((ifelse(is.finite(bond),bond,0)+ifelse(is.finite(angle),angle,0))==1,
                  "","s")),
         "wwPDB")
+
+  if (is.data.frame(local_context) && nrow(local_context)) {
+    label <- function(i) {
+      chain <- as.character(local_context$chain[[i]])
+      number <- local_context$resi[[i]]
+      insertion <- as.character(local_context$insertion_code[[i]])
+      position <- if (is.finite(number))
+        paste0(if(nzchar(chain)) paste0(chain,":") else "",
+               as.integer(number),insertion)
+        else if(nzchar(chain)) chain else "unnumbered"
+      sprintf("%s %s at %.1f Å",
+        local_context$resn[[i]],position,local_context$distance[[i]])
+    }
+    nearby <- paste(vapply(seq_len(nrow(local_context)),label,character(1L)),
+                    collapse="; ")
+    add("info",
+        if(nrow(local_context)==1L) "Nearby non-water hetero residue"
+        else "Nearby non-water hetero residues",
+        paste0(nearby,
+          ". Distances are nearest heavy-atom distances and indicate spatial proximity only, not biochemical binding."),
+        "Local structure context")
+  }
 
   if (!length(evidence))
     return(data.frame(level=character(),title=character(),

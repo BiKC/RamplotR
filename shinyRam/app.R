@@ -3344,6 +3344,26 @@ server <- function(input, output, session) {
     if (!length(ix)) return(NULL)
     data[ix[[1L]], , drop = FALSE]
   })
+  selected_prediction_ensemble_context <- reactive({
+    row <- selected_row()
+    result <- prediction_ensemble_matches()
+    if (is.null(row) || is.null(result) || !is.data.frame(result$summary) ||
+        !nrow(result$summary)) return(NULL)
+    data <- result$summary
+    insertion <- as.character(row$insertion_code[[1L]])
+    if (is.na(insertion)) insertion <- ""
+    ix <- which(
+      as.character(data$chain) == as.character(row$chain[[1L]]) &
+      as.integer(data$resi) == as.integer(row$resi[[1L]]) &
+      as.character(data$insertion_code) == insertion &
+      toupper(as.character(data$resn)) == toupper(as.character(row$resn[[1L]]))
+    )
+    if (!length(ix)) return(NULL)
+    context <- data[ix[[1L]],,drop=FALSE]
+    context$ensemble_models_total <- as.integer(result$analyzed_models)
+    context$ensemble_source <- as.character(result$source)
+    context
+  })
   observe({
     selection <- selected_residue()
     if (!is.null(selection) && is.null(selected_row())) selected_residue(NULL)
@@ -3365,7 +3385,9 @@ server <- function(input, output, session) {
         max_distance=6,max_hits=3L
       )
     }
-    evidence <- ram_residue_evidence(row,local_context=local_context)
+    ensemble_context <- selected_prediction_ensemble_context()
+    evidence <- ram_residue_evidence(
+      row,local_context=local_context,ensemble_context=ensemble_context)
     evidence_item <- function(item) {
       level <- as.character(item$level[[1L]])
       tags$div(class=paste("ram-evidence-item",paste0("ram-evidence-",level)),
@@ -3416,7 +3438,27 @@ server <- function(input, output, session) {
             row$plddt[[1L]] >= 90 &&
             identical(as.character(row$rama8000_region[[1L]]), "Outlier"))
           tags$span(class = "ram-inspector-warning",
-            "High model confidence with a Rama8000 outlier; inspect locally.")
+            "High model confidence with a Rama8000 outlier; inspect locally."),
+        if (!is.null(ensemble_context)) {
+          phi_sd <- suppressWarnings(as.numeric(ensemble_context$phi_sd[[1L]]))
+          psi_sd <- suppressWarnings(as.numeric(ensemble_context$psi_sd[[1L]]))
+          pmean <- if ("plddt_mean" %in% names(ensemble_context))
+            suppressWarnings(as.numeric(ensemble_context$plddt_mean[[1L]]))
+            else NA_real_
+          psd <- if ("plddt_sd" %in% names(ensemble_context))
+            suppressWarnings(as.numeric(ensemble_context$plddt_sd[[1L]]))
+            else NA_real_
+          models <- suppressWarnings(as.integer(
+            ensemble_context$models_present[[1L]]))
+          total <- suppressWarnings(as.integer(
+            ensemble_context$ensemble_models_total[[1L]]))
+          tags$span(class="ram-inspector-plddt",
+            paste0("Prediction ensemble · ",models,"/",total," models",
+              if(is.finite(phi_sd)) sprintf(" · φ SD %.1f°",phi_sd) else "",
+              if(is.finite(psi_sd)) sprintf(" · ψ SD %.1f°",psi_sd) else "",
+              if(is.finite(pmean)) sprintf(" · pLDDT %.1f",pmean) else "",
+              if(is.finite(psd)) sprintf(" ± %.1f",psd) else ""))
+        }
       ),
       tags$details(class="ram-evidence-panel",
         open=if(nrow(evidence)>0L) "open" else NULL,
@@ -3432,7 +3474,7 @@ server <- function(input, output, session) {
               evidence_item(evidence[i,,drop=FALSE])))
         else
           tags$p(class="ram-evidence-none",
-            "No unusual signal is present in the currently available backbone, prediction-confidence or attached official-validation evidence.")
+            "No unusual signal is present in the currently available backbone, prediction-confidence, prediction-ensemble or attached official-validation evidence.")
       )
     )
   })

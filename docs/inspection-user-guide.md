@@ -107,6 +107,8 @@ Above the paired 2D/3D workspace, the **Conformational change explorer** represe
 Use **Find aligned pair** to jump by the true residue number in either
 selected chain (for example 104), then inspect the primary/comparison
 amino acids, φ/ψ angles, wrapped Δφ/Δψ, combined backbone displacement and Rama8000 categories directly below the views.
+
+When either aligned structure carries prediction confidence, comparison keeps that evidence attached to the same residue. The pair inspector and comparison table show pLDDT independently for A and B, the angle-plot hover includes the available pLDDT value, and the filter **High-confidence backbone shift ≥ 30°** finds large local conformational differences where at least one predicted residue has pLDDT ≥90. This is a review/navigation aid: confidence and backbone displacement remain separate measurements and are not collapsed into a combined quality score.
 **Fit both chains** resets the camera without clearing the current
 selection. The shared primary-structure inspector and sequence navigator
 follow the selected primary residue when it is visible under current plot

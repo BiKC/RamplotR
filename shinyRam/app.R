@@ -3856,6 +3856,16 @@ server <- function(input, output, session) {
         if (nzchar(row$chain[[1L]])) paste("Chain", row$chain[[1L]]) else "Chain",
         as.integer(row$resi[[1L]]), row$insertion_code[[1L]],
         row$resn[[1L]])),
+        if ("canonical_status" %in% names(row) &&
+            identical(as.character(row$canonical_status[[1L]]),"mapped"))
+          tags$span(class="ram-inspector-canonical",
+            sprintf("UniProt %s:%d",
+              row$uniprot_accession[[1L]],
+              as.integer(row$uniprot_resi[[1L]]))),
+        if ("canonical_status" %in% names(row) &&
+            identical(as.character(row$canonical_status[[1L]]),"ambiguous"))
+          tags$span(class="ram-inspector-warning",
+            "UniProt mapping ambiguous"),
         tags$span(class = "ram-inspector-classification",
           if (is.na(row$region[[1L]])) "Missing angles" else row$region[[1L]])),
       tags$div(class = "ram-inspector-angles",

@@ -92,6 +92,10 @@ const puppeteer = require("puppeteer-core");
       .classList.contains("is-hidden"));
     const upload=await page.$("#structfile");
     await upload.uploadFile(fixture);
+    await page.waitForFunction(() => {
+      const value=window.Shiny?.shinyapp?.$inputValues?.["structfile:shiny.file"];
+      return value && JSON.stringify(value).length>5;
+    },{timeout:30000});
     // Select prediction provenance through the same visible native dropdown a
     // researcher uses. A Selectize-backed hidden input may silently revert
     // scripted changes and analyse an AF/ESM prediction as experimental.
@@ -108,7 +112,7 @@ const puppeteer = require("puppeteer-core");
     await chooseSource("esmfold");
     await page.waitForFunction(()=>document.getElementById("ram-confidence-sidecars")
       .classList.contains("is-hidden"));
-    await new Promise(done=>setTimeout(done,1300));
+    await new Promise(done=>setTimeout(done,250));
     await page.click("#submit");
     try {
       await page.waitForFunction(() => {

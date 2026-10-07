@@ -1,5 +1,6 @@
 # Run from the repository root: Rscript tests/scientific.R
 source(file.path("shinyRam", "R", "ramachandran.R"))
+source(file.path("shinyRam", "R", "conformation.R"))
 assert <- function(x, msg) if (!isTRUE(x)) stop(msg, call. = FALSE)
 groups <- ram_reference_group(
   c("ALA", "GLY", "PRO", "SER", "THR"),
@@ -30,3 +31,16 @@ assert(isTRUE(all.equal(unname(ranks), c(0, 60, 80))),
 invalid <- try(ram_density_thresholds(list(z = matrix(0, 2, 2))), silent = TRUE)
 assert(inherits(invalid, "try-error"), "Zero-density references must be rejected")
 message("Contour-threshold regression tests passed")
+
+# Coarse backbone states are comparison labels, not validation categories.
+states <- ram_backbone_basin(
+  c(-63,-135,-75,60,0,NA),
+  c(-43,135,145,40,0,0)
+)
+assert(identical(states,
+  c("Alpha-R","Beta","PPII","Alpha-L","Other",NA_character_)),
+  "Backbone-state prototypes or conservative fallback changed")
+assert(identical(ram_backbone_basin(c(179,-179),c(179,-179)),
+                 c("Other","Other")),
+       "Backbone-state distance must remain periodic at the angle seam")
+message("Backbone-state regression tests passed")

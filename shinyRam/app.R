@@ -587,6 +587,7 @@ ui <- fluidPage(
                     class="btn-primary btn-sm"),
                   uiOutput("groupComparisonSummary"),
                   uiOutput("groupComparisonTrack"),
+                  uiOutput("groupComparisonSelectionInfo"),
                   tags$div(class="ram-residue-table",
                     DT::DTOutput("groupComparisonRows")),
                   tags$div(class="ram-ensemble-actions",
@@ -2203,6 +2204,62 @@ server <- function(input, output, session) {
         "aria-label"="Between-group conformational-change track",cells),
       tags$p(class="ram-field-hint",
         "A secondary outline marks residues whose modal Rama8000 category differs between groups. Exact coverage, within-group SD and evidence profile remain available in the table.")
+    )
+  })
+
+  output$groupComparisonSelectionInfo <- renderUI({
+    result <- group_comparison_matches()
+    selection <- selected_residue()
+    if (is.null(result) || is.null(selection)) return(NULL)
+    data <- result$comparison
+    ins <- if(is.null(selection$insertion_code)) "" else
+      as.character(selection$insertion_code)
+    row <- data[
+      as.character(data$chain)==as.character(selection$chain) &
+      as.integer(data$resi)==as.integer(selection$resi) &
+      ifelse(is.na(data$insertion_code),"",as.character(data$insertion_code))==ins,
+      ,drop=FALSE]
+    if(nrow(row)!=1L || !is.finite(row$angular_displacement[[1L]])) return(NULL)
+    fmt_angle <- function(value)
+      if(is.finite(value)) sprintf("%.1f°",value) else "n/a"
+    fmt_pct <- function(value)
+      if(is.finite(value)) sprintf("%.0f%%",100*value) else "n/a"
+    tags$section(class="ram-group-evidence-card",
+      tags$div(class="ram-group-evidence-head",
+        tags$div(
+          tags$strong(sprintf("%s %s:%s%s",row$resn[[1L]],row$chain[[1L]],
+            row$resi[[1L]],
+            ifelse(is.na(row$insertion_code[[1L]]),"",
+              row$insertion_code[[1L]]))),
+          tags$span(row$evidence_profile[[1L]])
+        ),
+        if(isTRUE(row$high_support_shift[[1L]]))
+          tags$span(class="ram-group-evidence-badge","High-support shift")
+      ),
+      tags$div(class="ram-group-evidence-grid",
+        tags$div(tags$small("Between-group shift"),
+          tags$strong(fmt_angle(row$angular_displacement[[1L]])),
+          tags$span(sprintf("Δφ %s · Δψ %s",
+            fmt_angle(row$delta_phi[[1L]]),fmt_angle(row$delta_psi[[1L]])))),
+        tags$div(tags$small("Within-group dispersion"),
+          tags$strong(fmt_angle(row$max_within_group_sd[[1L]])),
+          tags$span("maximum circular SD across both groups")),
+        tags$div(tags$small("Residue coverage"),
+          tags$strong(sprintf("%s / %s",
+            fmt_pct(row$a_coverage[[1L]]),fmt_pct(row$b_coverage[[1L]]))),
+          tags$span(sprintf("%s / %s",result$label_a,result$label_b))),
+        tags$div(tags$small("Rama8000"),
+          tags$strong(sprintf("%s → %s",
+            ifelse(is.na(row$a_rama8000_mode[[1L]]),"n/a",
+              row$a_rama8000_mode[[1L]]),
+            ifelse(is.na(row$b_rama8000_mode[[1L]]),"n/a",
+              row$b_rama8000_mode[[1L]]))),
+          tags$span(if(isTRUE(row$rama8000_mode_changed[[1L]]))
+            "modal category differs between groups"
+            else "modal category retained"))
+      ),
+      tags$p(class="ram-field-hint",
+        "This card explains why the residue is prioritised. It is descriptive evidence, not a statistical significance test.")
     )
   })
 

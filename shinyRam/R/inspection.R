@@ -53,6 +53,8 @@ ram_nearby_hetero_context <- function(pdb, row, max_distance = 6,
   ]
   target <- ram_heavy_atoms(target)
   hetero <- ram_heavy_atoms(hetero)
+  water_names <- c("HOH","WAT","DOD","H2O","SOL","TIP","TIP3","TIP3P")
+  hetero <- hetero[!hetero$resid %in% water_names,,drop=FALSE]
   target <- target[is.finite(target$x)&is.finite(target$y)&is.finite(target$z),
                    ,drop=FALSE]
   hetero <- hetero[is.finite(hetero$x)&is.finite(hetero$y)&is.finite(hetero$z),

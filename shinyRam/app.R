@@ -3373,10 +3373,16 @@ server <- function(input, output, session) {
       standard <- if("rama8000_changes" %in% names(data) &&
                      isTRUE(data$rama8000_changes[[i]]))
         " · Rama8000 category differs across models" else ""
+      basin <- if("basin_changes" %in% names(data) &&
+                  isTRUE(data$basin_changes[[i]]))
+        paste0(" · backbone state differs across models",
+          if("basin_mode" %in% names(data) && !is.na(data$basin_mode[[i]]))
+            paste0(" (mode ",data$basin_mode[[i]],")") else "") else ""
       tags$button(type="button",
         class=paste("ram-ensemble-cell",
           paste0("ram-ensemble-",band[[i]]),
-          if(nzchar(standard)) "has-standard-change" else ""),
+          if(nzchar(standard)) "has-standard-change" else "",
+          if(nzchar(basin)) "has-basin-change" else ""),
         "data-chain"=data$chain[[i]],
         "data-resi"=data$resi[[i]],
         "data-insertion"=data$insertion_code[[i]],
@@ -3384,7 +3390,7 @@ server <- function(input, output, session) {
           if(is.finite(spread[[i]])) sprintf("%.1f°",spread[[i]]) else "N/A",
           if("plddt_mean" %in% names(data) && is.finite(data$plddt_mean[[i]]))
             sprintf(" · mean pLDDT %.1f",data$plddt_mean[[i]]) else "",
-          standard),
+          basin,standard),
         "aria-label"=paste("Inspect",label,"from prediction ensemble")
       )
     })
@@ -3400,8 +3406,10 @@ server <- function(input, output, session) {
         tags$span(class="ram-ensemble-moderate","5–15°"),
         tags$span(class="ram-ensemble-variable","15–30°"),
         tags$span(class="ram-ensemble-high","≥30°"),
+        tags$span(class="ram-ensemble-basin-mark",
+          "double outline = backbone-state disagreement"),
         tags$span(class="ram-ensemble-standard-mark",
-          "outline = Rama8000 disagreement"))
+          "inner outline = Rama8000 disagreement"))
     )
   })
 
@@ -3789,6 +3797,11 @@ server <- function(input, output, session) {
           psd <- if ("plddt_sd" %in% names(ensemble_context))
             suppressWarnings(as.numeric(ensemble_context$plddt_sd[[1L]]))
             else NA_real_
+          basin_mode <- if ("basin_mode" %in% names(ensemble_context))
+            as.character(ensemble_context$basin_mode[[1L]]) else NA_character_
+          basin_consistency <- if ("basin_consistency" %in% names(ensemble_context))
+            suppressWarnings(as.numeric(ensemble_context$basin_consistency[[1L]]))
+            else NA_real_
           models <- suppressWarnings(as.integer(
             ensemble_context$models_present[[1L]]))
           total <- suppressWarnings(as.integer(
@@ -3797,6 +3810,9 @@ server <- function(input, output, session) {
             paste0("Prediction ensemble · ",models,"/",total," models",
               if(is.finite(phi_sd)) sprintf(" · φ SD %.1f°",phi_sd) else "",
               if(is.finite(psi_sd)) sprintf(" · ψ SD %.1f°",psi_sd) else "",
+              if(!is.na(basin_mode)) paste0(" · state ",basin_mode) else "",
+              if(is.finite(basin_consistency))
+                sprintf(" %.0f%% agreement",100*basin_consistency) else "",
               if(is.finite(pmean)) sprintf(" · pLDDT %.1f",pmean) else "",
               if(is.finite(psd)) sprintf(" ± %.1f",psd) else ""))
         }

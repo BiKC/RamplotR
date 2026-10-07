@@ -173,6 +173,17 @@ ram_group_conformation_compare <- function(reference, group_a, group_b,
   }
   out$max_within_group_sd <- max_finite(
     out$a_phi_sd,out$a_psi_sd,out$b_phi_sd,out$b_psi_sd)
+  n_a <- length(group_a)
+  n_b <- length(group_b)
+  out$a_coverage <- pmin(out$a_phi_models,out$a_psi_models) / max(1L,n_a)
+  out$b_coverage <- pmin(out$b_phi_models,out$b_psi_models) / max(1L,n_b)
+  out$min_group_coverage <- pmin(out$a_coverage,out$b_coverage)
+  out$min_rama8000_consistency <- pmin(
+    out$a_rama8000_consistency,out$b_rama8000_consistency,na.rm=TRUE)
+  out$min_rama8000_consistency[
+    !is.finite(out$a_rama8000_consistency) |
+    !is.finite(out$b_rama8000_consistency)] <- NA_real_
+
   enough <- out$a_phi_models>=2 & out$a_psi_models>=2 &
             out$b_phi_models>=2 & out$b_psi_models>=2
   out$consistent_shift <- enough &
@@ -180,12 +191,27 @@ ram_group_conformation_compare <- function(reference, group_a, group_b,
     out$angular_displacement>=30 &
     is.finite(out$max_within_group_sd) &
     out$max_within_group_sd<=15
+  out$high_support_shift <- out$consistent_shift &
+    is.finite(out$min_group_coverage) & out$min_group_coverage>=0.75 &
+    (is.na(out$min_rama8000_consistency) |
+      out$min_rama8000_consistency>=0.75)
   out$rama8000_mode_changed <- !is.na(out$a_rama8000_mode) &
     !is.na(out$b_rama8000_mode) &
     out$a_rama8000_mode != out$b_rama8000_mode
+
+  out$evidence_profile <- ifelse(
+    !is.finite(out$angular_displacement),"Unavailable",
+    ifelse(out$min_group_coverage<0.75,"Sparse coverage",
+      ifelse(out$angular_displacement>=30 &
+               is.finite(out$max_within_group_sd) &
+               out$max_within_group_sd<=15,
+             "Low-dispersion shift",
+        ifelse(out$angular_displacement>=30,"Large but variable",
+          ifelse(out$angular_displacement>=15,"Moderate shift","Small shift")))))
   out$group_a <- label_a
   out$group_b <- label_b
-  out[order(-as.integer(out$consistent_shift),
+  out[order(-as.integer(out$high_support_shift),
+            -as.integer(out$consistent_shift),
             -replace(out$angular_displacement,
                      !is.finite(out$angular_displacement),-Inf),
             out$chain,out$resi,out$insertion_code),,drop=FALSE]

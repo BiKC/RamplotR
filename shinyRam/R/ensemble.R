@@ -166,6 +166,13 @@ ram_ensemble_summary <- function(models) {
 
   ph <- calc(phi); ps <- calc(psi)
   native <- mode_and_consistency(region)
+  basin <- NULL
+  if (exists("ram_backbone_basin", mode="function")) {
+    basin_matrix <- matrix(NA_character_,nrow=n,ncol=nmodels)
+    for(i in seq_len(nmodels))
+      basin_matrix[,i] <- ram_backbone_basin(phi[,i],psi[,i])
+    basin <- mode_and_consistency(basin_matrix)
+  }
   out <- data.frame(info,
     models_present=as.integer(rowSums(membership)),
     phi_models=as.integer(rowSums(is.finite(phi))),
@@ -177,6 +184,13 @@ ram_ensemble_summary <- function(models) {
     region_mode=native$mode,
     changes_class=!is.na(native$consistency) & native$consistency<1,
     stringsAsFactors=FALSE,check.names=FALSE)
+
+  if (!is.null(basin)) {
+    out$basin_models <- basin$count
+    out$basin_consistency <- basin$consistency
+    out$basin_mode <- basin$mode
+    out$basin_changes <- !is.na(basin$consistency) & basin$consistency<1
+  }
 
   if(optional_all("rama8000_region")) {
     standard <- get("rama8000_region","character")
@@ -208,7 +222,9 @@ ram_ensemble_summary <- function(models) {
                  replace(out$psi_sd,is.na(out$psi_sd),0))
   standard_change <- if("rama8000_changes" %in% names(out))
     as.integer(out$rama8000_changes) else rep(0L,nrow(out))
-  out[order(-standard_change,-as.integer(out$changes_class),-spread,
+  basin_change <- if("basin_changes" %in% names(out))
+    as.integer(out$basin_changes) else rep(0L,nrow(out))
+  out[order(-basin_change,-standard_change,-as.integer(out$changes_class),-spread,
             out$chain,out$resi,out$insertion_code),,drop=FALSE]
 }
 

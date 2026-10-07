@@ -963,8 +963,8 @@ server <- function(input, output, session) {
     }
   }, ignoreInit=TRUE)
 
-  observeEvent(input$compareSwap, {
-    req(isTRUE(input$compareSwap > 0),loaded(),comparison_loaded())
+  observeEvent(input$ramCompareSwap, {
+    req(!is.null(input$ramCompareSwap),loaded(),comparison_loaded())
     compare_swapped(!isTRUE(isolate(compare_swapped())))
     selected_comparison(NULL)
   },ignoreInit=FALSE)

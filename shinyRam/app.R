@@ -934,6 +934,100 @@ server <- function(input, output, session) {
     })
   }, ignoreInit = TRUE)
 
+  # Canonical UniProt coordinates are an additive annotation. PDB author
+  # numbering remains the local coordinate system used by selection and NGL.
+  # Public PDB entries request SIFTS mappings client-side so Shinylive keeps
+  # working without a server HTTP dependency. AlphaFold DB models already use
+  # the requested UniProt sequence numbering.
+  observeEvent(loaded(), {
+    structure <- loaded()
+    canonical_segments(ram_canonical_empty_segments())
+    canonical_mapping(ram_canonical_empty_map())
+    request_id <- isolate(canonical_request()) + 1L
+    canonical_request(request_id)
+
+    if (is.null(structure)) {
+      canonical_status(NULL)
+      return()
+    }
+    if (identical(structure$input_source,"afdb") &&
+        !is.null(structure$uniprot_accession)) {
+      mapping <- tryCatch(
+        ram_afdb_canonical_map(structure$torsions,
+                               structure$uniprot_accession),
+        error=function(e) {
+          canonical_status(list(state="error",
+            message=conditionMessage(e)))
+          NULL
+        }
+      )
+      if (!is.null(mapping)) {
+        canonical_mapping(mapping)
+        canonical_status(list(
+          state="mapped",source="AlphaFold DB",
+          mapped_residues=nrow(mapping),
+          accessions=unique(mapping$uniprot_accession)
+        ))
+      }
+      return()
+    }
+    if (identical(structure$input_source,"pdb") &&
+        !is.null(structure$pdb_accession)) {
+      canonical_status(list(state="searching",source="PDBe SIFTS",
+        pdb_id=structure$pdb_accession))
+      session$sendCustomMessage("ram-canonical-map",list(
+        request_id=as.character(request_id),
+        pdb_id=structure$pdb_accession
+      ))
+      return()
+    }
+    canonical_status(list(state="unavailable",
+      message="Canonical mapping is not inferred automatically for uploaded structures."))
+  },ignoreInit=TRUE)
+
+  observeEvent(input$ramCanonicalMapping, {
+    value <- input$ramCanonicalMapping
+    if (!is.list(value) || is.null(value$request_id)) return()
+    if (!identical(as.character(value$request_id),
+                   as.character(isolate(canonical_request())))) return()
+    structure <- isolate(loaded())
+    if (is.null(structure) || !identical(structure$input_source,"pdb"))
+      return()
+    if (!is.null(value$pdb_id) &&
+        !identical(toupper(as.character(value$pdb_id)),
+                   toupper(as.character(structure$pdb_accession)))) return()
+
+    if (!identical(as.character(value$state),"ok")) {
+      canonical_status(list(state="error",source="PDBe SIFTS",
+        message=if(is.null(value$message)) "Canonical mapping unavailable."
+          else as.character(value$message)))
+      return()
+    }
+
+    segments <- tryCatch(
+      ram_sifts_normalize_segments(value$segments,
+                                   pdb_id=structure$pdb_accession),
+      error=function(e) {
+        canonical_status(list(state="error",source="PDBe SIFTS",
+          message=conditionMessage(e)))
+        NULL
+      }
+    )
+    if (is.null(segments)) return()
+    mapping <- ram_sifts_expand_safe(segments)
+    canonical_segments(segments)
+    canonical_mapping(mapping)
+    canonical_status(list(
+      state=if(nrow(mapping)) "mapped" else "partial",
+      source="PDBe SIFTS",
+      endpoint=if(is.null(value$endpoint)) "" else as.character(value$endpoint),
+      segments=nrow(segments),
+      safe_segments=sum(segments$safe_linear,na.rm=TRUE),
+      mapped_residues=nrow(mapping),
+      accessions=unique(segments$uniprot_accession)
+    ))
+  },ignoreInit=TRUE)
+
   # Comparison loading is a separate, deliberate action, so changing plot
   # settings does not repeatedly refetch the secondary structure. The helper is
   # shared by the manual Compare tab and prediction-to-experiment discovery.
@@ -1203,6 +1297,7 @@ server <- function(input, output, session) {
     if(!is.null(official) && identical(official$key,structure$key))
       result <- ram_external_validation_join(result,official$records,
                                                model=current_model())
+    result <- ram_canonical_join(result,canonical_mapping())
     result
   })
   displayed <- reactive({

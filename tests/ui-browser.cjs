@@ -768,6 +768,7 @@ const assert = require("node:assert/strict");
       const select=document.getElementById("compareChainB");
       const models=window.getNGLStructure && window.getNGLStructure("NGLCompare");
       return select && models && models.length===2 &&
+        models[0].structure.atomCount!==models[1].structure.atomCount &&
         [...select.options].some(option=>option.value==="C");
     },{timeout:30000});
     await page.evaluate(() => {

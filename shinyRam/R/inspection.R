@@ -226,6 +226,10 @@ ram_residue_evidence <- function(row, boundary_margin = 2, local_context = NULL,
     standard_changes <- isTRUE(ensemble_value("rama8000_changes",FALSE))
     standard_consistency <- suppressWarnings(as.numeric(
       ensemble_value("rama8000_consistency",NA_real_)))
+    basin_changes <- isTRUE(ensemble_value("basin_changes",FALSE))
+    basin_consistency <- suppressWarnings(as.numeric(
+      ensemble_value("basin_consistency",NA_real_)))
+    basin_mode <- as.character(ensemble_value("basin_mode",NA_character_))
 
     if (is.finite(spread) && spread >= 20 && is.finite(plddt_mean) &&
         plddt_mean >= 90) {
@@ -248,6 +252,21 @@ ram_residue_evidence <- function(row, boundary_margin = 2, local_context = NULL,
           sprintf(paste0(
             "The largest circular SD across phi/psi is %.1f degrees across ",
             "the analysed prediction models."),spread),
+          "Prediction ensemble")
+    }
+
+    if (basin_changes) {
+      add("warning","Prediction models choose different backbone states",
+          if (is.finite(basin_consistency))
+            sprintf(paste0(
+              "Only %.1f%% of models with finite phi/psi occupy the modal ",
+              "coarse backbone state%s. This state label is a comparison aid, ",
+              "not a secondary-structure assignment."),
+              100*basin_consistency,
+              if(!is.na(basin_mode)) paste0(" (",basin_mode,")") else "")
+          else paste0(
+            "The prediction models occupy different coarse backbone states. ",
+            "These labels are comparison aids, not secondary-structure assignments."),
           "Prediction ensemble")
     }
 

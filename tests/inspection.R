@@ -173,6 +173,29 @@ quiet_row$wwpdb_clashes <- 0; quiet_row$wwpdb_bond_outliers <- 0
 quiet_row$wwpdb_angle_outliers <- 0
 assert(nrow(ram_residue_evidence(quiet_row))==0L,
        "Unremarkable residues should not receive artificial warnings.")
+
+ensemble_context <- data.frame(
+  models_present=4L,ensemble_models_total=5L,
+  phi_sd=34,psi_sd=12,
+  rama8000_changes=TRUE,rama8000_consistency=0.75,
+  plddt_mean=94,plddt_sd=12,
+  stringsAsFactors=FALSE
+)
+ensemble_ev <- ram_residue_evidence(
+  quiet_row,ensemble_context=ensemble_context)
+assert(all(c(
+  "High-confidence predictions disagree on local backbone",
+  "Rama8000 category differs across prediction models",
+  "Prediction confidence varies across ensemble",
+  "Residue is absent from some prediction models"
+) %in% ensemble_ev$title),
+  "Prediction ensemble evidence should explain geometry, standard-category, confidence and coverage disagreement.")
+assert(ensemble_ev$title[[1L]]==
+         "High-confidence predictions disagree on local backbone",
+       "High-confidence backbone disagreement should be prioritised.")
+assert(all(ensemble_ev$source=="Prediction ensemble"),
+       "Ensemble-derived evidence must retain its source.")
+
 missing_row <- quiet_row
 missing_row$phi <- NA_real_
 missing_ev <- ram_residue_evidence(missing_row)

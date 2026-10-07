@@ -96,7 +96,8 @@ ram_nearby_hetero_context <- function(pdb, row, max_distance = 6,
   head(result,max(1L,as.integer(max_hits)))
 }
 
-ram_residue_evidence <- function(row, boundary_margin = 2, local_context = NULL) {
+ram_residue_evidence <- function(row, boundary_margin = 2, local_context = NULL,
+                                 ensemble_context = NULL) {
   if (!is.data.frame(row) || nrow(row) != 1L)
     stop("Residue evidence expects exactly one residue row.")
   evidence <- list()
@@ -202,6 +203,78 @@ ram_residue_evidence <- function(row, boundary_margin = 2, local_context = NULL)
           ifelse((ifelse(is.finite(bond),bond,0)+ifelse(is.finite(angle),angle,0))==1,
                  "","s")),
         "wwPDB")
+
+  if (is.data.frame(ensemble_context) && nrow(ensemble_context)==1L) {
+    ensemble_value <- function(name, default=NA) {
+      if (!name %in% names(ensemble_context) ||
+          !length(ensemble_context[[name]])) return(default)
+      ensemble_context[[name]][[1L]]
+    }
+    phi_sd <- suppressWarnings(as.numeric(ensemble_value("phi_sd",NA_real_)))
+    psi_sd <- suppressWarnings(as.numeric(ensemble_value("psi_sd",NA_real_)))
+    finite_spread <- c(phi_sd,psi_sd)
+    finite_spread <- finite_spread[is.finite(finite_spread)]
+    spread <- if(length(finite_spread)) max(finite_spread) else NA_real_
+    plddt_mean <- suppressWarnings(as.numeric(
+      ensemble_value("plddt_mean",NA_real_)))
+    plddt_sd <- suppressWarnings(as.numeric(
+      ensemble_value("plddt_sd",NA_real_)))
+    models_present <- suppressWarnings(as.integer(
+      ensemble_value("models_present",NA_integer_)))
+    total_models <- suppressWarnings(as.integer(
+      ensemble_value("ensemble_models_total",NA_integer_)))
+    standard_changes <- isTRUE(ensemble_value("rama8000_changes",FALSE))
+    standard_consistency <- suppressWarnings(as.numeric(
+      ensemble_value("rama8000_consistency",NA_real_)))
+
+    if (is.finite(spread) && spread >= 20 && is.finite(plddt_mean) &&
+        plddt_mean >= 90) {
+      add("high","High-confidence predictions disagree on local backbone",
+          sprintf(paste0(
+            "Across the prediction ensemble, the largest circular backbone ",
+            "SD is %.1f degrees while mean pLDDT is %.1f. The models are ",
+            "individually confident but do not converge on one local ",
+            "backbone conformation."),spread,plddt_mean),
+          "Prediction ensemble")
+    } else if (is.finite(spread) && spread >= 30) {
+      add("warning","Strong prediction-ensemble backbone disagreement",
+          sprintf(paste0(
+            "The largest circular SD across phi/psi is %.1f degrees. This ",
+            "describes disagreement between prediction models or seeds, not ",
+            "experimental molecular motion."),spread),
+          "Prediction ensemble")
+    } else if (is.finite(spread) && spread >= 15) {
+      add("info","Moderate prediction-ensemble backbone variation",
+          sprintf(paste0(
+            "The largest circular SD across phi/psi is %.1f degrees across ",
+            "the analysed prediction models."),spread),
+          "Prediction ensemble")
+    }
+
+    if (standard_changes) {
+      add("warning","Rama8000 category differs across prediction models",
+          if (is.finite(standard_consistency))
+            sprintf("Only %.1f%% of classified ensemble models share the modal Rama8000 category at this residue.",
+                    100*standard_consistency)
+          else "The prediction models do not all share the same Rama8000 category at this residue.",
+          "Prediction ensemble")
+    }
+
+    if (is.finite(plddt_sd) && plddt_sd >= 10) {
+      add("info","Prediction confidence varies across ensemble",
+          sprintf("pLDDT has an SD of %.1f across the contributing prediction models.",
+                  plddt_sd),
+          "Prediction ensemble")
+    }
+
+    if (is.finite(models_present) && is.finite(total_models) &&
+        total_models > 0L && models_present < total_models) {
+      add("info","Residue is absent from some prediction models",
+          sprintf("%d of %d analysed models contain this exact chain/residue/insertion/amino-acid identity.",
+                  models_present,total_models),
+          "Prediction ensemble")
+    }
+  }
 
   if (is.data.frame(local_context) && nrow(local_context)) {
     label <- function(i) {

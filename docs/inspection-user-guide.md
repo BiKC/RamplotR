@@ -38,6 +38,15 @@ Each item identifies its source and explains why it may be worth examining.
 If none of the available evidence is unusual, the panel says so explicitly
 rather than inventing a warning.
 
+After a **prediction ensemble** has been analysed, the inspector also adds
+model-to-model evidence for the selected residue. It can flag strong circular
+phi/psi spread, Rama8000 category disagreement, variable pLDDT, or incomplete
+residue coverage across models. A useful discordant case is high mean pLDDT
+combined with substantial backbone spread: the predictions are individually
+confident but do not converge on one local backbone conformation. Ensemble
+spread remains prediction uncertainty/heterogeneity and is never presented as
+experimental molecular motion.
+
 This is an **inspection aid**, not a residue-quality score. A Rama8000
 classification, prediction confidence, local geometry and an official wwPDB
 annotation remain scientifically distinct observations.

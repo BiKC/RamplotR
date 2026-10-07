@@ -52,21 +52,38 @@ Wrapping is performed independently across the -180/180-degree boundary.
 The combined backbone shift is a **navigation effect size**, not a statistical
 significance score and not a Cartesian distance.
 
-## Consistent-shift marker
+## Evidence profile and support markers
 
-A residue is highlighted as a low-dispersion consistent shift when:
+RamplotR keeps the between-group effect and the evidence supporting it
+separate. Every residue reports:
 
-- both groups contribute at least two finite phi and psi observations;
-- the between-group combined shift is at least 30 degrees; and
-- the largest within-group circular SD across phi and psi is at most 15
-  degrees.
+- the combined wrapped backbone shift;
+- the maximum within-group circular SD across phi and psi;
+- the fraction of structures in each group contributing both phi and psi;
+- the minimum within-group Rama8000 modal-category consistency;
+- an evidence profile.
 
-These thresholds intentionally identify residues worth inspecting. They do not
-establish a biological effect or a p-value. The exact group means, angular
-differences and within-group dispersion remain visible in the table.
+The evidence profile is deliberately descriptive:
 
-A second marker indicates when the modal Rama8000 category differs between the
-two groups.
+- **Small shift**: <15 degrees;
+- **Moderate shift**: 15--30 degrees;
+- **Large but variable**: >=30 degrees without low within-group dispersion;
+- **Low-dispersion shift**: >=30 degrees with maximum within-group SD <=15 degrees;
+- **Sparse coverage**: fewer than 75% of structures in either group contribute
+  both angles;
+- **Unavailable**: no comparable finite group means.
+
+A residue receives the stronger **high-support shift** marker only when it is
+a low-dispersion shift, both groups have at least 75% residue coverage, and
+the Rama8000 modal category is at least 75% consistent within each group when
+that information is available.
+
+These thresholds are transparent navigation criteria, not a hypothesis test,
+p-value or claim of biological significance. The exact group means, angular
+differences, coverage and within-group dispersion remain visible in the table.
+
+A separate marker indicates when the modal Rama8000 category differs between
+the two groups.
 
 ## Interpretation
 
@@ -108,7 +125,8 @@ Unit tests cover:
 - rejection of unrelated chains at explicit thresholds;
 - circular means across +179/-179 degrees;
 - wrapped between-group differences;
-- low-dispersion consistent-shift detection;
+- low-dispersion and high-support shift detection;
+- sparse-coverage downgrading;
 - Rama8000 modal-category changes.
 
 The browser test additionally compares 1CRN against an identical uploaded

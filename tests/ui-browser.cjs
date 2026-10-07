@@ -761,8 +761,8 @@ const assert = require("node:assert/strict");
     await page.waitForFunction(expected => {
       const file=document.getElementById("compareFile")?.files?.[0];
       const shiny=window.Shiny?.shinyapp?.$inputValues?.["compareFile:shiny.file"];
-      const uploaded=Array.isArray(shiny) ? shiny[0] : shiny;
-      return file?.name===expected && uploaded?.name===expected;
+      return file?.name===expected &&
+        JSON.stringify(shiny || "").includes(expected);
     },{timeout:20000},"1BBB.pdb");
     await page.click("#compareSubmit");
     await page.waitForFunction(() => {
@@ -826,8 +826,8 @@ const assert = require("node:assert/strict");
     await page.waitForFunction(expected => {
       const file=document.getElementById("compareFile")?.files?.[0];
       const shiny=window.Shiny?.shinyapp?.$inputValues?.["compareFile:shiny.file"];
-      const uploaded=Array.isArray(shiny) ? shiny[0] : shiny;
-      return file?.name===expected && uploaded?.name===expected;
+      return file?.name===expected &&
+        JSON.stringify(shiny || "").includes(expected);
     },{timeout:20000},"1D3Z.pdb");
     await page.click("#compareSubmit");
     await page.waitForSelector("#compareModel",{timeout:30000});

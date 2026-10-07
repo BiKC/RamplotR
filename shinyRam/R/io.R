@@ -1,4 +1,17 @@
 # Parse structure input independently of the Shiny interface.
+ram_nonwater_hetero_atoms <- function(atoms) {
+  if (!is.data.frame(atoms) || !nrow(atoms) || !"type" %in% names(atoms))
+    return(if (is.data.frame(atoms)) atoms[0,,drop=FALSE] else data.frame())
+  type <- toupper(trimws(as.character(atoms$type)))
+  resid <- if ("resid" %in% names(atoms))
+    toupper(trimws(as.character(atoms$resid))) else rep("",nrow(atoms))
+  waters <- c("HOH","WAT","DOD","H2O","SOL","TIP","TIP3","TIP3P")
+  keep <- type %in% c("HETATM","HET") & !resid %in% waters
+  if (all(c("x","y","z") %in% names(atoms)))
+    keep <- keep & is.finite(atoms$x) & is.finite(atoms$y) & is.finite(atoms$z)
+  atoms[keep,,drop=FALSE]
+}
+
 ram_detect_format <- function(filename) {
   if (!is.character(filename) || length(filename) != 1L ||
       is.na(filename) || !nzchar(filename)) {
@@ -19,28 +32,55 @@ ram_load_structure <- function(path = NULL, original_name = NULL,
     if (format == "pdb") {
       structure <- read_pdb(path, multi = TRUE, rm.insert = FALSE, rm.alt = FALSE,
                             ATOM.only = TRUE, verbose = FALSE)
+      # Keep the analysis atom table protein-only, but retain non-water HETATM
+      # records separately for residue-level spatial context. This avoids
+      # changing backbone/model bookkeeping while making ligands/cofactors/ions
+      # available to the inspector.
+      full_structure <- tryCatch(
+        read_pdb(path, multi = TRUE, rm.insert = FALSE, rm.alt = FALSE,
+                 ATOM.only = FALSE, verbose = FALSE),
+        error = function(e) NULL
+      )
+      structure$hetero_atom <- if (is.null(full_structure))
+        structure$atom[0,,drop=FALSE]
+        else ram_nonwater_hetero_atoms(full_structure$atom)
+      structure$hetero_context_model <- 1L
     } else {
       structure <- read_cif(path, multi = TRUE, rm.insert = FALSE, rm.alt = FALSE,
                             verbose = FALSE)
+      structure$hetero_atom <- ram_nonwater_hetero_atoms(structure$atom)
+      structure$hetero_context_model <- 1L
     }
   } else {
     if (!is.character(pdb_id) || length(pdb_id) != 1L ||
         is.na(pdb_id) || !grepl("^[[:alnum:]]{4}$", pdb_id)) {
       stop("Enter a valid four-character PDB accession.")
     }
-    structure <- tryCatch(
-      read_cif(pdb_id, multi = TRUE, rm.insert = FALSE, rm.alt = FALSE, verbose = FALSE),
-      error = function(cif_error) {
-        tryCatch(
+    structure <- tryCatch({
+      value <- read_cif(pdb_id, multi = TRUE, rm.insert = FALSE, rm.alt = FALSE,
+                        verbose = FALSE)
+      value$hetero_atom <- ram_nonwater_hetero_atoms(value$atom)
+      value$hetero_context_model <- 1L
+      value
+    }, error = function(cif_error) {
+      tryCatch({
+        value <- read_pdb(pdb_id, multi = TRUE, rm.insert = FALSE, rm.alt = FALSE,
+                          ATOM.only = TRUE, verbose = FALSE)
+        full_value <- tryCatch(
           read_pdb(pdb_id, multi = TRUE, rm.insert = FALSE, rm.alt = FALSE,
-                   ATOM.only = TRUE, verbose = FALSE),
-          error = function(pdb_error) {
-            stop(sprintf("Could not retrieve %s: %s",
-                         pdb_id, conditionMessage(pdb_error)), call. = FALSE)
-          }
+                   ATOM.only = FALSE, verbose = FALSE),
+          error = function(e) NULL
         )
-      }
-    )
+        value$hetero_atom <- if (is.null(full_value))
+          value$atom[0,,drop=FALSE]
+          else ram_nonwater_hetero_atoms(full_value$atom)
+        value$hetero_context_model <- 1L
+        value
+      }, error = function(pdb_error) {
+        stop(sprintf("Could not retrieve %s: %s",
+                     pdb_id, conditionMessage(pdb_error)), call. = FALSE)
+      })
+    })
   }
   if (!is.list(structure) || !is.data.frame(structure$atom) ||
       nrow(structure$atom) == 0L) {

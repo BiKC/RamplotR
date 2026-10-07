@@ -35,7 +35,7 @@ ram_canonical_empty_map <- function() {
 ram_uniprot_accession <- function(accession) {
   value <- toupper(trimws(as.character(accession)))
   if (length(value)!=1L || is.na(value) || !nzchar(value) ||
-      !grepl("^[A-Z0-9]{6,12}(?:-[1-9][0-9]*)?$",value))
+      !grepl("^[A-Z0-9]{6,12}(-[1-9][0-9]*)?$",value))
     stop("Expected a UniProt accession or isoform accession.",call.=FALSE)
   value
 }
@@ -128,6 +128,10 @@ ram_sifts_normalize_segments <- function(segments,pdb_id="") {
   if (is.data.frame(segments)) {
     rows <- lapply(seq_len(nrow(segments)),function(i)
       as.list(segments[i,,drop=FALSE]))
+  } else if (is.list(segments) &&
+             !is.null(names(segments)) &&
+             "uniprot_accession" %in% names(segments)) {
+    rows <- list(segments)
   } else if (is.list(segments) &&
              all(vapply(segments,is.list,logical(1L)))) {
     rows <- segments

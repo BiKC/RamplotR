@@ -758,18 +758,25 @@ const assert = require("node:assert/strict");
     // swapping reverses NGL source order rather than only changing labels.
     await (await page.$("#compareFile")).uploadFile(
       path.resolve("benchmarks/output/ui-preview/1BBB.pdb"));
-    await page.waitForFunction(expected => {
-      const field=document.getElementById("compareFile");
-      const shiny=window.Shiny?.shinyapp?.$inputValues?.["compareFile:shiny.file"];
-      return field?.files?.[0]?.name===expected &&
-        shiny?.name===expected;
-    },{timeout:15000},"1BBB.pdb");
-    await page.click("#compareSubmit");
-    // Wait first for the server-side comparison object to expose the new
-    // structure's chains, then separately for NGL's asynchronous reload.
+    await page.waitForFunction(expected =>
+      document.getElementById("compareFile")?.files?.[0]?.name===expected,
+      {timeout:10000},"1BBB.pdb");
+    // Shiny uploads the local file asynchronously. Wait until its progress
+    // widget is idle before submitting instead of inspecting private
+    // Shiny input-value internals, which vary between Shiny versions.
+    await new Promise(resolve => setTimeout(resolve, 400));
     await page.waitForFunction(() => {
+      const progress=document.getElementById("compareFile_progress");
+      return !progress || getComputedStyle(progress).display==="none";
+    },{timeout:20000});
+    await page.click("#compareSubmit");
+    // Chain controls are server-rendered from comparison_loaded(), so this
+    // proves the new file—not the previous 1CRN upload—has been parsed.
+    await page.waitForFunction(() => {
+      const controls=document.querySelector(".ram-compare-chains");
       const select=document.getElementById("compareChainB");
-      return select && [...select.options].some(option=>option.value==="C");
+      return controls?.textContent.includes("1BBB") && select &&
+        [...select.options].some(option=>option.value==="C");
     },{timeout:30000});
     await page.waitForFunction(() => {
       const models=window.getNGLStructure && window.getNGLStructure("NGLCompare");
@@ -827,12 +834,14 @@ const assert = require("node:assert/strict");
     // primary after a role swap. Preserve that user choice across rerenders.
     await (await page.$("#compareFile")).uploadFile(
       path.resolve("benchmarks/output/ui-preview/1D3Z.pdb"));
-    await page.waitForFunction(expected => {
-      const field=document.getElementById("compareFile");
-      const shiny=window.Shiny?.shinyapp?.$inputValues?.["compareFile:shiny.file"];
-      return field?.files?.[0]?.name===expected &&
-        shiny?.name===expected;
-    },{timeout:15000},"1D3Z.pdb");
+    await page.waitForFunction(expected =>
+      document.getElementById("compareFile")?.files?.[0]?.name===expected,
+      {timeout:10000},"1D3Z.pdb");
+    await new Promise(resolve => setTimeout(resolve, 400));
+    await page.waitForFunction(() => {
+      const progress=document.getElementById("compareFile_progress");
+      return !progress || getComputedStyle(progress).display==="none";
+    },{timeout:20000});
     await page.click("#compareSubmit");
     await page.waitForSelector("#compareModel",{timeout:30000});
     await page.evaluate(() => {

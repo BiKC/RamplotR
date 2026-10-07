@@ -1,4 +1,5 @@
 # Run from repository root: Rscript tests/group-comparison.R
+source(file.path("shinyRam","R","conformation.R"))
 source(file.path("shinyRam","R","inspection.R"))
 source(file.path("shinyRam","R","ensemble.R"))
 source(file.path("shinyRam","R","group-comparison.R"))
@@ -63,6 +64,21 @@ assert(isTRUE(r1$high_support_shift) &&
        "Fully covered low-dispersion shifts should receive a high-support evidence profile.")
 assert(isTRUE(r1$rama8000_mode_changed),
        "Different standard-validation modes should remain visible.")
+
+assert(all(c("a_basin_mode","b_basin_mode","basin_mode_changed") %in% names(cmp)),
+       "Group comparisons must retain modal backbone states for both groups.")
+
+state_reference <- make_chain("A",c(-63,-63,-63),c(-43,-43,-43))
+state_a1 <- make_chain("A",c(-63,-63,-63),c(-43,-43,-43))
+state_a2 <- make_chain("A",c(-65,-61,-64),c(-41,-45,-42))
+state_b1 <- make_chain("A",c(-135,-63,-63),c(135,-43,-43))
+state_b2 <- make_chain("A",c(-133,-62,-65),c(137,-44,-42))
+state_cmp <- ram_group_conformation_compare(
+  state_reference,list(state_a1,state_a2),list(state_b1,state_b2),"apo","holo")
+state_r1 <- state_cmp[state_cmp$resi==1L,,drop=FALSE]
+assert(state_r1$a_basin_mode=="Alpha-R" && state_r1$b_basin_mode=="Beta" &&
+       isTRUE(state_r1$basin_mode_changed),
+       "Group comparison must flag a modal backbone-state transition.")
 
 
 sparse_a <- prepared_a$models

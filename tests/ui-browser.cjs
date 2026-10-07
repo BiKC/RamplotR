@@ -821,18 +821,33 @@ const assert = require("node:assert/strict");
     }));
 
     await swapPage.click("#compareSwap");
-    await swapPage.waitForFunction(expected => {
+    await swapPage.waitForFunction(() => {
       const status=document.querySelector(".ram-compare-swap-state")?.textContent || "";
-      const components=window.getNGLStructure &&
-        window.getNGLStructure("NGLCompare");
       return status.includes("Roles swapped") &&
         document.getElementById("compareModel")?.value==="2" &&
         document.querySelector('label[for="compareModel"]')?.textContent
-          .includes("currently Primary") &&
-        components && components.length===2 &&
-        components[0].structure.atomCount===expected[1] &&
-        components[1].structure.atomCount===expected[0];
-    },{timeout:45000},swapBefore.atoms);
+          .includes("currently Primary");
+    },{timeout:20000});
+    try {
+      await swapPage.waitForFunction(expected => {
+        const components=window.getNGLStructure &&
+          window.getNGLStructure("NGLCompare");
+        return components && components.length===2 &&
+          components[0].structure.atomCount===expected[1] &&
+          components[1].structure.atomCount===expected[0];
+      },{timeout:35000},swapBefore.atoms);
+    } catch(error) {
+      const state=await swapPage.evaluate(() => ({
+        status:document.querySelector(".ram-compare-swap-state")?.textContent || "",
+        model:document.getElementById("compareModel")?.value || "",
+        modelLabel:document.querySelector('label[for="compareModel"]')?.textContent || "",
+        atoms:(window.getNGLStructure &&
+          window.getNGLStructure("NGLCompare") || [])
+          .map(component=>component.structure.atomCount)
+      }));
+      console.error("SWAP NGL DIAGNOSTICS",JSON.stringify(state));
+      throw error;
+    }
     await swapPage.waitForFunction(() =>
       document.querySelectorAll(".ram-change-cell").length>0,
       {timeout:18000});
@@ -845,18 +860,20 @@ const assert = require("node:assert/strict");
     },{timeout:18000});
 
     await swapPage.click("#compareSwap");
-    await swapPage.waitForFunction(expected => {
+    await swapPage.waitForFunction(() => {
       const status=document.querySelector(".ram-compare-swap-state")?.textContent || "";
-      const components=window.getNGLStructure &&
-        window.getNGLStructure("NGLCompare");
       return status.includes("Loaded structure is primary") &&
         document.getElementById("compareModel")?.value==="2" &&
         document.querySelector('label[for="compareModel"]')?.textContent
-          .includes("currently Comparison") &&
-        components && components.length===2 &&
+          .includes("currently Comparison");
+    },{timeout:20000});
+    await swapPage.waitForFunction(expected => {
+      const components=window.getNGLStructure &&
+        window.getNGLStructure("NGLCompare");
+      return components && components.length===2 &&
         components[0].structure.atomCount===expected[0] &&
         components[1].structure.atomCount===expected[1];
-    },{timeout:45000},swapBefore.atoms);
+    },{timeout:35000},swapBefore.atoms);
     await swapPage.screenshot({
       path:"benchmarks/output/ui-preview/compare-swapped.png",fullPage:true
     });

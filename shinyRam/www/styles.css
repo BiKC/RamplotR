@@ -472,8 +472,8 @@ body > .container-fluid { max-width: none; padding: 0; }
 
 /* Comparison is optional; keep the primary workflow compact. */
 .ram-compare-source {
-  display:grid; grid-template-columns:minmax(190px,235px) minmax(180px,1fr) auto;
-  align-items:end; gap:14px;
+  display:grid; grid-template-columns:minmax(190px,235px) minmax(180px,1fr) auto auto;
+  align-items:end; gap:10px 14px;
   border:1px solid #e1eae8; border-radius:10px;
   background:#f8fbfa; padding:15px; margin:14px 0;
 }
@@ -483,8 +483,12 @@ body > .container-fluid { max-width: none; padding: 0; }
   background:#eef4f2; padding:8px 12px 8px 30px; font-size:11px; }
 .ram-compare-source .radio-inline:has(input:checked) { color:#155b62;
   background:#d9ede8; }
-.ram-compare-source .btn-primary { padding:10px 14px; font-weight:700;
-  border-radius:8px; background:#126e74; border-color:#126e74; }
+.ram-compare-source .btn-primary,
+.ram-compare-source .btn-default { padding:10px 14px; font-weight:700;
+  border-radius:8px; white-space:nowrap; }
+.ram-compare-source .btn-primary { background:#126e74; border-color:#126e74; }
+.ram-compare-source .btn-default { background:#fff; border-color:#bed5d1;
+  color:#285b62; }
 .ram-compare-source .is-hidden { display:none; }
 .ram-compare-chains { display:flex; flex-wrap:wrap; gap:12px; margin:12px 0;
   align-items:flex-end; }

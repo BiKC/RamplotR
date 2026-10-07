@@ -2538,11 +2538,15 @@ server <- function(input, output, session) {
               tags$p(class="ram-field-hint",
                 "AF3 files are paired by their official seed/sample filename stem: *_model.cif ↔ *_confidences.json ↔ optional *_summary_confidences.json. Upload order is ignored.")
             ),
-            conditionalPanel(
-              condition="input.predictionEnsembleSource !== 'alphafold3'",
-              checkboxInput("includeLoadedPrediction",
-                paste("Include currently loaded model:",structure$name),value=TRUE)
-            ),
+            if(!identical(structure$declared_source,"alphafold3"))
+              conditionalPanel(
+                condition="input.predictionEnsembleSource !== 'alphafold3'",
+                checkboxInput("includeLoadedPrediction",
+                  paste("Include currently loaded model:",structure$name),value=TRUE)
+              )
+            else
+              tags$p(class="ram-field-hint",
+                "The currently loaded AlphaFold 3 model is not auto-included in another ensemble type. Upload it again with its matching full-confidence JSON when analysing an AF3 sample set."),
             actionButton("calculatePredictionEnsemble",
               "Analyse prediction ensemble",class="btn-primary btn-sm")
           ),

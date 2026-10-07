@@ -634,6 +634,7 @@
 
   let comparisonRows = null;
   let comparisonSelectedId = null;
+  let comparisonOverlayIndices = [2, 3];
   function compareSelectedPoint(side) {
     if (!comparisonRows || comparisonSelectedId == null)
       return { x: [], y: [] };
@@ -646,17 +647,19 @@
       { x: [phi], y: [psi] } : { x: [], y: [] };
   }
   function emphasizeComparison() {
-    if (!comparePlot || !window.Plotly || !comparePlot.data ||
-        comparePlot.data.length < 4) return;
+    if (!comparePlot || !window.Plotly || !comparePlot.data) return;
     const a = compareSelectedPoint("a"), b = compareSelectedPoint("b");
+    const ia = comparisonOverlayIndices[0], ib = comparisonOverlayIndices[1];
+    if (!Number.isInteger(ia) || !Number.isInteger(ib) ||
+        comparePlot.data.length <= Math.max(ia, ib)) return;
     window.Plotly.restyle(comparePlot, {
       x: [a.x], y: [a.y],
       customdata: [a.x.length ? [[Number(comparisonSelectedId), "a"]] : []]
-    }, [2]);
+    }, [ia]);
     window.Plotly.restyle(comparePlot, {
       x: [b.x], y: [b.y],
       customdata: [b.x.length ? [[Number(comparisonSelectedId), "b"]] : []]
-    }, [3]);
+    }, [ib]);
   }
 
   function onComparePlotClick(event) {
@@ -726,20 +729,44 @@
         hovertemplate:"%{text}<extra>" + escapeText(name) + "</extra>",
         marker:{color:color,size:8,opacity:.82,symbol:symbol}};
     };
-    const traces = [
+    const frame = obj && obj.matrix;
+    const limits = array(obj && obj.limits);
+    const shades = array(obj && obj.backgroundColors);
+    const traces = [];
+    if (frame && frame.x && frame.y && frame.z && limits.length >= 3) {
+      const background = [
+        safeColor(shades[0], "#FFF8ED"),
+        safeColor(shades[1], "#D4ECE7"),
+        safeColor(shades[2], "#7DB9B5"),
+        safeColor(shades[3], "#126E74")
+      ];
+      traces.push(
+        contourTrace(frame, "<", limits[2], background[1]),
+        contourTrace(frame, "<", limits[1], background[2]),
+        contourTrace(frame, "<", limits[0], background[3]),
+        contourTrace(frame, ">", limits[2], background[0])
+      );
+    }
+    traces.push(
       makeTrace("a",aPhi,aPsi,String(obj.nameA || "Primary"),"#CE6A4D","circle"),
-      makeTrace("b",bPhi,bPsi,String(obj.nameB || "Comparison"),"#317E9A","diamond"),
+      makeTrace("b",bPhi,bPsi,String(obj.nameB || "Comparison"),"#317E9A","diamond")
+    );
+    comparisonOverlayIndices = [traces.length,traces.length+1];
+    traces.push(
       {type:"scattergl",mode:"markers",showlegend:false,hoverinfo:"skip",
        x:[],y:[],marker:{color:"#ffc04a",size:17,opacity:.95,
                            line:{color:"#623c17",width:2}}},
       {type:"scattergl",mode:"markers",showlegend:false,hoverinfo:"skip",
        x:[],y:[],marker:{color:"#83e6f5",size:17,opacity:.95,
                            symbol:"diamond",line:{color:"#174958",width:2}}}
-    ];
+    );
     // Overlay markers retain the same aligned-pair identity when clicked.
     const index = ids.findIndex(id => Number(id) === Number(comparisonSelectedId));
     if (comparisonSelectedId != null && index >= 0) {
-      for (const [side, trace] of [["a",traces[2]],["b",traces[3]]]) {
+      for (const [side,traceIndex] of [
+        ["a",comparisonOverlayIndices[0]],["b",comparisonOverlayIndices[1]]
+      ]) {
+        const trace = traces[traceIndex];
         const p = compareSelectedPoint(side);
         trace.x = p.x; trace.y = p.y;
         trace.customdata = p.x.length ? [[Number(ids[index]),side]] : [];
@@ -754,6 +781,11 @@
       xaxis:Object.assign({},axis,{title:"Phi (°)"}),
       yaxis:Object.assign({},axis,{title:"Psi (°)",scaleanchor:"x",scaleratio:1}),
       legend:{orientation:"h",y:1.13,x:0},
+      annotations: obj.backgroundName ? [{
+        x:1,y:-0.16,xref:"paper",yref:"paper",xanchor:"right",
+        showarrow:false,font:{size:10,color:"#6b7f84"},
+        text:"Background: " + escapeText(String(obj.backgroundName))
+      }] : [],
       height:Math.min(650,Math.max(410,comparePlot.clientWidth+45))
     },{responsive:true,displaylogo:false})).then(function () {
       if (typeof comparePlot.on === "function" && !comparePlot.__ramCompareBound) {

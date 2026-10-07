@@ -298,6 +298,19 @@ const puppeteer = require("puppeteer-core");
     await page.waitForFunction(() =>
       document.querySelector("#selectedResidueInfo strong"),
       {timeout:15000});
+    await page.waitForFunction(() => {
+      const panel=document.querySelector(
+        "#selectedResidueInfo .ram-evidence-panel");
+      return panel &&
+        panel.textContent.includes("Prediction confidence varies across ensemble") &&
+        panel.textContent.includes("Prediction ensemble");
+    },{timeout:15000});
+    const inspectorEnsemble=await page.$eval(
+      "#selectedResidueInfo .ram-inspector-angles",
+      node=>node.textContent);
+    assert.ok(inspectorEnsemble.includes("Prediction ensemble") &&
+              inspectorEnsemble.includes("2/2 models"),
+      "Selected residue should expose its ensemble coverage and variability in the shared inspector.");
     await page.screenshot({
       path:path.join(output,"prediction-ensemble.png"),fullPage:true
     });

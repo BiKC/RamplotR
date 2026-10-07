@@ -154,3 +154,10 @@ Record the software version, reference dataset, background, classification mode,
 - `node tests/ui-browser.cjs`: live Shiny browser workflow, plot-to-NGL/table/sequence selection, default palette, responsive sizing and pairwise self-comparison.
 
 Scientific tests run on Ubuntu and Windows; full-browser checks run on Ubuntu. For changes that affect validation criteria or reference grids, the scientific regression tests must remain unchanged or include explicitly reviewed new reference fixtures.
+
+
+### Comparison background and role swapping
+
+The aligned-angle plot uses the same selected RamplotR density background and contour palette as the individual plot.
+
+**Swap primary ↔ comparison** reverses A/B roles without reloading either structure. Chain selectors, angle-difference direction, colours, residue navigation and 3D superposition follow the swap, while the globally loaded structure and its external/prediction context remain unchanged.

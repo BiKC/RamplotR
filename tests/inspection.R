@@ -93,6 +93,22 @@ assert(is.na(ram_comparison_find(pair,"b","A",999L)),
 deletion <- ram_compare_torsions(ref, ref[-2,,drop=FALSE])
 assert(sum(deletion$alignment=="Deletion")==1L, "Expected deletion")
 assert(any(!is.na(pair$delta_phi)), "Aligned angles should be comparable")
+pred_a <- ref
+pred_b <- ref
+pred_a$plddt <- c(95,80,72,60)
+pred_b$plddt <- c(75,82,92,60)
+pred_a$confidence_category <- c("Very high","Confident","Confident","Low")
+pred_b$confidence_category <- c("Confident","Confident","Very high","Low")
+confidence_pair <- ram_compare_torsions(pred_a,pred_b)
+assert(isTRUE(all.equal(confidence_pair$delta_plddt,c(-20,2,20,0))) &&
+       identical(confidence_pair$confidence_changed,
+                 c(TRUE,FALSE,TRUE,FALSE)),
+       "Pairwise prediction confidence differences changed.")
+mixed_pair <- ram_compare_torsions(ref,pred_b)
+assert(all(is.na(mixed_pair$plddt_a)) &&
+       identical(mixed_pair$plddt_b,pred_b$plddt) &&
+       all(is.na(mixed_pair$delta_plddt)),
+       "Experimental-vs-predicted comparison must keep missing confidence missing.")
 assert(inherits(try(ram_align_residues(ref,other,max_cells=2),
                     silent=TRUE),"try-error"), "Bounded alignments")
 empty <- ram_sequence_data(a[0,,drop=FALSE])

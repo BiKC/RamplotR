@@ -5,11 +5,12 @@
 
 ## Current baseline
 
-- Current `main` baseline: `9681c8c4132b9201185ee512e86f69e8a4664ecf` (PR #43 merged).
+- Current `main` baseline: `24c498738fabf256d7049ac32e8e5b22a6af8677` (PR #44 merged).
 - Manuscript work remains separate on `arxiv-preprint` / PR #20.
 - The roadmap deliberately focuses RamplotR on backbone conformation, predicted-model confidence and comparative structural analysis rather than recreating a full MolProbity/Phenix validation suite.
 - PR #43 — Compare workflow progressive-disclosure polish — is merged.
-- Active implementation branch: `chore/post-compare-responsive-audit` for post-merge laptop/mobile regression coverage only.
+- PR #44 — post-merge mobile Compare regression audit — is merged and green; no CSS changes were required.
+- There are currently **no active implementation PRs**.
 - Manuscript PR #20 remains open separately.
 
 ## Roadmap features already merged
@@ -57,17 +58,18 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 
 ## Active work
 
-- `chore/post-compare-responsive-audit` — responsive regression audit after PR #43.
-  - do not change scientific calculations;
-  - verify Compare at normal laptop width and narrow/mobile width;
-  - add browser assertions/screenshots for layout, swap accessibility and overflow;
-  - only patch CSS if the browser regression demonstrates a concrete responsive defect.
+- No active implementation branch or PR.
+- The integrated Compare workflow is covered at desktop/laptop and 390x844 mobile widths.
+- Before starting anything new, inspect open/recent PRs and branch names to avoid rebuilding merged work.
 
 ## Next implementation steps
 
-1. Complete the post-merge Compare responsive audit and merge only if its browser/scientific workflows are green.
-2. Re-read this worklog and inspect open/recent PRs before starting another feature; merged feature branches must not be reused as active work.
-3. Synchronize the manuscript only after the implementation/UI settles.
+1. Re-read this worklog and inspect open/recent PRs before starting another feature; merged feature branches must not be reused as active work.
+2. Synchronize the manuscript with the now-settled implementation/UI.
+   - Describe current Rama8000 standard validation, not old/native outlier interpretations.
+   - Include Conformational Change Explorer, prediction ensembles (including AF3 samples), experimental counterpart discovery, residue evidence/context, group comparison, alignment-quality reporting and pLDDT comparison.
+   - Position RamplotR around residue-centred backbone comparison, predicted-model confidence and linked structural context.
+3. Only add a new scientific feature after identifying a concrete remaining user/research gap not already covered above.
    - Describe current Rama8000 standard validation, not old/native outlier interpretations.
    - Position RamplotR around residue-centred backbone comparison, predicted-model confidence and linked structural context.
 

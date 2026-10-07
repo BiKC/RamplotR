@@ -101,6 +101,8 @@ ram_batch_run <- function(options,repo_root=".") {
         classified, file.path(repo_root,"shinyRam","static","rama8000"))
       diagnostic <- ram_extra_geometry(selected,backbone)
       classified <- ram_join_geometry(classified,diagnostic)
+      if(exists("ram_protein_blocks",mode="function"))
+        classified <- ram_protein_blocks(classified)
       if(options$prediction_source!="experimental") {
         confidence <- ram_prediction_from_atoms(selected,backbone,
                                                   options$prediction_source)

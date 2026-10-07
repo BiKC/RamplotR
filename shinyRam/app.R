@@ -2701,11 +2701,12 @@ server <- function(input, output, session) {
   observeEvent(input$calculatePredictionEnsemble, {
     structure <- req(loaded())
     source <- req(input$predictionEnsembleSource)
-    permitted <- c("alphafold2","esmfold","other_prediction")
+    permitted <- c("alphafold2","alphafold3","esmfold","other_prediction")
     if(!source %in% permitted) return()
 
     uploaded <- input$predictionEnsembleFiles
     include_loaded <- isTRUE(input$includeLoadedPrediction) &&
+      !identical(source,"alphafold3") &&
       !identical(structure$declared_source,"alphafold3")
     source_loaded <- if(identical(structure$declared_source,"alphafold_db"))
       "alphafold2" else structure$declared_source
@@ -2719,7 +2720,29 @@ server <- function(input, output, session) {
       return()
     }
 
-    file_count <- if(is.null(uploaded)) 0L else nrow(uploaded)
+    af3_pairs <- NULL
+    if(identical(source,"alphafold3")) {
+      confidences <- input$predictionEnsembleConfidenceFiles
+      summaries <- input$predictionEnsembleSummaryFiles
+      af3_pairs <- tryCatch(
+        ram_af3_pair_files(
+          model_names=if(is.null(uploaded)) character() else uploaded$name,
+          model_paths=if(is.null(uploaded)) character() else uploaded$datapath,
+          confidence_names=if(is.null(confidences)) character() else confidences$name,
+          confidence_paths=if(is.null(confidences)) character() else confidences$datapath,
+          summary_names=if(is.null(summaries)) character() else summaries$name,
+          summary_paths=if(is.null(summaries)) character() else summaries$datapath
+        ),
+        error=function(e) {
+          showNotification(conditionMessage(e),type="error",duration=16)
+          NULL
+        }
+      )
+      if(is.null(af3_pairs)) return()
+    }
+
+    file_count <- if(identical(source,"alphafold3")) nrow(af3_pairs) else
+      if(is.null(uploaded)) 0L else nrow(uploaded)
     if(file_count + as.integer(include_loaded) < 2L) {
       showNotification(
         "A prediction ensemble needs at least two models. Upload another model or include the loaded prediction.",
@@ -2731,8 +2754,12 @@ server <- function(input, output, session) {
       pdbs <- list()
       labels <- character()
       hashes <- character()
+      confidence_hashes <- character()
+      summary_hashes <- character()
       structure_models <- integer()
       input_roles <- character()
+      sidecars <- character()
+      summary_files <- character()
 
       if(include_loaded) {
         selected_model <- current_model()
@@ -2746,40 +2773,59 @@ server <- function(input, output, session) {
              length(structure$source_id)==1L &&
              file.exists(structure$source_id))
             unname(tools::md5sum(structure$source_id)) else NA_character_)
+        confidence_hashes <- c(confidence_hashes,NA_character_)
+        summary_hashes <- c(summary_hashes,NA_character_)
         structure_models <- c(structure_models,selected_model)
         input_roles <- c(input_roles,"loaded")
       }
 
       if(file_count) {
         for(i in seq_len(file_count)) {
+          model_name <- if(identical(source,"alphafold3"))
+            af3_pairs$model_name[[i]] else uploaded$name[[i]]
+          model_path <- if(identical(source,"alphafold3"))
+            af3_pairs$model_path[[i]] else uploaded$datapath[[i]]
           incProgress(0.35/max(1L,file_count),
-            detail=paste("Loading",uploaded$name[[i]]))
+            detail=paste("Loading",model_name))
           model <- tryCatch(
-            ram_load_structure(
-              path=uploaded$datapath[[i]],
-              original_name=uploaded$name[[i]]
-            ),
+            ram_load_structure(path=model_path,original_name=model_name),
             error=function(e) e
           )
           if(inherits(model,"error")) {
             showNotification(
-              paste(uploaded$name[[i]],conditionMessage(model),sep=": "),
+              paste(model_name,conditionMessage(model),sep=": "),
               type="error",duration=14)
             return()
           }
           if(ram_model_count(model)!=1L) {
             showNotification(
-              paste(uploaded$name[[i]],
+              paste(model_name,
                 "contains multiple structural models. Prediction-ensemble uploads must contain one model per file."),
               type="error",duration=14)
             return()
           }
           pdbs[[length(pdbs)+1L]] <- model
           labels <- c(labels,
-            tools::file_path_sans_ext(basename(uploaded$name[[i]])))
-          hashes <- c(hashes,unname(tools::md5sum(uploaded$datapath[[i]])))
+            if(identical(source,"alphafold3")) af3_pairs$label[[i]]
+            else tools::file_path_sans_ext(basename(model_name)))
+          hashes <- c(hashes,unname(tools::md5sum(model_path)))
           structure_models <- c(structure_models,1L)
-          input_roles <- c(input_roles,"uploaded")
+          input_roles <- c(input_roles,
+            if(identical(source,"alphafold3")) "uploaded-af3" else "uploaded")
+          if(identical(source,"alphafold3")) {
+            confidence_path <- af3_pairs$confidence_path[[i]]
+            summary_path <- af3_pairs$summary_path[[i]]
+            sidecars <- c(sidecars,confidence_path)
+            summary_files <- c(summary_files,summary_path)
+            confidence_hashes <- c(confidence_hashes,
+              unname(tools::md5sum(confidence_path)))
+            summary_hashes <- c(summary_hashes,
+              if(nzchar(summary_path)) unname(tools::md5sum(summary_path))
+              else NA_character_)
+          } else {
+            confidence_hashes <- c(confidence_hashes,NA_character_)
+            summary_hashes <- c(summary_hashes,NA_character_)
+          }
         }
       }
 
@@ -2794,6 +2840,8 @@ server <- function(input, output, session) {
       result <- tryCatch(
         ram_prediction_ensemble_analyze(
           pdbs,source=source,labels=labels,max_models=30L,
+          sidecars=if(identical(source,"alphafold3")) sidecars else NULL,
+          summary_files=if(identical(source,"alphafold3")) summary_files else NULL,
           classifier=function(torsions) {
             classified <- ram_classify_torsions(
               torsions,
@@ -2812,12 +2860,15 @@ server <- function(input, output, session) {
         }
       )
       if(is.null(result)) return()
+      n_used <- result$analyzed_models
       result$provenance <- data.frame(
         model=result$labels,
         source=result$source,
-        input_role=input_roles[seq_len(result$analyzed_models)],
-        structure_model=structure_models[seq_len(result$analyzed_models)],
-        coordinate_md5=hashes[seq_len(result$analyzed_models)],
+        input_role=input_roles[seq_len(n_used)],
+        structure_model=structure_models[seq_len(n_used)],
+        coordinate_md5=hashes[seq_len(n_used)],
+        confidence_md5=confidence_hashes[seq_len(n_used)],
+        summary_md5=summary_hashes[seq_len(n_used)],
         stringsAsFactors=FALSE
       )
       prediction_ensemble_results(list(

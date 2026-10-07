@@ -11,19 +11,28 @@ not experimental evidence that a protein moves between those conformations.
 
 ## Supported inputs
 
-The first implementation accepts one coordinate file per model for:
+RamplotR accepts one coordinate file per model for:
 
 - AlphaFold 2 / ColabFold;
+- AlphaFold 3 sample sets;
 - ESMFold;
 - other prediction models that store pLDDT in the B-factor field.
 
-The currently loaded compatible prediction can optionally be included as one
-ensemble member.
+For AF2/ColabFold, ESMFold and compatible B-factor predictions, the currently
+loaded prediction can optionally be included as one ensemble member.
 
-AlphaFold 3 is intentionally excluded from automatic ensemble confidence
-analysis for now. AF3 confidence is atom/token based and needs its matching
-confidence JSON sidecar; RamplotR does not silently reinterpret an AF3 model as
-AF2.
+For **AlphaFold 3**, upload the sample coordinate files together with the
+matching full-confidence JSON files. RamplotR pairs files by the official
+seed/sample filename stem, not by upload order:
+
+- `*_model.cif`;
+- `*_confidences.json`;
+- optional `*_summary_confidences.json`.
+
+Every AF3 model must have exactly one matching full-confidence JSON. Missing,
+duplicate or ambiguous pairs are rejected. The currently loaded AF3 model is
+not silently added because its original sidecar path is not assumed to remain
+available.
 
 Each uploaded file must contain exactly one structural model. Up to 30 models
 are analysed per run.
@@ -83,7 +92,14 @@ The model summary records:
 - Rama8000 outlier count;
 - mean and minimum pLDDT;
 - declared prediction source;
-- coordinate-file MD5 hash when available.
+- coordinate-file MD5 hash when available;
+- for AF3 samples, pTM, ipTM, ranking score, disordered fraction and clash flag;
+- for AF3 samples, hashes of the matched full-confidence and optional summary
+  confidence files.
+
+AF3 model-level ranking metrics are retained as provenance and comparison
+context. They do **not** alter the residue-level φ/ψ variability, pLDDT spread
+or Rama8000 agreement.
 
 The two downloadable CSV files therefore preserve both residue-level ensemble
 results and model-level provenance.
@@ -114,7 +130,8 @@ as separate measurements.
 ## Current limitations
 
 - models are matched by residue identity rather than sequence realignment;
-- AF3 multi-model confidence sidecars are not yet supported;
+- AF3 sample pairing currently requires the standard filename suffixes so
+  sample identity can be established without guessing;
 - ensemble members are not superposed or clustered in 3D yet;
 - the current map summarizes local backbone variability, not global domain
   motion;

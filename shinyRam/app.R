@@ -664,6 +664,7 @@ server <- function(input, output, session) {
   selected_residue <- reactiveVal(NULL)
   selected_comparison <- reactiveVal(NULL)
   compare_swapped <- reactiveVal(FALSE)
+  compare_swap_chains <- reactiveVal(NULL)
   viewer_ready <- reactiveVal(FALSE)
   current_model <- reactive({
     value <- input$modelChoice
@@ -925,6 +926,7 @@ server <- function(input, output, session) {
       preferred_chain_b=preferred_chain_b
     ))
     compare_swapped(FALSE)
+    compare_swap_chains(NULL)
     TRUE
   }
 
@@ -952,6 +954,9 @@ server <- function(input, output, session) {
 
   observeEvent(input$compareSwap, {
     req(comparison_loaded(), loaded())
+    old_a <- isolate(input$compareChainA)
+    old_b <- isolate(input$compareChainB)
+    compare_swap_chains(list(a=old_b,b=old_a))
     compare_swapped(!isTRUE(isolate(compare_swapped())))
     selected_comparison(NULL)
   }, ignoreInit=TRUE)
@@ -970,11 +975,16 @@ server <- function(input, output, session) {
       else comparison$preferred_chain_a
     preferred_second <- if (swapped) comparison$preferred_chain_a
       else comparison$preferred_chain_b
-    selected_a <- if (!is.null(preferred_first) &&
-                      preferred_first %in% first_chains)
+    pending <- compare_swap_chains()
+    selected_a <- if (!is.null(pending) && !is.null(pending$a) &&
+                      pending$a %in% first_chains)
+      pending$a else if (!is.null(preferred_first) &&
+                         preferred_first %in% first_chains)
       preferred_first else first_chains[[1L]]
-    selected_b <- if (!is.null(preferred_second) &&
-                      preferred_second %in% second_chains)
+    selected_b <- if (!is.null(pending) && !is.null(pending$b) &&
+                      pending$b %in% second_chains)
+      pending$b else if (!is.null(preferred_second) &&
+                         preferred_second %in% second_chains)
       preferred_second else second_chains[[1L]]
 
     tags$div(class="ram-compare-chains",

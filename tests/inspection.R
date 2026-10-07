@@ -66,8 +66,17 @@ ref <- data.frame(
 )
 other <- rbind(ref[1,,drop=FALSE], transform(ref[1,,drop=FALSE],
   resn="ASP",resi=88L,phi=-110,psi=85), ref[2:4,,drop=FALSE])
+ref$plddt <- c(96,82,55,NA)
+ref$confidence_category <- c("Very high","Confident","Low","Unavailable")
 pair <- ram_compare_torsions(ref,other)
 assert(nrow(pair)==5L, "Alignment should preserve inserted residues")
+assert(isTRUE(all.equal(pair$plddt_a[c(1,3,4)],c(96,82,55))) &&
+       all(is.na(pair$plddt_b)),
+       "Prediction confidence must follow aligned residues without being invented for the partner.")
+assert(isTRUE(pair$high_confidence_shift[[1L]]) ==
+       (is.finite(pair$angular_displacement[[1L]]) &&
+        pair$angular_displacement[[1L]]>=30),
+       "High-confidence shift flag must require both a large shift and pLDDT >=90.")
 assert(sum(pair$alignment=="Insertion")==1L, "Expected insertion")
 assert(identical(ram_comparison_find(pair,"a","A",2L), 3L),
   "Find the primary residue by exact PDB numbering")

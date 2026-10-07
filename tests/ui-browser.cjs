@@ -850,13 +850,17 @@ const assert = require("node:assert/strict");
     await page.waitForFunction(() =>
       document.querySelector(".ram-compare-swap-state")?.textContent
         .includes("Roles swapped") &&
-      document.getElementById("compareModel")?.value==="2",
+      document.getElementById("compareModel")?.value==="2" &&
+      document.querySelector('label[for="compareModel"]')?.textContent
+        .includes("currently Primary"),
       {timeout:25000});
     await page.click("#compareSwap");
     await page.waitForFunction(() =>
       document.querySelector(".ram-compare-swap-state")?.textContent
         .includes("Loaded structure is primary") &&
-      document.getElementById("compareModel")?.value==="2",
+      document.getElementById("compareModel")?.value==="2" &&
+      document.querySelector('label[for="compareModel"]')?.textContent
+        .includes("currently Comparison"),
       {timeout:25000});
     await page.screenshot({
       path:"benchmarks/output/ui-preview/compare-self.png",fullPage:true

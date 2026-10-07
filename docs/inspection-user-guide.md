@@ -120,6 +120,14 @@ Use **Find aligned pair** to jump by the true residue number in either
 selected chain (for example 104), then inspect the primary/comparison
 amino acids, φ/ψ angles, wrapped Δφ/Δψ, combined backbone displacement and Rama8000 categories directly below the views.
 
+The same selected-pair card also reports nearby non-water hetero residues
+for **both** structures when model-appropriate coordinates are available.
+This is useful for apo/holo, cofactor-bound or ion-associated comparisons:
+for example, a local backbone shift can be inspected alongside an ATP or
+metal ion present on only one side. Distances are minimum heavy-atom
+distances within 6 Å and are explicitly structural proximity, not evidence
+of biochemical binding.
+
 Use **Swap primary ↔ comparison** when the second structure should become the
 coral primary reference for the comparison. This reverses the A/B chain
 controls, angle traces, superposition roles and paired-residue navigation

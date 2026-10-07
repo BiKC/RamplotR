@@ -736,6 +736,25 @@ const assert = require("node:assert/strict");
         document.querySelector(".ram-compare-selection-pair");
     }, {timeout:18000});
     await page.$eval("#compareJumpResidue", input => {
+      input.value = "10";
+      input.dispatchEvent(new Event("input",{bubbles:true}));
+      input.dispatchEvent(new Event("change",{bubbles:true}));
+    });
+    await page.click("#compareJump");
+    await page.waitForFunction(() => {
+      const panel=document.querySelector(".ram-compare-local-context");
+      return panel && panel.textContent.includes("Primary local context") &&
+        panel.textContent.includes("LIG L:401") &&
+        panel.textContent.includes("Comparison local context") &&
+        panel.textContent.includes("No non-water hetero residue within 6 Å");
+    },{timeout:18000});
+    const compareContext=await page.$eval(".ram-compare-local-context",
+      node=>node.textContent);
+    assert.ok(compareContext.includes("Proximity is structural context") &&
+              compareContext.includes("not evidence of biochemical binding"),
+      "Comparison hetero context must remain explicitly descriptive.");
+
+    await page.$eval("#compareJumpResidue", input => {
       input.value = "12";
       input.dispatchEvent(new Event("input",{bubbles:true}));
       input.dispatchEvent(new Event("change",{bubbles:true}));

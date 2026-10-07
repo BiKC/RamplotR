@@ -1110,6 +1110,17 @@ body > .container-fluid { max-width: none; padding: 0; }
   font-size:11px; font-weight:750; font-variant-numeric:tabular-nums; }
 .ram-compare-selection-deltas .ram-compare-change { color:#994c33;
   background:#fff0e8; border-color:#efd0bd; }
+.ram-compare-local-context { flex:1 1 100%; display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px 12px;
+  padding-top:10px; border-top:1px solid #d9e8e5; }
+.ram-compare-context-side { display:grid; gap:3px; min-width:0;
+  padding:9px 10px; border-radius:8px; background:#fff; border:1px solid #dbe8e5;
+  color:#426168; font-size:10px; line-height:1.4; }
+.ram-compare-context-side strong { color:#225760; font-size:10px;
+  text-transform:uppercase; letter-spacing:.035em; }
+.ram-compare-context-muted { color:#7b8e92; font-style:italic; }
+.ram-compare-context-note { grid-column:1/-1; margin:0; color:#72868b;
+  font-size:9px; line-height:1.4; }
 
 /* Numbers are fixed above the letters. pLDDT is a *separate* strip/score,
    never the same fill as Ramachandran classification. */
@@ -1172,6 +1183,7 @@ body > .container-fluid { max-width: none; padding: 0; }
   .ram-compare-card { padding:9px; }
   .ram-compare-toolbar { padding:10px; }
   .ram-compare-selection { padding:11px; }
+  .ram-compare-local-context { grid-template-columns:1fr; }
   .ram-sequence-chain-heading { flex-wrap:wrap; }
   .ram-sequence-jump { margin-left:0; }
   .ram-sequence-scroll-hint { display:none; }

@@ -291,15 +291,6 @@
   }
 
   document.addEventListener("click", function (event) {
-    const button = event.target && event.target.closest &&
-      event.target.closest("#compareSwap");
-    if (!button || !window.Shiny || !window.Shiny.setInputValue) return;
-    window.Shiny.setInputValue("ramCompareSwap", {
-      nonce: Date.now()
-    }, { priority: "event" });
-  });
-
-  document.addEventListener("click", function (event) {
     const target = event.target && event.target.closest &&
       event.target.closest(".ram-change-pick");
     if (!target) return;

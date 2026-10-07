@@ -90,8 +90,9 @@ const puppeteer = require("puppeteer-core");
       'input[name="inputSource"][value="upload"]').click());
     await page.waitForFunction(()=>!document.getElementById("ram-upload-wrap")
       .classList.contains("is-hidden"));
-    // Set provenance before selecting the file so the reactive upload panel
-    // cannot replace the selected File object after Puppeteer attaches it.
+    // Set provenance *before* selecting a file. Changing this reactive input
+    // after upload can rebuild the upload controls and discard the browser's
+    // selected File object before Shiny has transferred it.
     async function chooseSource(value) {
       const settings=await page.$("#ram-prediction-upload");
       const opened=await page.evaluate(el=>el.open,settings);
@@ -111,6 +112,8 @@ const puppeteer = require("puppeteer-core");
       const input=document.getElementById("structfile");
       return input && input.files && input.files.length===1;
     },{timeout:10000});
+    // With provenance stable, Shiny can finish the upload without the file
+    // input being replaced by a reactive re-render.
     await new Promise(done=>setTimeout(done,1800));
     await page.click("#submit");
     try {

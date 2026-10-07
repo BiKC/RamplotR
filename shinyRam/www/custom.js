@@ -818,6 +818,11 @@
       comparisonSelectedId = choice && !choice.clear ? Number(choice.rowId) : null;
       emphasizeComparison();
     });
+    window.Shiny.addCustomMessageHandler("ram-compare-source-state", function (message) {
+      const panel = document.getElementById("ram-compare-source-panel");
+      if (!panel || !message || typeof message.open !== "boolean") return;
+      panel.open = message.open;
+    });
     window.Shiny.addCustomMessageHandler("ram-selection", function (choice) {
       selectedResidue = choice && !choice.clear ? choice : null;
       const inspector = document.querySelector(".ram-global-inspector");

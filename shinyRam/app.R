@@ -488,43 +488,52 @@ ui <- fluidPage(
                   tags$div(tags$h2("Compare protein conformations"),
                     tags$p("Align one chain from each structure by amino-acid sequence. Compare angles and classifications, not residue numbers alone."))
                 ),
-                tags$div(class = "ram-compare-source",
-                  radioButtons("compareInputSource", "Comparison input",
-                    choices = c("PDB accession" = "pdb", "Uploaded file" = "upload"),
-                    selected = "pdb", inline = TRUE),
-                  tags$div(id = "ram-compare-pdb", textInput(
-                    "comparePDB", "Second structure", value = "1CRN",
-                    placeholder = "e.g. 1CRN")),
-                  tags$div(id = "ram-compare-upload", class = "is-hidden",
-                    fileInput("compareFile", "Second PDB/mmCIF file",
-                      accept = c(".pdb", ".ent", ".cif", ".mmcif", ".mcif")),
-                    selectInput("comparePredictionSource",
-                      "Comparison structure type",
-                      choices=c(
-                        "Experimental / unknown"="experimental",
-                        "AlphaFold 2 / ColabFold"="alphafold2",
-                        "AlphaFold 3"="alphafold3",
-                        "ESMFold"="esmfold",
-                        "Other prediction with pLDDT in B-factor"="other_prediction"
-                      ),selected="experimental",selectize=FALSE),
-                    conditionalPanel(
-                      condition="input.comparePredictionSource == 'alphafold3'",
-                      fileInput("comparePredictionJson",
-                        "Matching AF3 full confidences JSON",
-                        accept=c(".json")),
-                      fileInput("comparePredictionSummaryJson",
-                        "AF3 summary confidences JSON (optional)",
-                        accept=c(".json")),
-                      tags$p(class="ram-field-hint",
-                        "Use confidence files from the same AF3 seed/sample as the uploaded coordinates.")
-                    ),
-                    tags$p(class="ram-field-hint",
-                      "Prediction confidence is interpreted only after an explicit prediction source is selected. Experimental B-factors are never treated as pLDDT.")
+                tags$details(
+                  id="ram-compare-source-panel",
+                  class="ram-details ram-compare-source-panel",
+                  open=NA,
+                  tags$summary(
+                    tags$span(class="ram-compare-source-title",
+                      "Comparison structure"),
+                    uiOutput("compareSourceSummary",inline=TRUE)
                   ),
-                  actionButton("compareSubmit", "Load comparison", class="btn-primary"),
-                  actionButton("compareSwap", "Swap primary ↔ comparison",
-                    class="btn-default",
-                    title="Swap A/B roles without reloading either structure")
+                  tags$div(class = "ram-compare-source",
+                    radioButtons("compareInputSource", "Comparison input",
+                      choices = c("PDB accession" = "pdb",
+                                  "Uploaded file" = "upload"),
+                      selected = "pdb", inline = TRUE),
+                    tags$div(id = "ram-compare-pdb", textInput(
+                      "comparePDB", "Second structure", value = "1CRN",
+                      placeholder = "e.g. 1CRN")),
+                    tags$div(id = "ram-compare-upload", class = "is-hidden",
+                      fileInput("compareFile", "Second PDB/mmCIF file",
+                        accept = c(".pdb", ".ent", ".cif", ".mmcif", ".mcif")),
+                      selectInput("comparePredictionSource",
+                        "Comparison structure type",
+                        choices=c(
+                          "Experimental / unknown"="experimental",
+                          "AlphaFold 2 / ColabFold"="alphafold2",
+                          "AlphaFold 3"="alphafold3",
+                          "ESMFold"="esmfold",
+                          "Other prediction with pLDDT in B-factor"="other_prediction"
+                        ),selected="experimental",selectize=FALSE),
+                      conditionalPanel(
+                        condition="input.comparePredictionSource == 'alphafold3'",
+                        fileInput("comparePredictionJson",
+                          "Matching AF3 full confidences JSON",
+                          accept=c(".json")),
+                        fileInput("comparePredictionSummaryJson",
+                          "AF3 summary confidences JSON (optional)",
+                          accept=c(".json")),
+                        tags$p(class="ram-field-hint",
+                          "Use confidence files from the same AF3 seed/sample as the uploaded coordinates.")
+                      ),
+                      tags$p(class="ram-field-hint",
+                        "Prediction confidence is interpreted only after an explicit prediction source is selected. Experimental B-factors are never treated as pLDDT.")
+                    ),
+                    actionButton("compareSubmit", "Load comparison",
+                      class="btn-primary")
+                  )
                 ),
                 uiOutput("compareChainControls"),
                 tags$div(class = "ram-compare-status", uiOutput("compareSummary")),
@@ -990,6 +999,7 @@ server <- function(input, output, session) {
     ))
     compare_swapped(FALSE)
     compare_swap_chains(NULL)
+    session$sendCustomMessage("ram-compare-source-state",list(open=FALSE))
     TRUE
   }
 
@@ -1036,6 +1046,29 @@ server <- function(input, output, session) {
     selected_comparison(NULL)
   }, ignoreInit=TRUE)
 
+  output$compareSourceSummary <- renderUI({
+    comparison <- comparison_loaded()
+    if (is.null(comparison))
+      return(tags$span(class="ram-compare-source-summary",
+        "Load a second structure to begin"))
+
+    source_label <- switch(
+      comparison$declared_source,
+      experimental="Experimental / unknown",
+      alphafold2="AlphaFold 2 / ColabFold",
+      alphafold3="AlphaFold 3",
+      esmfold="ESMFold",
+      other_prediction="Predicted model",
+      "Experimental / unknown"
+    )
+    origin <- if (is.null(comparison$viewer_format))
+      "PDB accession" else "Uploaded file"
+    tags$span(class="ram-compare-source-summary is-loaded",
+      tags$strong(comparison$name),
+      tags$span(paste(origin,source_label,sep=" · "))
+    )
+  })
+
   output$compareChainControls <- renderUI({
     main <- req(loaded())
     comparison <- req(comparison_loaded())
@@ -1074,8 +1107,13 @@ server <- function(input, output, session) {
       if (comparison$nmodels > 1L)
         selectInput("compareModel", paste("Model in", comparison$name),
           choices=as.character(seq_len(comparison$nmodels)), selected="1"),
-      tags$span(class="ram-compare-swap-state",
-        if (swapped) "Roles swapped" else "Loaded structure is primary")
+      tags$div(class="ram-compare-chain-actions",
+        actionButton("compareSwap", "Swap primary ↔ comparison",
+          class="btn-default btn-sm",
+          title="Swap A/B roles without reloading either structure"),
+        tags$span(class="ram-compare-swap-state",
+          if (swapped) "Roles swapped" else "Loaded structure is primary")
+      )
     )
   })
 
@@ -1987,31 +2025,49 @@ server <- function(input, output, session) {
     weak_alignment <- (is.finite(quality$identity) && quality$identity < 0.50) ||
       (is.finite(quality$coverage_a) && quality$coverage_a < 0.70) ||
       (is.finite(quality$coverage_b) && quality$coverage_b < 0.70)
+
+    metric <- function(value,label)
+      tags$span(class="ram-compare-summary-metric",
+        tags$strong(value),tags$span(label))
+    group <- function(label,...)
+      tags$section(class="ram-compare-summary-group",
+        tags$h4(label),
+        tags$div(class="ram-compare-summary-values",...))
+
     tags$div(
       class="ram-compare-summary-block",
-      tags$div(class="ram-compare-metrics",
-        tags$span(tags$strong(quality$aligned), " aligned residues"),
-        tags$span(tags$strong(pct(quality$identity)), " sequence identity"),
-        tags$span(tags$strong(pct(quality$coverage_a)), " primary coverage"),
-        tags$span(tags$strong(pct(quality$coverage_b)), " comparison coverage"),
-        tags$span(tags$strong(sum(shifts>=30)), " pairs with ≥30° combined shift"),
-        tags$span(tags$strong(if(length(shifts)) sprintf("%.1f°",max(shifts)) else "n/a"),
-                  " largest combined shift"),
-        tags$span(tags$strong(sum(result$class_changed)), " RamplotR region changes"),
-        tags$span(tags$strong(standard_changes), " Rama8000 category changes"),
-        tags$span(tags$strong(standard_outliers), " pairs with a Rama8000 outlier"),
+      tags$div(class="ram-compare-summary-groups",
+        group("Alignment",
+          metric(quality$aligned,"aligned residues"),
+          metric(pct(quality$identity),"sequence identity"),
+          metric(pct(quality$coverage_a),"primary coverage"),
+          metric(pct(quality$coverage_b),"comparison coverage"),
+          metric(sum(!aligned),"insertions / deletions")
+        ),
+        group("Backbone",
+          metric(sum(shifts>=30),"pairs with ≥30° combined shift"),
+          metric(if(length(shifts)) sprintf("%.1f°",max(shifts)) else "n/a",
+                 "largest combined shift")
+        ),
+        group("Validation",
+          metric(sum(result$class_changed),"RamplotR region changes"),
+          metric(standard_changes,"Rama8000 category changes"),
+          metric(standard_outliers,"pairs with a Rama8000 outlier")
+        ),
         if(confidence_pairs>0L)
-          tags$span(tags$strong(confidence_pairs), " pairs with pLDDT on both sides"),
-        if(confidence_pairs>0L)
-          tags$span(tags$strong(confidence_large), " pairs with |ΔpLDDT| ≥20"),
-        tags$span(tags$strong(sum(!aligned)), " insertions / deletions"),
-        tags$span("Angular differences account for the -180° / +180° boundary.")
+          group("Prediction confidence",
+            metric(confidence_pairs,"pairs with pLDDT on both sides"),
+            metric(confidence_large,"pairs with |ΔpLDDT| ≥20")
+          )
       ),
+      tags$p(class="ram-compare-summary-note",
+        "Angular differences wrap across the -180° / +180° boundary."),
       if(weak_alignment)
         tags$p(class="ram-compare-alignment-warning",
           "Alignment identity or coverage is limited. Interpret local conformational shifts cautiously and inspect the aligned sequence context.")
     )
   })
+
   output$compareChangeTrack <- renderUI({
     data <- comparison_data()
     if (!nrow(data) || !"angular_displacement" %in% names(data)) return(NULL)

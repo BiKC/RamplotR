@@ -8,7 +8,8 @@
 - Current `main` baseline: `860ee1bb95f5af336db42528be7ef81aa2d3db53`.
 - Manuscript work remains separate on `arxiv-preprint` / PR #20.
 - The roadmap deliberately focuses RamplotR on backbone conformation, predicted-model confidence and comparative structural analysis rather than recreating a full MolProbity/Phenix validation suite.
-- As of 7 October 2026 there are **no open implementation PRs**; only the manuscript PR remains open.
+- Active implementation PR: #43 — Compare workflow progressive-disclosure polish.
+- Manuscript PR #20 remains open separately.
 
 ## Roadmap features already merged
 
@@ -49,12 +50,20 @@ Current stable browser-test ordering:
 PR #38 was rebuilt against this central fix and passed its scientific and browser workflows before merge.
 PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation and full live-browser workflows passed on the final feature code. The independent wwPDB workflow had also passed on the prior identical scientific feature implementation; the final rerun was still waiting in runner setup when #40 was merged.
 
+## Active work
+
+- PR #43 — Compare workflow polish.
+  - comparison source/provenance moved into an auto-collapsing setup disclosure;
+  - loaded source remains identified in the collapsed header;
+  - Swap remains always available beside chain-role controls;
+  - summary evidence grouped into Alignment, Backbone, Validation and conditional Prediction confidence;
+  - browser regression coverage added for disclosure state and evidence hierarchy;
+  - no scientific calculations changed.
+
 ## Next implementation steps
 
-1. **Audit/polish the integrated Compare workflow.**
-   - It now combines source/provenance, chain alignment quality, conformational-change track, matched density background, 2D/3D linked selection, Rama8000, pLDDT differences, ligand/hetero context, filters/table and group comparison.
-   - Prefer progressive disclosure and clearer information hierarchy over adding more permanent panels.
-2. Verify the post-merge `main` browser experience at normal laptop width and mobile width after any Compare polish.
+1. Run/review PR #43 browser and scientific workflows; merge only after the integrated Compare workflow is green.
+2. Verify the post-merge `main` browser experience at normal laptop width and mobile width.
 3. Only start a new scientific feature after checking open PRs, recent main commits and branch names.
 4. Synchronize the manuscript only after the implementation/UI settles.
    - Describe current Rama8000 standard validation, not old/native outlier interpretations.

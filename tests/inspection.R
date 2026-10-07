@@ -77,6 +77,12 @@ assert(isTRUE(pair$high_confidence_shift[[1L]]) ==
        (is.finite(pair$angular_displacement[[1L]]) &&
         pair$angular_displacement[[1L]]>=30),
        "High-confidence shift flag must require both a large shift and pLDDT >=90.")
+shifted <- ref
+shifted$phi[[1L]] <- -20
+confidence_shift <- ram_compare_torsions(ref,shifted)
+assert(isTRUE(confidence_shift$high_confidence_shift[[1L]]) &&
+       confidence_shift$angular_displacement[[1L]]>=30,
+       "A large shift at pLDDT >=90 should be explicitly reviewable.")
 assert(sum(pair$alignment=="Insertion")==1L, "Expected insertion")
 assert(identical(ram_comparison_find(pair,"a","A",2L), 3L),
   "Find the primary residue by exact PDB numbering")

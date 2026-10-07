@@ -170,7 +170,7 @@ const puppeteer = require("puppeteer-core");
       document.querySelectorAll("#comparison tbody tr").length>0 &&
       document.querySelectorAll(".ram-change-cell").length>20,
       {timeout:30000});
-    const confidenceHeaders=await page.$eval("#comparison thead th",
+    const confidenceHeaders=await page.$$eval("#comparison thead th",
       nodes=>nodes.map(node=>node.textContent.trim()));
     assert.ok(confidenceHeaders.includes("pLDDT A") &&
               confidenceHeaders.includes("pLDDT B") &&

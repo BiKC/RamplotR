@@ -648,6 +648,10 @@ const assert = require("node:assert/strict");
     // Comparing 1CRN with itself tests sequence alignment without relying
     // on any additional external downloads inside the Shiny session.
     await page.click('.nav-tabs a[data-value="compare"]');
+    const sourcePanelInitiallyOpen=await page.$eval("#ram-compare-source-panel",
+      panel=>panel.open);
+    assert.equal(sourcePanelInitiallyOpen,true,
+      "Comparison structure setup should be open before a comparison is loaded.");
     await page.evaluate(() =>
       document.querySelector('input[name="compareInputSource"][value="upload"]').click());
     await page.waitForFunction(() => {
@@ -659,6 +663,23 @@ const assert = require("node:assert/strict");
     await new Promise(resolve => setTimeout(resolve, 1500));
     await page.click("#compareSubmit");
     await page.waitForSelector("#comparison tbody tr", {timeout:25000});
+    await page.waitForFunction(() => {
+      const panel=document.getElementById("ram-compare-source-panel");
+      const summary=panel?.querySelector(".ram-compare-source-summary");
+      return panel && panel.open===false &&
+        summary && summary.textContent.includes("1CRN");
+    },{timeout:15000});
+    const sourceDisclosure=await page.$eval("#ram-compare-source-panel",
+      panel=>({
+        open:panel.open,
+        text:panel.querySelector("summary")?.textContent
+          .replace(/\s+/g," ").trim()
+      }));
+    assert.equal(sourceDisclosure.open,false,
+      "Successful comparison loading should collapse the setup panel.");
+    assert.ok(sourceDisclosure.text.includes("1CRN") &&
+              sourceDisclosure.text.includes("Uploaded file"),
+      "Collapsed setup should identify the loaded comparison source.");
     await page.waitForFunction(() => {
       const p = document.getElementById("comparePlot");
       return p && p.data && p.data.length >= 8 &&
@@ -691,6 +712,11 @@ const assert = require("node:assert/strict");
               compareSummaryText.includes("100.0% primary coverage") &&
               compareSummaryText.includes("100.0% comparison coverage"),
       "Self-comparison should report complete sequence identity and coverage.");
+    const evidenceGroups=await page.$$eval(".ram-compare-summary-group h4",
+      nodes=>nodes.map(node=>node.textContent.trim()));
+    assert.deepEqual(evidenceGroups.slice(0,3),
+      ["Alignment","Backbone","Validation"],
+      "Comparison summary should group evidence instead of showing one flat metric strip.");
     await page.waitForFunction(() => {
       const s = window.getNGLStage && window.getNGLStage("NGLCompare");
       const models = window.getNGLStructure && window.getNGLStructure("NGLCompare");

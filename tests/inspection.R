@@ -112,6 +112,32 @@ assert(isTRUE(all.equal(seq_a$known_fraction,2/3)),
 assert(identical(ram_chain_query_sequence(seq_fixture,"B")$sequence,"V"),
        "Chain-specific counterpart sequence extraction changed.")
 
+
+context_pdb <- list(
+  atom=data.frame(
+    type="ATOM",chain=c("A","A"),resno=c(10L,10L),resid=c("ALA","ALA"),
+    insert=c("",""),elety=c("CA","CB"),elesy=c("C","C"),
+    x=c(0,1),y=c(0,0),z=c(0,0),stringsAsFactors=FALSE
+  ),
+  hetero_atom=data.frame(
+    type="HETATM",chain=c("B","B","B","B"),resno=c(401L,401L,402L,501L),
+    resid=c("ATP","ATP","MG","HOH"),insert=c("","","",""),
+    elety=c("P","H1","MG","O"),elesy=c("P","H","MG","O"),
+    x=c(4,2,5,2),y=c(0,0,0,0),z=c(0,0,0,0),stringsAsFactors=FALSE
+  )
+)
+context_row <- data.frame(chain="A",resi=10L,insertion_code="",resn="ALA",
+                          stringsAsFactors=FALSE)
+nearby <- ram_nearby_hetero_context(context_pdb,context_row,max_distance=6)
+assert(nrow(nearby)==2L && identical(as.character(nearby$resn),c("ATP","MG")),
+       "Nearby hetero context must exclude water and group atoms by hetero residue.")
+assert(isTRUE(all.equal(nearby$distance,c(3,4))) &&
+       identical(as.character(nearby$target_atom),c("CB","CB")),
+       "Nearest hetero distances must use heavy atoms from the selected residue.")
+assert(nrow(ram_nearby_hetero_context(
+  context_pdb,context_row,max_distance=2.5))==0L,
+  "Distant hetero residues must stay out of the local context.")
+
 evidence_row <- data.frame(
   chain="A",resi=10L,insertion_code="",resn="ALA",
   phi=-120,psi=95,region="Not allowed",density=98.4,
@@ -122,7 +148,7 @@ evidence_row <- data.frame(
   wwpdb_clashes=2,wwpdb_bond_outliers=1,wwpdb_angle_outliers=0,
   stringsAsFactors=FALSE
 )
-ev <- ram_residue_evidence(evidence_row)
+ev <- ram_residue_evidence(evidence_row,local_context=nearby)
 assert(all(c(
   "Rama8000 backbone outlier",
   "Unusual RamplotR density position",
@@ -131,7 +157,8 @@ assert(all(c(
   "Official wwPDB Ramachandran outlier",
   "Official wwPDB rotamer outlier",
   "Official wwPDB local clash",
-  "Official covalent-geometry outlier"
+  "Official covalent-geometry outlier",
+  "Nearby non-water hetero residues"
 ) %in% ev$title), "Residue evidence should preserve independent warning sources.")
 assert(ev$title[[1L]] %in% c(
   "High-confidence prediction with unusual backbone geometry",

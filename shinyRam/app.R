@@ -2126,14 +2126,20 @@ server <- function(input, output, session) {
           sprintf("%d residues with ≥30° mean shift",
             sum(finite & data$angular_displacement>=30))),
         tags$span(class="ram-confidence-metric",
-          sprintf("%d low-dispersion consistent shifts",
+          sprintf("%d high-support shifts",
+            sum(data$high_support_shift,na.rm=TRUE))),
+        tags$span(class="ram-confidence-metric",
+          sprintf("%d low-dispersion shifts",
             sum(data$consistent_shift,na.rm=TRUE))),
+        tags$span(class="ram-confidence-metric",
+          sprintf("%d sparse-coverage residues",
+            sum(data$evidence_profile=="Sparse coverage",na.rm=TRUE))),
         tags$span(class="ram-confidence-metric",
           sprintf("%d Rama8000 mode changes",
             sum(data$rama8000_mode_changed,na.rm=TRUE)))
       ),
       tags$p(class="ram-confidence-explainer",
-        "Between-group displacement compares circular mean φ/ψ values. Within-group SD is shown separately. The thresholds are navigation aids, not statistical significance tests.")
+        "Between-group displacement compares circular mean φ/ψ values. A high-support shift combines ≥30° displacement, ≤15° within-group circular SD and ≥75% residue coverage in both groups. These are transparent navigation criteria, not statistical significance tests.")
     )
   })
 
@@ -2156,6 +2162,10 @@ server <- function(input, output, session) {
                    band_class(data$shift_band[[i]]))
       if (isTRUE(data$consistent_shift[[i]]))
         classes <- c(classes,"is-consistent")
+      if (isTRUE(data$high_support_shift[[i]]))
+        classes <- c(classes,"is-high-support")
+      if (identical(data$evidence_profile[[i]],"Sparse coverage"))
+        classes <- c(classes,"is-sparse")
       if (isTRUE(data$rama8000_mode_changed[[i]]))
         classes <- c(classes,"has-standard-change")
       tags$div(class="ram-change-slot",
@@ -2166,20 +2176,22 @@ server <- function(input, output, session) {
           "data-chain"=data$chain[[i]],
           "data-resi"=data$resi[[i]],
           "data-insertion"=insertion,
-          title=sprintf("%s %s:%s · %s → %s · Δφ %.1f° · Δψ %.1f° · shift %.1f° · max within-group SD %s",
+          title=sprintf("%s %s:%s · %s → %s · Δφ %.1f° · Δψ %.1f° · shift %.1f° · max within-group SD %s · coverage %.0f%%/%.0f%% · %s",
             data$resn[[i]],data$chain[[i]],data$resi[[i]],
             result$label_a,result$label_b,
             data$delta_phi[[i]],data$delta_psi[[i]],
             data$angular_displacement[[i]],
             if(is.finite(data$max_within_group_sd[[i]]))
-              sprintf("%.1f°",data$max_within_group_sd[[i]]) else "n/a")
+              sprintf("%.1f°",data$max_within_group_sd[[i]]) else "n/a",
+            100*data$a_coverage[[i]],100*data$b_coverage[[i]],
+            data$evidence_profile[[i]])
         )
       )
     })
     tags$section(class="ram-change-explorer ram-group-change-explorer",
       tags$div(class="ram-change-head",
         tags$div(tags$h3("Between-group backbone shift"),
-          tags$p("Each cell is one reference-chain residue. Colour shows displacement between group circular means; dark outline marks low-dispersion consistent shifts.")),
+          tags$p("Each cell is one reference-chain residue. Colour shows displacement between group circular means; a dark double outline marks high-support low-dispersion shifts, while faded cells indicate sparse coverage.")),
         tags$div(class="ram-change-legend",
           tags$span(class="ram-change-small","<15°"),
           tags$span(class="ram-change-moderate","15–30°"),
@@ -2189,7 +2201,7 @@ server <- function(input, output, session) {
       tags$div(class="ram-change-track",role="group",
         "aria-label"="Between-group conformational-change track",cells),
       tags$p(class="ram-field-hint",
-        "A secondary outline marks residues whose modal Rama8000 category differs between groups.")
+        "A secondary outline marks residues whose modal Rama8000 category differs between groups. Exact coverage, within-group SD and evidence profile remain available in the table.")
     )
   })
 
@@ -2203,20 +2215,27 @@ server <- function(input, output, session) {
       "a_phi_mean","b_phi_mean","delta_phi",
       "a_psi_mean","b_psi_mean","delta_psi",
       "angular_displacement","max_within_group_sd",
-      "a_rama8000_mode","b_rama8000_mode",
-      "consistent_shift","rama8000_mode_changed"
+      "a_coverage","b_coverage","min_rama8000_consistency",
+      "evidence_profile","a_rama8000_mode","b_rama8000_mode",
+      "high_support_shift","consistent_shift","rama8000_mode_changed"
     ),drop=FALSE]
     for(field in c("a_phi_mean","b_phi_mean","delta_phi",
                    "a_psi_mean","b_psi_mean","delta_psi",
                    "angular_displacement","max_within_group_sd"))
       shown[[field]] <- round(shown[[field]],1L)
+    shown$a_coverage <- round(100*shown$a_coverage,1L)
+    shown$b_coverage <- round(100*shown$b_coverage,1L)
+    shown$min_rama8000_consistency <- round(100*shown$min_rama8000_consistency,1L)
+    shown$high_support_shift <- ifelse(shown$high_support_shift,"Yes","No")
     shown$consistent_shift <- ifelse(shown$consistent_shift,"Yes","No")
     shown$rama8000_mode_changed <- ifelse(shown$rama8000_mode_changed,
                                            "Yes","No")
     DT::datatable(shown,rownames=FALSE,selection="single",
       colnames=c("Chain","Residue","Ins.","AA","n A","n B",
         "φ A","φ B","Δφ","ψ A","ψ B","Δψ",
-        "Mean shift","Max within SD","Rama8000 A","Rama8000 B",
+        "Mean shift","Max within SD","Coverage A (%)","Coverage B (%)",
+        "Min Rama8000 agreement (%)","Evidence profile",
+        "Rama8000 A","Rama8000 B","High support",
         "Consistent shift","Rama8000 changed"),
       options=list(pageLength=12,scrollX=TRUE,autoWidth=FALSE,dom="ftip"),
       class="compact stripe hover")

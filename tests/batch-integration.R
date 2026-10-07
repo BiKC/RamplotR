@@ -1,7 +1,7 @@
 # End-to-end offline batch regression with known downloaded wwPDB structures.
 # Called by ui-preview.yml after fetching 1CRN and 1D3Z.
-for(filename in c("io","backbone","ramachandran","rama8000","geometry","experimental",
-                  "ensemble","predictions","reports","batch"))
+for(filename in c("io","backbone","ramachandran","rama8000","conformation",
+                  "geometry","experimental","ensemble","predictions","reports","batch"))
   source(file.path("shinyRam","R",paste0(filename,".R")))
 assert <- function(x,msg) if(!isTRUE(x)) stop(msg,call.=FALSE)
 root <- "benchmarks/output/ui-preview"
@@ -45,9 +45,10 @@ assert(nrow(run2)==1L && run2$status[[1]]=="ok" &&
        paste("Multi-model ensemble batch failed:",run2$error[[1]]))
 ensemble <- utils::read.csv(file.path(output,"1D3Z.pdb.ensemble.csv"))
 assert(nrow(ensemble)>=50 &&
-       all(c("phi_mean","phi_sd","changes_class","models_present") %in%
+       all(c("phi_mean","phi_sd","changes_class","models_present",
+             "basin_mode","basin_consistency","basin_changes") %in%
          names(ensemble)),
-       "NMR ensemble CSV is missing circular statistics.")
+       "NMR ensemble CSV is missing circular or backbone-state statistics.")
 repeat_error <- ram_batch_run(a)
 assert(repeat_error$status[[1]]=="error" &&
        grepl("already exists",repeat_error$error[[1]]),

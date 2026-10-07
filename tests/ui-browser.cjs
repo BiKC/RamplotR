@@ -661,9 +661,24 @@ const assert = require("node:assert/strict");
     await page.waitForSelector("#comparison tbody tr", {timeout:25000});
     await page.waitForFunction(() => {
       const p = document.getElementById("comparePlot");
-      return p && p.data && p.data.length >= 4 &&
-        p.data[0].customdata.length > 10;
+      if (!p || !p.data || p.data.length < 8) return false;
+      const contours=p.data.filter(trace=>trace.type==="contour");
+      const residues=p.data.filter(trace =>
+        trace.type==="scattergl" && trace.showlegend!==false);
+      return contours.length===4 && residues.length===2 &&
+        residues[0].customdata.length>10;
     }, {timeout:18000});
+    const compareBackground=await page.evaluate(() => {
+      const p=document.getElementById("comparePlot");
+      return {
+        contours:p.data.filter(trace=>trace.type==="contour").length,
+        annotation:(p.layout.annotations || []).map(item=>item.text).join(" ")
+      };
+    });
+    assert.equal(compareBackground.contours,4,
+      "Aligned backbone angles should use the selected density background.");
+    assert.ok(compareBackground.annotation.includes("Background:"),
+      "Comparison plot should identify the selected Ramachandran background.");
     await page.waitForFunction(() => {
       const s = window.getNGLStage && window.getNGLStage("NGLCompare");
       const models = window.getNGLStructure && window.getNGLStructure("NGLCompare");
@@ -739,6 +754,22 @@ const assert = require("node:assert/strict");
               compareHeaders.includes("Rama8000 B") &&
               compareHeaders.includes("Rama8000 changed"),
       "Comparison table should expose standard validation changes.");
+    await page.click("#compareSwap");
+    await page.waitForFunction(() =>
+      document.querySelector(".ram-compare-swap-state")?.textContent
+        .includes("Roles swapped"),{timeout:18000});
+    await page.waitForFunction(() => {
+      const p=document.getElementById("comparePlot");
+      const stage=window.getNGLStage && window.getNGLStage("NGLCompare");
+      return p && p.data.filter(trace=>trace.type==="contour").length===4 &&
+        stage &&
+        stage.getRepresentationsByName("ram-compare-chain-a").list.length===1 &&
+        stage.getRepresentationsByName("ram-compare-chain-b").list.length===1;
+    },{timeout:30000});
+    await page.click("#compareSwap");
+    await page.waitForFunction(() =>
+      document.querySelector(".ram-compare-swap-state")?.textContent
+        .includes("Loaded structure is primary"),{timeout:18000});
     await page.screenshot({
       path:"benchmarks/output/ui-preview/compare-self.png",fullPage:true
     });

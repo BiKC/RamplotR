@@ -2376,7 +2376,7 @@ server <- function(input, output, session) {
       file,row.names=FALSE,na="")
   )
 
-  observeEvent(comparison_data(), {
+  observe({
     result <- comparison_data()
     if (!nrow(result)) return()
     main <- req(loaded()); comparison <- req(comparison_loaded())
@@ -2384,12 +2384,13 @@ server <- function(input, output, session) {
     comparison_model <- if (is.null(input$compareModel)) 1L
       else as.integer(input$compareModel)
     reference <- plot_reference()
+    palette <- active_palette()
     session$sendCustomMessage("ram-comparison", list(
       nameA=if (swapped) comparison$name else main$name,
       nameB=if (swapped) main$name else comparison$name,
       matrix=reference,
       limits=ram_density_thresholds(reference),
-      backgroundColors=active_palette(),
+      backgroundColors=palette,
       backgroundName=input$background,
       phiA=result$phi_a, psiA=result$psi_a,
       phiB=result$phi_b, psiB=result$psi_b,

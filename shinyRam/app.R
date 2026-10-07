@@ -1718,23 +1718,30 @@ server <- function(input, output, session) {
     ram_extract_torsions(ram_model_at(second$pdb, choice))
   })
   comparison_data <- reactive({
-    first <- req(loaded())
-    second <- req(comparison_loaded())
-    req(input$compareChainA, input$compareChainB, input$bgtype,
-        input$validationMode)
-    original <- classified()
-    original <- original[original$chain == input$compareChainA, , drop=FALSE]
-    secondary <- ram_classify_torsions(comparison_torsions(),
+    req(loaded(), comparison_loaded(), input$compareChainA, input$compareChainB,
+        input$bgtype, input$validationMode)
+    main_data <- classified()
+    secondary_data <- ram_classify_torsions(comparison_torsions(),
       reference_dir = file.path("static", input$bgtype),
       selected_reference=plot_reference(),
       mode=input$validationMode,
       threshold_fn=ram_density_thresholds)
-    secondary <- ram_rama8000_classify(
-      secondary, file.path("static", "rama8000"))
-    secondary <- secondary[secondary$chain == input$compareChainB, , drop=FALSE]
-    if (!nrow(original) || !nrow(secondary))
-      return(data.frame())
-    result <- ram_compare_torsions(original, secondary)
+    secondary_data <- ram_rama8000_classify(
+      secondary_data, file.path("static", "rama8000"))
+
+    if (isTRUE(compare_swapped())) {
+      first <- secondary_data[
+        secondary_data$chain == input$compareChainA, , drop=FALSE]
+      second <- main_data[
+        main_data$chain == input$compareChainB, , drop=FALSE]
+    } else {
+      first <- main_data[
+        main_data$chain == input$compareChainA, , drop=FALSE]
+      second <- secondary_data[
+        secondary_data$chain == input$compareChainB, , drop=FALSE]
+    }
+    if (!nrow(first) || !nrow(second)) return(data.frame())
+    result <- ram_compare_torsions(first, second)
     result$row_id <- seq_len(nrow(result))
     result
   })
@@ -1747,23 +1754,23 @@ server <- function(input, output, session) {
         row_index < 1L || row_index > nrow(data)) return(invisible(FALSE))
     row <- data[row_index, , drop=FALSE]
     selected_comparison(row$row_id[[1L]])
-    # Make the shared inspector and main sequence navigator follow the
-    # primary chain, without selecting residues hidden by main plot filters.
-    if (!is.na(row$residue_a[[1L]])) {
+    # The global inspector belongs to the structure loaded in the main app.
+    # If comparison roles are swapped, that structure is side B rather than A.
+    main_side <- if (isTRUE(isolate(compare_swapped()))) "b" else "a"
+    number <- row[[paste0("residue_",main_side)]][[1L]]
+    if (!is.na(number)) {
+      chain <- row[[paste0("chain_",main_side)]][[1L]]
+      insertion <- row[[paste0("insertion_",main_side)]][[1L]]
       visible <- isolate(displayed())
-      matches <- which(visible$chain == row$chain_a[[1L]] &
-        visible$resi == row$residue_a[[1L]] &
-        visible$insertion_code == row$insertion_a[[1L]])
+      matches <- which(visible$chain == chain &
+        visible$resi == number & visible$insertion_code == insertion)
       if (length(matches)) selected_residue(list(
-        chain = row$chain_a[[1L]],
-        resi = as.integer(row$residue_a[[1L]]),
-        insertion_code = row$insertion_a[[1L]]
-      ))
+        chain=chain, resi=as.integer(number), insertion_code=insertion))
     }
     invisible(TRUE)
   }
   observeEvent(list(input$compareChainA, input$compareChainB,
-                    input$compareModel, comparison_loaded()), {
+                    input$compareModel, comparison_loaded(), compare_swapped()), {
     selected_comparison(NULL)
   }, ignoreInit=TRUE)
   observeEvent(input$ramComparePlotPick, {
@@ -1821,14 +1828,17 @@ server <- function(input, output, session) {
   # partner when the comparison is available.
   observeEvent(selected_residue(), {
     item <- selected_residue()
-    if (is.null(item) || is.null(isolate(input$compareChainA)) ||
-        !identical(item$chain, isolate(input$compareChainA)) ||
-        is.null(isolate(comparison_loaded()))) return()
-    index <- ram_comparison_find(isolate(comparison_data()), "a",
+    if (is.null(item) || is.null(isolate(comparison_loaded()))) return()
+    main_side <- if (isTRUE(isolate(compare_swapped()))) "b" else "a"
+    main_chain <- if (identical(main_side,"a"))
+      isolate(input$compareChainA) else isolate(input$compareChainB)
+    if (is.null(main_chain) || !identical(item$chain, main_chain)) return()
+    data <- isolate(comparison_data())
+    index <- ram_comparison_find(data, main_side,
                item$chain, item$resi, item$insertion_code)
     if (!is.na(index) &&
-        !identical(isolate(selected_comparison()), index))
-      selected_comparison(index)
+        !identical(isolate(selected_comparison()), data$row_id[[index]]))
+      selected_comparison(data$row_id[[index]])
   }, ignoreNULL=TRUE)
   filtered_comparison <- reactive({
     result <- comparison_data()

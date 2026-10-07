@@ -5,9 +5,10 @@
 
 ## Current baseline
 
-- Main branch baseline when this worklog was created: `9b4f77f200888f779208a9c249900abe865d4af0`.
+- Current `main` baseline: `860ee1bb95f5af336db42528be7ef81aa2d3db53`.
 - Manuscript work remains separate on `arxiv-preprint` / PR #20.
-- The roadmap intentionally focuses RamplotR on backbone conformation, predicted-model confidence and comparative structural analysis rather than recreating a full MolProbity/Phenix validation suite.
+- The roadmap deliberately focuses RamplotR on backbone conformation, predicted-model confidence and comparative structural analysis rather than recreating a full MolProbity/Phenix validation suite.
+- As of 7 October 2026 there are **no open implementation PRs**; only the manuscript PR remains open.
 
 ## Roadmap features already merged
 
@@ -21,44 +22,58 @@
 - PR #28 — discovery of experimental PDB counterparts for predicted models.
 - PR #30 — residue evidence inspector.
 - PR #32 — structure-group conformational comparison.
-- PR #33 — local ligand/hetero-residue structural context.
+- PR #33 — local ligand/hetero-residue structural context in the main inspector.
 - PR #34 — AlphaFold 3 sample ensemble analysis.
 - PR #36 — comparison Ramachandran density background and quick structure-role swap.
 - PR #37 — prediction-ensemble disagreement linked into the residue inspector.
-
-Do **not** reimplement these features on old feature branches; several old branches still exist after merge.
-
-## Currently open feature PRs
-
-- PR #38 — compare local ligand/hetero context across aligned residues.
-  - Scientific tests pass.
-  - Browser preview currently fails in a shared file-upload wait in `tests/prediction-browser.cjs`; not currently evidence of a PR-specific scientific bug.
-- PR #39 — show pairwise alignment identity and coverage.
-  - Scientific, structure-validation and wwPDB workflows pass.
-  - Same shared browser-test upload wait fails.
+- PR #38 — compare nearby ligand/hetero context across aligned residues.
+- PR #39 — pairwise sequence identity and chain-coverage reporting with interpretation warnings.
 - PR #40 — compare prediction confidence across aligned residues.
-  - Scientific, structure-validation and wwPDB workflows pass.
-  - Same shared browser-test upload wait fails.
+  - Explicit prediction provenance for uploaded comparison structures.
+  - pLDDT on both sides, signed delta-pLDDT, confidence-change filtering and plot/table/inspector integration.
 
-## Shared blocker discovered 2026-10-07
+Do **not** reimplement these features on old feature branches; several merged branches still exist.
 
-All three open PRs time out at `tests/prediction-browser.cjs` line 95 while waiting for Shiny's internal file-upload progress/input representation after Puppeteer `uploadFile()`.
+## Browser-test blocker: resolved
 
-The file is already present in the native browser input, so the test should not depend solely on Shiny's private `$inputValues["structfile:shiny.file"]` key or progress-bar state. Fix this once on main/test infrastructure, then rerun/rebase feature PRs rather than patching each feature independently.
+The shared prediction-upload timeout was fixed centrally in PRs #41 and #42.
+
+Current stable browser-test ordering:
+
+1. choose prediction provenance first;
+2. wait for the reactive upload controls to settle;
+3. attach the file;
+4. verify the native `File` object exists;
+5. allow Shiny to finish the upload before submitting.
+
+PR #38 was rebuilt against this central fix and passed its scientific and browser workflows before merge.
+PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation and full live-browser workflows passed on the final feature code. The independent wwPDB workflow had also passed on the prior identical scientific feature implementation; the final rerun was still waiting in runner setup when #40 was merged.
 
 ## Next implementation steps
 
-1. Stabilize the prediction browser file-upload wait centrally.
-2. Rerun PRs #38, #39 and #40; fix only feature-specific failures that remain.
-3. Merge completed PRs when all workflows pass.
-4. Review the integrated Compare workflow for information density and duplicated controls after #38-#40 are combined.
-5. Continue roadmap only after checking merged/open branches to avoid duplicating work.
-6. Keep the manuscript synchronized only after implementation settles; do not describe old/native validation outputs as if they were the current standard Rama8000 result.
+1. **Audit/polish the integrated Compare workflow.**
+   - It now combines source/provenance, chain alignment quality, conformational-change track, matched density background, 2D/3D linked selection, Rama8000, pLDDT differences, ligand/hetero context, filters/table and group comparison.
+   - Prefer progressive disclosure and clearer information hierarchy over adding more permanent panels.
+2. Verify the post-merge `main` browser experience at normal laptop width and mobile width after any Compare polish.
+3. Only start a new scientific feature after checking open PRs, recent main commits and branch names.
+4. Synchronize the manuscript only after the implementation/UI settles.
+   - Describe current Rama8000 standard validation, not old/native outlier interpretations.
+   - Position RamplotR around residue-centred backbone comparison, predicted-model confidence and linked structural context.
 
 ## Branch hygiene
 
-Before starting a new feature:
-1. inspect open and recently merged PRs;
-2. search branch names for the intended feature;
-3. read this worklog;
-4. branch from current `main`, not from an old merged feature branch unless intentionally stacking work.
+Before starting or continuing work:
+
+1. read this worklog;
+2. inspect open and recently merged PRs;
+3. inspect `main` recent commits;
+4. search existing branch names for the intended feature;
+5. branch from current `main`, unless an intentionally stacked PR is explicitly documented here.
+
+Old merged branches such as `feature/rama8000-validation`,
+`feature/conformational-change-explorer` and `feature/prediction-ensemble`
+are historical implementation branches and must not be treated as active work.
+
+A temporary branch named `rebuild/compare-prediction-confidence-20261007`
+was used to reconstruct PR #40 cleanly on top of the then-current `main`.
+It is not active development work.

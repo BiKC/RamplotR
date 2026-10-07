@@ -19,6 +19,40 @@ const assert = require("node:assert/strict");
     executablePath, headless: true,
     args: ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"]
   });
+
+  // Add a deterministic non-water hetero residue near ALA 10 while keeping
+  // the protein coordinates unchanged. A closer water verifies that solvent
+  // is ignored by the local-context evidence.
+  const baseFixture = path.resolve("benchmarks/output/ui-preview/1CRN.pdb");
+  const contextFixture = path.resolve(
+    "benchmarks/output/ui-preview/1CRN-local-context.pdb");
+  const baseText = fs.readFileSync(baseFixture, "utf8");
+  const baseLines = baseText.split(/\r?\n/);
+  const ca10 = baseLines.find(line =>
+    line.startsWith("ATOM") &&
+    line.slice(12,16).trim() === "CA" &&
+    Number(line.slice(22,26).trim()) === 10);
+  assert.ok(ca10, "1CRN fixture must contain CA for residue 10.");
+  const xyz = [
+    Number(ca10.slice(30,38)),
+    Number(ca10.slice(38,46)),
+    Number(ca10.slice(46,54))
+  ];
+  const heteroLine = (serial, atom, resn, chain, resi, x, y, z, element) =>
+    "HETATM" + String(serial).padStart(5) + " " +
+    String(atom).padStart(4) + " " + String(resn).padStart(3) + " " +
+    String(chain).slice(0,1) + String(resi).padStart(4) + "    " +
+    x.toFixed(3).padStart(8) + y.toFixed(3).padStart(8) +
+    z.toFixed(3).padStart(8) + "  1.00 20.00          " +
+    String(element).padStart(2);
+  const insertion = [
+    heteroLine(9998,"C1","LIG","L",401,xyz[0]+3,xyz[1],xyz[2],"C"),
+    heteroLine(9999,"O","HOH","W",501,xyz[0]+1,xyz[1],xyz[2],"O")
+  ];
+  const end = baseLines.findIndex(line => line.trim() === "END");
+  const contextLines = baseLines.slice();
+  contextLines.splice(end >= 0 ? end : contextLines.length, 0, ...insertion);
+  fs.writeFileSync(contextFixture, contextLines.join("\n"));
   const errors = [];
   try {
     const page = await browser.newPage();
@@ -46,7 +80,7 @@ const assert = require("node:assert/strict");
     await page.waitForFunction(() =>
       !document.getElementById("ram-upload-wrap").classList.contains("is-hidden"));
     const input = await page.$("#structfile");
-    await input.uploadFile(path.resolve("benchmarks/output/ui-preview/1CRN.pdb"));
+    await input.uploadFile(contextFixture);
     // Shiny's upload widget does not expose a stable progress-complete
     // attribute across versions. Confirm the file was selected, then give the
     // small local upload a moment to finish before submitting.
@@ -580,6 +614,22 @@ const assert = require("node:assert/strict");
     assert.equal(await page.$eval('.nav-tabs li.active a',
       el => el.getAttribute("data-value")), "plot",
       "Picking a residue must preserve the visible plot and NGL viewer.");
+    // Local structure context: residue 10 has a synthetic LIG 3 Å away and
+    // a water 1 Å away. Only the non-water hetero residue should be reported.
+    await page.$eval(".ram-seq-jump-input", input => { input.value = "10"; });
+    await page.click(".ram-seq-jump");
+    await page.waitForFunction(() => {
+      const info = document.getElementById("selectedResidueInfo");
+      return info && info.textContent.includes("Nearby non-water hetero residue") &&
+        info.textContent.includes("LIG L:401") &&
+        !info.textContent.includes("HOH");
+    },{timeout:15000});
+    const localContextText = await page.$eval(
+      "#selectedResidueInfo .ram-evidence-panel",node=>node.textContent);
+    assert.ok(localContextText.includes("3.0 Å") &&
+              localContextText.includes("spatial proximity only"),
+      "Local context must report nearest heavy-atom distance without claiming binding.");
+
     // Jump straight to a true PDB residue number rather than counting letters.
     await page.$eval(".ram-seq-jump-input", input => { input.value = "12"; });
     await page.click(".ram-seq-jump");

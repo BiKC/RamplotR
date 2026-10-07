@@ -411,11 +411,25 @@ ram_compare_torsions <- function(a, b) {
     region_b=value(b, pairing$index_b, "region", NA_character_),
     stringsAsFactors=FALSE
   )
+  result$plddt_a <- if ("plddt" %in% names(a))
+    value(a,pairing$index_a,"plddt",NA_real_) else rep(NA_real_,nrow(pairing))
+  result$plddt_b <- if ("plddt" %in% names(b))
+    value(b,pairing$index_b,"plddt",NA_real_) else rep(NA_real_,nrow(pairing))
+  result$confidence_a <- if ("confidence_category" %in% names(a))
+    value(a,pairing$index_a,"confidence_category",NA_character_)
+    else rep(NA_character_,nrow(pairing))
+  result$confidence_b <- if ("confidence_category" %in% names(b))
+    value(b,pairing$index_b,"confidence_category",NA_character_)
+    else rep(NA_character_,nrow(pairing))
   result$delta_phi <- ram_angular_difference(result$phi_a, result$phi_b)
   result$delta_psi <- ram_angular_difference(result$psi_a, result$psi_b)
   result$angular_displacement <- ram_backbone_angular_displacement(
     result$delta_phi, result$delta_psi)
   result$shift_band <- ram_backbone_shift_band(result$angular_displacement)
+  result$high_confidence_shift <- is.finite(result$angular_displacement) &
+    result$angular_displacement >= 30 &
+    ((is.finite(result$plddt_a) & result$plddt_a >= 90) |
+     (is.finite(result$plddt_b) & result$plddt_b >= 90))
   result$class_changed <- !is.na(result$region_a) &
     !is.na(result$region_b) & result$region_a != result$region_b
   if (all(c("rama8000_region","rama8000_group","rama8000_score") %in% names(a)) &&

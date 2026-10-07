@@ -28,6 +28,7 @@ source(file.path("R", "ramachandran.R"), local = TRUE)
 source(file.path("R", "rama8000.R"), local = TRUE)
 source(file.path("R", "backbone.R"), local = TRUE)
 source(file.path("R", "conformation.R"), local = TRUE)
+source(file.path("R", "protein-blocks.R"), local = TRUE)
 source(file.path("R", "canonical.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
 source(file.path("R", "inspection.R"), local = TRUE)
@@ -1300,6 +1301,7 @@ server <- function(input, output, session) {
       result <- ram_external_validation_join(result,official$records,
                                                model=current_model())
     result <- ram_canonical_join(result,canonical_mapping())
+    result <- ram_protein_blocks(result)
     result
   })
   displayed <- reactive({
@@ -1343,6 +1345,9 @@ server <- function(input, output, session) {
     columns <- c("chain", "resi", "insertion_code", "resn",
                  "phi", "psi", "region", "density",
                  "rama8000_region", "rama8000_group", "rama8000_score")
+    if ("protein_block" %in% names(data) &&
+        any(!is.na(data$protein_block)))
+      columns <- c(columns,"protein_block","protein_block_rmsda")
     has_canonical <- all(c("uniprot_accession","uniprot_resi") %in% names(data)) &&
       any(!is.na(data$uniprot_accession) & is.finite(data$uniprot_resi))
     if (has_canonical)
@@ -1351,6 +1356,8 @@ server <- function(input, output, session) {
       columns <- c(columns, "plddt", "confidence_category")
     shown <- data[, columns, drop = FALSE]
     if ("plddt" %in% names(shown)) shown$plddt <- round(shown$plddt, 1L)
+    if ("protein_block_rmsda" %in% names(shown))
+      shown$protein_block_rmsda <- round(shown$protein_block_rmsda,1L)
     shown$phi <- round(shown$phi, 1L)
     shown$psi <- round(shown$psi, 1L)
     shown$density <- round(shown$density, 1L)
@@ -1360,6 +1367,8 @@ server <- function(input, output, session) {
       colnames = c("Chain", "Residue", "Ins.", "AA", "Phi (°)", "Psi (°)",
                    "RamplotR region", "Percentile", "Rama8000", "Rama8000 class",
                    "Rama8000 score (%)",
+                   if ("protein_block" %in% names(shown))
+                     c("Protein Block","PB RMSDA (°)"),
                    if (has_canonical) c("UniProt","UniProt residue"),
                    if ("plddt" %in% names(shown)) c("pLDDT", "Confidence")),
       selection = list(mode = "single",
@@ -3656,6 +3665,8 @@ server <- function(input, output, session) {
       tags$td(class="ram-numeric", standard_pct(n))
     )
     standard_outliers <- standard_count("Outlier")
+    pb_n <- if ("protein_block" %in% names(data))
+      sum(!is.na(data$protein_block)) else 0L
     mapped_n <- if ("canonical_status" %in% names(data))
       sum(data$canonical_status=="mapped",na.rm=TRUE) else 0L
     canonical_accessions <- if ("uniprot_accession" %in% names(data))
@@ -3668,6 +3679,8 @@ server <- function(input, output, session) {
         metric("RamplotR not allowed", outlier, "Native density regions"),
         metric("Rama8000 outliers", standard_outliers,
                "Six-class standard validation"),
+        metric("Fragment fingerprints", pb_n,
+               "5-residue Protein Blocks"),
         if (!is.null(mapping_state) &&
             mapping_state$state %in% c("mapped","partial"))
           metric("UniProt mapped", mapped_n,
@@ -3929,6 +3942,12 @@ server <- function(input, output, session) {
         tags$span(paste("ψ", angle(row$psi[[1L]]))),
         tags$span(if (is.finite(row$density[[1L]]))
           sprintf("Density percentile %.1f", row$density[[1L]]) else ""),
+        if ("protein_block" %in% names(row) &&
+            !is.na(row$protein_block[[1L]]))
+          tags$span(class="ram-inspector-canonical",
+            sprintf("Protein Block %s · RMSDA %.1f°",
+              row$protein_block[[1L]],
+              row$protein_block_rmsda[[1L]])),
         if ("rama8000_region" %in% names(row) &&
             !is.na(row$rama8000_region[[1L]]))
           tags$span(class = if (identical(row$rama8000_region[[1L]], "Outlier"))

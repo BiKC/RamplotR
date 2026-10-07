@@ -58,25 +58,37 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 
 ## Active work
 
-- No active implementation branch or PR.
+- Active branch: `feature/conformational-atlas-foundation`.
+- The implementation roadmap is in
+  `docs/conformational-atlas-roadmap.md`.
+- Current slice: Phase 0A, canonical SIFTS/UniProt residue coordinates.
+  - normalize PDBe SIFTS mapping segments;
+  - expand only provably one-to-one author-number/UniProt ranges;
+  - preserve unresolved/nonlinear ranges instead of inventing residue mappings;
+  - add direct UniProt coordinates for AlphaFold DB models;
+  - expose canonical coordinates in residue inspection;
+  - add pure regression tests before moving to archive-scale Atlas retrieval.
 - PR #45 added a transparent, comparison-only coarse phi/psi state
   (Alpha-R, Beta, PPII, Alpha-L or Other) across pairwise comparison,
   prediction/NMR ensembles, group comparison, residue evidence and exports.
 - The state is explicitly not a validation category, DSSP secondary-structure
   assignment, statistical significance test or claim of molecular dynamics.
 - The integrated Compare workflow is covered at desktop/laptop and 390x844 mobile widths.
-- Before starting anything new, inspect open/recent PRs and branch names to avoid rebuilding merged work.
+- Before continuing after a reconnect, inspect this section and the Atlas
+  roadmap before starting another branch.
 
 ## Next implementation steps
 
-1. Re-read this worklog and inspect open/recent PRs before starting another feature; merged feature branches must not be reused as active work.
-2. Synchronize the manuscript with the now-settled implementation/UI.
-   - Describe current Rama8000 standard validation, not old/native outlier interpretations.
-   - Include Conformational Change Explorer, prediction ensembles (including AF3 samples), experimental counterpart discovery, residue evidence/context, group comparison, alignment-quality reporting and pLDDT comparison.
-   - Position RamplotR around residue-centred backbone comparison, predicted-model confidence and linked structural context.
-3. Only add a new scientific feature after identifying a concrete remaining user/research gap not already covered above.
-   - Describe current Rama8000 standard validation, not old/native outlier interpretations.
-   - Position RamplotR around residue-centred backbone comparison, predicted-model confidence and linked structural context.
+1. Finish Phase 0A canonical mapping on the active Atlas branch and merge it
+   with tests.
+2. Benchmark the current coarse backbone-state layer before giving it a
+   stronger scientific interpretation.
+3. Implement the experimental Atlas retrieval layer around canonical UniProt
+   coordinates, with explicit mapping/coverage exclusions.
+4. Only then add archive-scale state discovery, switch-region analysis and
+   prediction-state clustering.
+5. Keep the manuscript branch separate until these new workflows and their
+   scientific claims are stable.
 
 ## Branch hygiene
 

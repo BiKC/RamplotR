@@ -758,12 +758,14 @@ const assert = require("node:assert/strict");
     // swapping reverses NGL source order rather than only changing labels.
     await (await page.$("#compareFile")).uploadFile(
       path.resolve("benchmarks/output/ui-preview/1BBB.pdb"));
-    await page.waitForFunction(expected =>
-      document.getElementById("compareFile")?.files?.[0]?.name===expected,
-      {timeout:10000},"1BBB.pdb");
-    // Give Shiny's file-upload transport time to finish, then assert the
-    // parsed comparison result rather than the framework-specific progress DOM.
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await page.waitForFunction(expected => {
+      const selected=document.getElementById("compareFile")?.files?.[0]?.name;
+      const value=window.Shiny?.shinyapp?.$inputValues?.["compareFile:shiny.file"];
+      const uploaded=Array.isArray(value)
+        ? value.some(item=>item?.name===expected)
+        : value?.name===expected;
+      return selected===expected && uploaded;
+    },{timeout:25000},"1BBB.pdb");
     await page.click("#compareSubmit");
     // Chain controls are server-rendered from comparison_loaded(), so this
     // proves the new file—not the previous 1CRN upload—has been parsed.
@@ -829,10 +831,14 @@ const assert = require("node:assert/strict");
     // primary after a role swap. Preserve that user choice across rerenders.
     await (await page.$("#compareFile")).uploadFile(
       path.resolve("benchmarks/output/ui-preview/1D3Z.pdb"));
-    await page.waitForFunction(expected =>
-      document.getElementById("compareFile")?.files?.[0]?.name===expected,
-      {timeout:10000},"1D3Z.pdb");
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await page.waitForFunction(expected => {
+      const selected=document.getElementById("compareFile")?.files?.[0]?.name;
+      const value=window.Shiny?.shinyapp?.$inputValues?.["compareFile:shiny.file"];
+      const uploaded=Array.isArray(value)
+        ? value.some(item=>item?.name===expected)
+        : value?.name===expected;
+      return selected===expected && uploaded;
+    },{timeout:25000},"1D3Z.pdb");
     await page.click("#compareSubmit");
     await page.waitForSelector("#compareModel",{timeout:30000});
     await page.evaluate(() => {

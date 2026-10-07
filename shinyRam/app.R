@@ -3173,7 +3173,19 @@ server <- function(input, output, session) {
     if (is.null(row)) return(tags$span(class = "ram-inspector-empty",
       "Select a residue in the plot, table, sequence or 3D model. Review controls navigate to the next issue."))
     angle <- function(value) if (is.finite(value)) sprintf("%.1f°", value) else "Unavailable"
-    evidence <- ram_residue_evidence(row)
+    structure <- loaded()
+    local_context <- NULL
+    # Hetero coordinates are retained separately for model 1 so normal
+    # protein-only backbone/model bookkeeping is unchanged. Do not reuse
+    # model-1 ligand positions for another selected structural model.
+    if (!is.null(structure) &&
+        (structure$nmodels==1L || identical(current_model(),1L))) {
+      local_context <- ram_nearby_hetero_context(
+        ram_model_at(structure$pdb,current_model()),row,
+        max_distance=6,max_hits=3L
+      )
+    }
+    evidence <- ram_residue_evidence(row,local_context=local_context)
     evidence_item <- function(item) {
       level <- as.character(item$level[[1L]])
       tags$div(class=paste("ram-evidence-item",paste0("ram-evidence-",level)),

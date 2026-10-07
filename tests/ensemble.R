@@ -140,6 +140,36 @@ assert(identical(as.character(af3_ensemble$model_summary$model),
        identical(af3_ensemble$model_summary$has_clash,c(FALSE,TRUE)),
        "AF3 ensemble must preserve per-sample ranking and clash provenance.")
 unlink(c(sidecars,summaries))
+paired <- ram_af3_pair_files(
+  model_names=c(
+    "job_seed-7_sample-0_model.cif",
+    "job_seed-7_sample-1_model.cif"
+  ),
+  model_paths=c("/tmp/model0.cif","/tmp/model1.cif"),
+  confidence_names=c(
+    "job_seed-7_sample-1_confidences.json",
+    "job_seed-7_sample-0_confidences.json"
+  ),
+  confidence_paths=c("/tmp/conf1.json","/tmp/conf0.json"),
+  summary_names=c("job_seed-7_sample-0_summary_confidences.json"),
+  summary_paths=c("/tmp/summary0.json")
+)
+assert(identical(paired$label,
+  c("job_seed-7_sample-0","job_seed-7_sample-1")) &&
+  identical(paired$confidence_path,c("/tmp/conf0.json","/tmp/conf1.json")) &&
+  identical(paired$summary_path,c("/tmp/summary0.json","")),
+  "AF3 files must pair by seed/sample filename stem, not upload order.")
+assert(inherits(try(ram_af3_pair_files(
+  c("job_seed-1_sample-0_model.cif","job_seed-1_sample-1_model.cif"),
+  c("/m0","/m1"),
+  c("job_seed-1_sample-0_confidences.json"),
+  c("/c0")),silent=TRUE),"try-error"),
+  "AF3 pairing must reject a model without its full confidence sidecar.")
+assert(inherits(try(ram_af3_pair_files(
+  c("model0.cif","model1.cif"),c("/m0","/m1"),
+  c("conf0.json","conf1.json"),c("/c0","/c1")),silent=TRUE),"try-error"),
+  "AF3 pairing must reject filenames that cannot establish sample identity.")
+
 assert(inherits(try(ram_prediction_ensemble_analyze(
   list(make_prediction()),prediction_classifier,
   source="esmfold"),silent=TRUE),"try-error"),

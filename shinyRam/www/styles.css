@@ -486,8 +486,15 @@ body > .container-fluid { max-width: none; padding: 0; }
 .ram-compare-source .btn-primary { padding:10px 14px; font-weight:700;
   border-radius:8px; background:#126e74; border-color:#126e74; }
 .ram-compare-source .is-hidden { display:none; }
-.ram-compare-chains { display:flex; flex-wrap:wrap; gap:12px; margin:12px 0; }
+.ram-compare-chains { display:flex; flex-wrap:wrap; gap:12px; margin:12px 0;
+  align-items:flex-end; }
 .ram-compare-chains .form-group { flex:1 1 200px; max-width:360px; }
+.ram-compare-role { flex:1 1 220px; max-width:380px; }
+.ram-compare-role .form-group { margin-bottom:0; }
+.ram-compare-role-label { display:block; margin:0 0 3px; color:#4f6c73;
+  font-size:10px; font-weight:750; text-transform:uppercase; letter-spacing:.035em; }
+.ram-compare-swap-state { align-self:center; padding:5px 8px; border-radius:999px;
+  background:#eef6f4; color:#42676d; font-size:10px; font-weight:700; }
 .ram-compare-status { margin:12px 0; }
 .ram-compare-metrics { display:flex; flex-wrap:wrap; align-items:center;
   gap:9px 20px; color:#4b6671; font-size:12px;

@@ -710,11 +710,18 @@ const assert = require("node:assert/strict");
     }));
     assert.ok(groupState.cells.every(classes=>classes.includes("ram-change-small")),
       "Identical structure groups should stay entirely in the Small shift band.");
-    assert.ok(!groupState.summary.includes("low-dispersion consistent shifts 1"),
-      "Self-group comparison must not invent a consistent between-group shift.");
+    assert.ok(groupState.summary.includes("0 high-support shifts"),
+      "Self-group comparison must not invent a high-support between-group shift.");
     await page.click(".ram-group-cell");
     await page.waitForFunction(() =>
-      document.querySelector("#selectedResidueInfo strong"),{timeout:12000});
+      document.querySelector("#selectedResidueInfo strong") &&
+      document.querySelector(".ram-group-evidence-card"),{timeout:12000});
+    const groupEvidence = await page.$eval(".ram-group-evidence-card",
+      node => node.textContent);
+    assert.ok(groupEvidence.includes("Small shift") &&
+              groupEvidence.includes("Between-group shift") &&
+              groupEvidence.includes("Residue coverage"),
+      "Selected group residue should explain its effect size, coverage and evidence profile.");
     await page.screenshot({
       path:"benchmarks/output/ui-preview/group-comparison-self.png",fullPage:true
     });

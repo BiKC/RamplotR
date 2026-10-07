@@ -169,6 +169,19 @@
   // when the user switches chains or changes scientific reference datasets.
   document.addEventListener("click", function (event) {
     const button = event.target && event.target.closest &&
+      event.target.closest(".ram-group-pick");
+    if (!button || !window.Shiny || !window.Shiny.setInputValue) return;
+    const resi = Number(button.dataset.resi);
+    if (!Number.isInteger(resi)) return;
+    window.Shiny.setInputValue("ramGroupComparisonPick", {
+      chain: String(button.dataset.chain || ""),
+      resi,
+      insertion_code: String(button.dataset.insertion || "")
+    }, { priority: "event" });
+  });
+
+  document.addEventListener("click", function (event) {
+    const button = event.target && event.target.closest &&
       event.target.closest(".ram-ensemble-cell");
     if (!button) return;
     const resi = Number(button.dataset.resi);

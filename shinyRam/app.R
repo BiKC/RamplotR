@@ -547,6 +547,7 @@ ui <- fluidPage(
                       "Changed RamplotR region" = "changed",
                       "Changed Rama8000 category" = "standard_changed",
                       "Rama8000 outlier in either structure" = "standard_outlier",
+                      "High-confidence backbone shift ≥ 30°" = "high_conf_shift",
                       "Combined backbone shift ≥ 30°" = "shift_large",
                       "Either angle difference ≥ 30°" = "large",
                       "Insertions / deletions" = "gaps"), selected = "All"),
@@ -1892,6 +1893,9 @@ server <- function(input, output, session) {
       result <- result[
         result$rama8000_region_a == "Outlier" |
         result$rama8000_region_b == "Outlier", , drop=FALSE]
+    else if (identical(criterion, "high_conf_shift"))
+      result <- result[!is.na(result$high_confidence_shift) &
+                       result$high_confidence_shift, , drop=FALSE]
     else if (identical(criterion, "shift_large"))
       result <- result[is.finite(result$angular_displacement) &
                        result$angular_displacement >= 30, , drop=FALSE]
@@ -1915,9 +1919,13 @@ server <- function(input, output, session) {
       sum(result$rama8000_region_a == "Outlier" |
           result$rama8000_region_b == "Outlier", na.rm=TRUE) else 0L
     shifts <- result$angular_displacement[is.finite(result$angular_displacement)]
+    high_conf_shifts <- sum(result$high_confidence_shift,na.rm=TRUE)
     tags$div(class="ram-compare-metrics",
       tags$span(tags$strong(sum(aligned)), " aligned residues"),
       tags$span(tags$strong(sum(shifts>=30)), " pairs with ≥30° combined shift"),
+      if(any(is.finite(result$plddt_a)) || any(is.finite(result$plddt_b)))
+        tags$span(tags$strong(high_conf_shifts),
+          " ≥30° shifts with pLDDT ≥90"),
       tags$span(tags$strong(if(length(shifts)) sprintf("%.1f°",max(shifts)) else "n/a"),
                 " largest combined shift"),
       tags$span(tags$strong(sum(result$class_changed)), " RamplotR region changes"),
@@ -1959,12 +1967,19 @@ server <- function(input, output, session) {
           type="button",
           class=paste("ram-change-cell","ram-change-pick",
             band_class(data$shift_band[[i]]),
+            if (isTRUE(data$high_confidence_shift[[i]]))
+              "ram-change-high-confidence" else "",
             if (!is.null(selected) && identical(data$row_id[[i]],selected))
               "is-selected" else ""),
           "data-row-id"=data$row_id[[i]],
-          title=sprintf("%s ↔ %s · Δφ %.1f° · Δψ %.1f° · combined %.1f°",
+          title=paste0(sprintf(
+            "%s ↔ %s · Δφ %.1f° · Δψ %.1f° · combined %.1f°",
             residue_label("a",i),residue_label("b",i),
             data$delta_phi[[i]],data$delta_psi[[i]],shift),
+            if(is.finite(data$plddt_a[[i]]))
+              sprintf(" · A pLDDT %.1f",data$plddt_a[[i]]) else "",
+            if(is.finite(data$plddt_b[[i]]))
+              sprintf(" · B pLDDT %.1f",data$plddt_b[[i]]) else ""),
           "aria-label"=sprintf(
             "Inspect aligned residue pair with %.1f degree backbone shift",shift)
         )
@@ -2006,6 +2021,7 @@ server <- function(input, output, session) {
     fields <- c("chain_a", "residue_a", "insertion_a", "amino_a",
       "chain_b", "residue_b", "insertion_b", "amino_b",
       "delta_phi", "delta_psi", "angular_displacement", "shift_band",
+      "plddt_a", "confidence_a", "plddt_b", "confidence_b",
       "class_changed", "rama8000_region_a", "rama8000_region_b",
       "rama8000_changed", "alignment")
     if (!all(fields %in% names(result)))
@@ -2018,16 +2034,20 @@ server <- function(input, output, session) {
     shown$delta_phi <- round(shown$delta_phi, 1)
     shown$delta_psi <- round(shown$delta_psi, 1)
     shown$angular_displacement <- round(shown$angular_displacement, 1)
+    shown$plddt_a <- round(shown$plddt_a,1)
+    shown$plddt_b <- round(shown$plddt_b,1)
     shown$class_changed <- ifelse(shown$class_changed, "Yes", "No")
     shown$rama8000_changed <- ifelse(shown$rama8000_changed, "Yes", "No")
     shown <- shown[, c("chain_a", "pos_a", "amino_a",
       "chain_b", "pos_b", "amino_b", "delta_phi", "delta_psi",
-      "angular_displacement", "shift_band", "class_changed",
-      "rama8000_region_a", "rama8000_region_b",
+      "angular_displacement", "shift_band",
+      "plddt_a", "confidence_a", "plddt_b", "confidence_b",
+      "class_changed", "rama8000_region_a", "rama8000_region_b",
       "rama8000_changed", "alignment"), drop=FALSE]
     DT::datatable(shown, rownames=FALSE,
       colnames=c("Chain A", "Pos A", "AA A", "Chain B", "Pos B", "AA B",
                  "Δφ (°)", "Δψ (°)", "Backbone shift (°)", "Shift band",
+                 "pLDDT A", "Confidence A", "pLDDT B", "Confidence B",
                  "RamplotR changed", "Rama8000 A", "Rama8000 B",
                  "Rama8000 changed", "Alignment"),
       selection="single",
@@ -2434,6 +2454,8 @@ server <- function(input, output, session) {
       chainB=result$chain_b, posB=result$residue_b,
       insB=result$insertion_b, aminoB=result$amino_b,
       deltaPhi=result$delta_phi, deltaPsi=result$delta_psi,
+      plddtA=result$plddt_a, plddtB=result$plddt_b,
+      confidenceA=result$confidence_a, confidenceB=result$confidence_b,
       alignment=result$alignment
     ))
     comparison_model <- if (is.null(input$compareModel)) 1L else
@@ -2469,12 +2491,20 @@ server <- function(input, output, session) {
         tags$span(class="ram-compare-primary",
           tags$small("Primary"), tags$strong(label("a")),
           tags$span(paste("φ",angle(row$phi_a[[1L]]),
-                          "· ψ",angle(row$psi_a[[1L]])))),
+                          "· ψ",angle(row$psi_a[[1L]]))),
+          if(is.finite(row$plddt_a[[1L]]))
+            tags$span(class="ram-compare-confidence",
+              sprintf("pLDDT %.1f · %s",row$plddt_a[[1L]],
+                row$confidence_a[[1L]]))),
         tags$span(class="ram-compare-pair-arrow", "↔", "aria-hidden"="true"),
         tags$span(class="ram-compare-secondary",
           tags$small("Comparison"), tags$strong(label("b")),
           tags$span(paste("φ",angle(row$phi_b[[1L]]),
-                          "· ψ",angle(row$psi_b[[1L]]))))
+                          "· ψ",angle(row$psi_b[[1L]]))),
+          if(is.finite(row$plddt_b[[1L]]))
+            tags$span(class="ram-compare-confidence",
+              sprintf("pLDDT %.1f · %s",row$plddt_b[[1L]],
+                row$confidence_b[[1L]])))
       ),
       tags$div(class="ram-compare-selection-deltas",
         tags$span(paste("Δφ",angle(row$delta_phi[[1L]]))),

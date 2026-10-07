@@ -350,6 +350,11 @@ body > .container-fluid { max-width: none; padding: 0; }
   border: 1px solid #bdd4d1; color: #19575b; background:#fff;
   padding:3px 7px; border-radius: 7px; font-size: 11px; font-weight:700;
 }
+.ram-inspector-canonical {
+  border:1px solid #d5e4e6; color:#315b64; background:#f7fbfb;
+  padding:3px 7px; border-radius:7px; font-size:11px; font-weight:700;
+  font-variant-numeric:tabular-nums;
+}
 .ram-inspector-angles { display:flex; flex-wrap:wrap; gap: 8px 18px;
   color:#466570; font-size:12px; font-variant-numeric:tabular-nums; }
 .ram-inspector-actions { display:flex; flex-wrap:wrap; gap:7px; align-items:center; }

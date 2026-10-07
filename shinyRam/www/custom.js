@@ -700,10 +700,13 @@
     const bPhi = array(obj.phiB), bPsi = array(obj.psiB);
     const meta = {
       a: {chain:array(obj.chainA),pos:array(obj.posA),
-          ins:array(obj.insA),amino:array(obj.aminoA)},
+          ins:array(obj.insA),amino:array(obj.aminoA),
+          plddt:array(obj.plddtA),confidence:array(obj.confidenceA)},
       b: {chain:array(obj.chainB),pos:array(obj.posB),
-          ins:array(obj.insB),amino:array(obj.aminoB)}
+          ins:array(obj.insB),amino:array(obj.aminoB),
+          plddt:array(obj.plddtB),confidence:array(obj.confidenceB)}
     };
+    const deltaPlddt = array(obj.deltaPlddt);
     const makeTrace = function (side, phi, psi, name, color, symbol) {
       const x = [], y = [], text = [], customdata = [];
       const m = meta[side];
@@ -719,9 +722,18 @@
         const dphi = array(obj.deltaPhi)[i], dpsi = array(obj.deltaPsi)[i];
         const fmt = v => Number.isFinite(v) ? v.toFixed(1) + "°" : "N/A";
         x.push(phi[i]); y.push(psi[i]);
+        const plddt = Number(m.plddt[i]);
+        const conf = String(m.confidence[i] || "");
+        const dplddt = Number(deltaPlddt[i]);
+        const confidenceText = Number.isFinite(plddt)
+          ? "<br>pLDDT " + plddt.toFixed(1) +
+            (conf ? " · " + escapeText(conf) : "") : "";
+        const deltaConfidenceText = Number.isFinite(dplddt)
+          ? "<br>ΔpLDDT " + (dplddt >= 0 ? "+" : "") + dplddt.toFixed(1) : "";
         text.push(escapeText(label) + " ↔ " + escapeText(other) +
           "<br>φ " + fmt(phi[i]) + " · ψ " + fmt(psi[i]) +
-          "<br>Δφ " + fmt(dphi) + " · Δψ " + fmt(dpsi));
+          "<br>Δφ " + fmt(dphi) + " · Δψ " + fmt(dpsi) +
+          confidenceText + deltaConfidenceText);
         customdata.push([Number(ids[i]), side]);
       }
       return {type:"scattergl",mode:"markers",name:name,x:x,y:y,

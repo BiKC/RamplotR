@@ -28,6 +28,7 @@ source(file.path("R", "ramachandran.R"), local = TRUE)
 source(file.path("R", "rama8000.R"), local = TRUE)
 source(file.path("R", "backbone.R"), local = TRUE)
 source(file.path("R", "conformation.R"), local = TRUE)
+source(file.path("R", "canonical.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
 source(file.path("R", "inspection.R"), local = TRUE)
 source(file.path("R", "reports.R"), local = TRUE)
@@ -678,6 +679,7 @@ ui <- fluidPage(
   ),
   tags$script(src = "plotly-loader.js"),
   tags$script(src = "custom.js"),
+  tags$script(src = "canonical-mapping.js"),
   tags$script(src = "experimental-search.js"),
   tags$script(src = "compare.js"),
   tags$script(src = "prediction.js"),
@@ -696,6 +698,10 @@ server <- function(input, output, session) {
   experimental_search_results <- reactiveVal(NULL)
   experimental_search_status <- reactiveVal(NULL)
   experimental_search_request <- reactiveVal(0L)
+  canonical_segments <- reactiveVal(ram_canonical_empty_segments())
+  canonical_mapping <- reactiveVal(ram_canonical_empty_map())
+  canonical_status <- reactiveVal(NULL)
+  canonical_request <- reactiveVal(0L)
   selected_residue <- reactiveVal(NULL)
   selected_comparison <- reactiveVal(NULL)
   compare_swapped <- reactiveVal(FALSE)
@@ -919,7 +925,11 @@ server <- function(input, output, session) {
       loaded(list(key = key, name = name, torsions = torsions, chains = chains,
                   pdb = pdb, nmodels = ram_model_count(pdb), source_id = source_id,
                   viewer_format = viewer_format, prediction = prediction,
-                  declared_source = declared_source, input_source = source_type))
+                  declared_source = declared_source, input_source = source_type,
+                  pdb_accession = if (identical(source_type,"pdb"))
+                    toupper(source_label) else NULL,
+                  uniprot_accession = if (is_afdb)
+                    ram_uniprot_accession(source_label) else NULL))
       incProgress(0.25, detail = "Preparing interactive views")
     })
   }, ignoreInit = TRUE)

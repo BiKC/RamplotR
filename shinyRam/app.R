@@ -2379,9 +2379,18 @@ server <- function(input, output, session) {
   observeEvent(comparison_data(), {
     result <- comparison_data()
     if (!nrow(result)) return()
+    main <- req(loaded()); comparison <- req(comparison_loaded())
+    swapped <- isTRUE(compare_swapped())
+    comparison_model <- if (is.null(input$compareModel)) 1L
+      else as.integer(input$compareModel)
+    reference <- plot_reference()
     session$sendCustomMessage("ram-comparison", list(
-      nameA=req(loaded())$name,
-      nameB=req(comparison_loaded())$name,
+      nameA=if (swapped) comparison$name else main$name,
+      nameB=if (swapped) main$name else comparison$name,
+      matrix=reference,
+      limits=ram_density_thresholds(reference),
+      backgroundColors=active_palette(),
+      backgroundName=input$background,
       phiA=result$phi_a, psiA=result$psi_a,
       phiB=result$phi_b, psiB=result$psi_b,
       rowIds=result$row_id,
@@ -2394,10 +2403,10 @@ server <- function(input, output, session) {
     ))
     session$sendCustomMessage("ram-compare-config", list(
       chainA=input$compareChainA, chainB=input$compareChainB,
-      modelA=current_model(), modelB=if (is.null(input$compareModel)) 1L
-        else as.integer(input$compareModel),
-      multipleA=req(loaded())$nmodels > 1L,
-      multipleB=req(comparison_loaded())$nmodels > 1L
+      modelA=if (swapped) comparison_model else current_model(),
+      modelB=if (swapped) current_model() else comparison_model,
+      multipleA=if (swapped) comparison$nmodels > 1L else main$nmodels > 1L,
+      multipleB=if (swapped) main$nmodels > 1L else comparison$nmodels > 1L
     ))
   })
   output$compareSelectionInfo <- renderUI({
@@ -2468,24 +2477,37 @@ server <- function(input, output, session) {
         insertion_code=as.character(row[[paste0("insertion_",side)]][[1L]]),
         modelIndex=model, multipleModels=multiple)
     }
-    second <- req(comparison_loaded())
+    main <- req(loaded())
+    comparison <- req(comparison_loaded())
+    swapped <- isTRUE(compare_swapped())
+    comparison_model <- if (is.null(input$compareModel)) 1L else
+      as.integer(input$compareModel)
     session$sendCustomMessage("ram-comparison-selected",
       list(rowId=id))
     session$sendCustomMessage("ram-compare-pair", list(
-      a=pair("a",current_model(),req(loaded())$nmodels > 1L),
-      b=pair("b",if (is.null(input$compareModel)) 1L else
-                      as.integer(input$compareModel),second$nmodels > 1L)
+      a=pair("a",
+        if (swapped) comparison_model else current_model(),
+        if (swapped) comparison$nmodels > 1L else main$nmodels > 1L),
+      b=pair("b",
+        if (swapped) current_model() else comparison_model,
+        if (swapped) main$nmodels > 1L else comparison$nmodels > 1L)
     ))
   })
   output$NGLCompare <- NGLVieweR::renderNGLVieweR({
     req(input$showComparison3D,input$compareChainA,input$compareChainB)
     req(comparison_data())
-    first <- req(loaded()); second <- req(comparison_loaded())
+    main <- req(loaded()); comparison <- req(comparison_loaded())
+    swapped <- isTRUE(compare_swapped())
+    first <- if (swapped) comparison else main
+    second <- if (swapped) main else comparison
+    comparison_model <- if (is.null(input$compareModel)) 1L else
+      as.integer(input$compareModel)
+    first_model <- if (swapped) comparison_model else current_model()
+    second_model <- if (swapped) current_model() else comparison_model
     model_a <- if (first$nmodels > 1L)
-      paste0(" and /",current_model()-1L) else ""
+      paste0(" and /",first_model-1L) else ""
     model_b <- if (second$nmodels > 1L)
-      paste0(" and /",if (is.null(input$compareModel)) 0L else
-                     as.integer(input$compareModel)-1L) else ""
+      paste0(" and /",second_model-1L) else ""
     sel_a <- paste0(":", input$compareChainA, model_a, " and protein")
     sel_b <- paste0(":", input$compareChainB, model_b, " and protein")
     widget <- NGLVieweR(data=first$source_id,format=first$viewer_format) %>%

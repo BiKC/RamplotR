@@ -24,7 +24,15 @@ Depending on the data available for that residue, the explanation can surface:
 - the combination of very high pLDDT with a Rama8000 outlier;
 - cis or twisted peptide geometry;
 - an attached official wwPDB Ramachandran or rotamer outlier;
-- official local clashes or covalent-geometry outliers.
+- official local clashes or covalent-geometry outliers;
+- nearby non-water hetero residues such as ligands, cofactors or ions, reported
+  with their nearest heavy-atom distance when they fall within 6 Å.
+
+Local hetero context is intentionally descriptive. RamplotR reports spatial
+proximity but does **not** infer a binding interaction from distance alone.
+Water/solvent records and hydrogen atoms are excluded from this context. For
+multi-model coordinate files, hetero context is currently reported only for
+model 1 so ligand coordinates are never silently reused for another model.
 
 Each item identifies its source and explains why it may be worth examining.
 If none of the available evidence is unusual, the panel says so explicitly

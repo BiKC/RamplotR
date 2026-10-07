@@ -664,6 +664,8 @@ server <- function(input, output, session) {
   selected_residue <- reactiveVal(NULL)
   selected_comparison <- reactiveVal(NULL)
   compare_swapped <- reactiveVal(FALSE)
+  compare_choices <- reactiveValues(
+    main_chain=NULL, comparison_chain=NULL, comparison_model="1")
   viewer_ready <- reactiveVal(FALSE)
   current_model <- reactive({
     value <- input$modelChoice
@@ -924,6 +926,17 @@ server <- function(input, output, session) {
       preferred_chain_a=preferred_chain_a,
       preferred_chain_b=preferred_chain_b
     ))
+    main <- isolate(loaded())
+    main_chains <- if (!is.null(main$chains)) main$chains else
+      unique(main$torsions$chain)
+    comparison_chains <- unique(torsions$chain)
+    compare_choices$main_chain <-
+      if (!is.null(preferred_chain_a) && preferred_chain_a %in% main_chains)
+        preferred_chain_a else main_chains[[1L]]
+    compare_choices$comparison_chain <-
+      if (!is.null(preferred_chain_b) && preferred_chain_b %in% comparison_chains)
+        preferred_chain_b else comparison_chains[[1L]]
+    compare_choices$comparison_model <- "1"
     compare_swapped(FALSE)
     TRUE
   }
@@ -966,14 +979,14 @@ server <- function(input, output, session) {
       unique(first$torsions$chain)
     second_chains <- if (!is.null(second$chains)) second$chains else
       unique(second$torsions$chain)
-    preferred_a <- if (swapped) comparison$preferred_chain_b else
-      comparison$preferred_chain_a
-    preferred_b <- if (swapped) comparison$preferred_chain_a else
-      comparison$preferred_chain_b
-    selected_a <- if (!is.null(preferred_a) && preferred_a %in% first_chains)
-      preferred_a else first_chains[[1L]]
-    selected_b <- if (!is.null(preferred_b) && preferred_b %in% second_chains)
-      preferred_b else second_chains[[1L]]
+    selected_a <- if (swapped) compare_choices$comparison_chain else
+      compare_choices$main_chain
+    selected_b <- if (swapped) compare_choices$main_chain else
+      compare_choices$comparison_chain
+    if (is.null(selected_a) || !selected_a %in% first_chains)
+      selected_a <- first_chains[[1L]]
+    if (is.null(selected_b) || !selected_b %in% second_chains)
+      selected_b <- second_chains[[1L]]
     tags$div(class="ram-compare-chains",
       tags$div(class="ram-compare-role",
         tags$span(class="ram-compare-role-label","Primary · coral"),
@@ -985,11 +998,38 @@ server <- function(input, output, session) {
           choices=second_chains,selected=selected_b)),
       if (comparison$nmodels > 1L)
         selectInput("compareModel",paste("Model in",comparison$name),
-          choices=as.character(seq_len(comparison$nmodels)),selected="1"),
+          choices=as.character(seq_len(comparison$nmodels)),
+          selected=compare_choices$comparison_model),
       tags$span(class="ram-compare-swap-state",
         if(swapped) "Roles swapped" else "Loaded structure is primary")
     )
   })
+
+  observeEvent(input$compareChainA, {
+    value <- input$compareChainA
+    if (is.null(value) || !nzchar(value) || is.null(isolate(comparison_loaded())))
+      return()
+    if (isTRUE(isolate(compare_swapped())))
+      compare_choices$comparison_chain <- value
+    else
+      compare_choices$main_chain <- value
+  },ignoreInit=TRUE)
+
+  observeEvent(input$compareChainB, {
+    value <- input$compareChainB
+    if (is.null(value) || !nzchar(value) || is.null(isolate(comparison_loaded())))
+      return()
+    if (isTRUE(isolate(compare_swapped())))
+      compare_choices$main_chain <- value
+    else
+      compare_choices$comparison_chain <- value
+  },ignoreInit=TRUE)
+
+  observeEvent(input$compareModel, {
+    value <- as.character(input$compareModel)
+    if (!is.null(value) && nzchar(value))
+      compare_choices$comparison_model <- value
+  },ignoreInit=TRUE)
 
   plot_reference <- reactive({
     req(loaded(), input$bgtype, input$background)

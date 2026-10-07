@@ -81,10 +81,21 @@ Before starting or continuing work:
 4. search existing branch names for the intended feature;
 5. branch from current `main`, unless an intentionally stacked PR is explicitly documented here.
 
-Old merged branches such as `feature/rama8000-validation`,
-`feature/conformational-change-explorer` and `feature/prediction-ensemble`
-are historical implementation branches and must not be treated as active work.
+Old feature/fix/chore branches are retained in GitHub but are **not active work** unless this file explicitly says otherwise. This includes, among others:
 
-A temporary branch named `rebuild/compare-prediction-confidence-20261007`
-was used to reconstruct PR #40 cleanly on top of the then-current `main`.
-It is not active development work.
+- `feature/rama8000-validation`
+- `feature/conformational-change-explorer`
+- `feature/prediction-ensemble` and `feature/prediction-ensemble-reporting`
+- `feature/experimental-counterparts` and `feature/experimental-counterpart-search`
+- `feature/group-conformation-comparison*`
+- `feature/comparison-background-swap` and `fix/compare-background-swap`
+- `feature/compare-local-context`, `feature/compare-alignment-quality`,
+  `feature/compare-prediction-confidence`, and `feature/compare-workflow-polish`
+- `feature/af3-prediction-ensembles`, `feature/local-structure-context`,
+  `feature/residue-evidence-inspector`, and `feature/ensemble-evidence-inspector`
+- `chore/browser-test-stability-worklog` and `chore/prediction-upload-order`
+- `rebuild/compare-prediction-confidence-20261007`
+
+The only long-lived non-main branch intentionally kept for active content is
+`arxiv-preprint` / PR #20. The only implementation branch currently active is
+the one named in **Active work** above.

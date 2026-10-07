@@ -498,7 +498,10 @@ ui <- fluidPage(
                   tags$div(id = "ram-compare-upload", class = "is-hidden",
                     fileInput("compareFile", "Second PDB/mmCIF file",
                       accept = c(".pdb", ".ent", ".cif", ".mmcif", ".mcif"))),
-                  actionButton("compareSubmit", "Load comparison", class="btn-primary")
+                  actionButton("compareSubmit", "Load comparison", class="btn-primary"),
+                  actionButton("compareSwap", "Swap primary ↔ comparison",
+                    class="btn-default",
+                    title="Swap A/B roles without reloading either structure")
                 ),
                 uiOutput("compareChainControls"),
                 tags$div(class = "ram-compare-status", uiOutput("compareSummary")),
@@ -660,6 +663,7 @@ server <- function(input, output, session) {
   experimental_search_request <- reactiveVal(0L)
   selected_residue <- reactiveVal(NULL)
   selected_comparison <- reactiveVal(NULL)
+  compare_swapped <- reactiveVal(FALSE)
   viewer_ready <- reactiveVal(FALSE)
   current_model <- reactive({
     value <- input$modelChoice
@@ -920,6 +924,7 @@ server <- function(input, output, session) {
       preferred_chain_a=preferred_chain_a,
       preferred_chain_b=preferred_chain_b
     ))
+    compare_swapped(FALSE)
     TRUE
   }
 
@@ -945,24 +950,44 @@ server <- function(input, output, session) {
     }
   }, ignoreInit=TRUE)
 
+  observeEvent(input$compareSwap, {
+    req(loaded(),comparison_loaded())
+    compare_swapped(!isTRUE(isolate(compare_swapped())))
+    selected_comparison(NULL)
+  },ignoreInit=TRUE)
+
   output$compareChainControls <- renderUI({
-    first <- req(loaded())
-    second <- req(comparison_loaded())
-    chains_b <- unique(second$torsions$chain)
-    preferred_a <- second$preferred_chain_a
-    preferred_b <- second$preferred_chain_b
-    selected_a <- if (!is.null(preferred_a) && preferred_a %in% first$chains)
-      preferred_a else first$chains[[1L]]
-    selected_b <- if (!is.null(preferred_b) && preferred_b %in% chains_b)
-      preferred_b else chains_b[[1L]]
+    main <- req(loaded())
+    comparison <- req(comparison_loaded())
+    swapped <- isTRUE(compare_swapped())
+    first <- if (swapped) comparison else main
+    second <- if (swapped) main else comparison
+    first_chains <- if (!is.null(first$chains)) first$chains else
+      unique(first$torsions$chain)
+    second_chains <- if (!is.null(second$chains)) second$chains else
+      unique(second$torsions$chain)
+    preferred_a <- if (swapped) comparison$preferred_chain_b else
+      comparison$preferred_chain_a
+    preferred_b <- if (swapped) comparison$preferred_chain_a else
+      comparison$preferred_chain_b
+    selected_a <- if (!is.null(preferred_a) && preferred_a %in% first_chains)
+      preferred_a else first_chains[[1L]]
+    selected_b <- if (!is.null(preferred_b) && preferred_b %in% second_chains)
+      preferred_b else second_chains[[1L]]
     tags$div(class="ram-compare-chains",
-      selectInput("compareChainA", paste("Chain in", first$name),
-        choices=first$chains, selected=selected_a),
-      selectInput("compareChainB", paste("Chain in", second$name),
-        choices=chains_b, selected=selected_b),
-      if (second$nmodels > 1L)
-        selectInput("compareModel", "Second structure model",
-          choices=as.character(seq_len(second$nmodels)), selected="1")
+      tags$div(class="ram-compare-role",
+        tags$span(class="ram-compare-role-label","Primary · coral"),
+        selectInput("compareChainA",paste("Chain in",first$name),
+          choices=first_chains,selected=selected_a)),
+      tags$div(class="ram-compare-role",
+        tags$span(class="ram-compare-role-label","Comparison · blue"),
+        selectInput("compareChainB",paste("Chain in",second$name),
+          choices=second_chains,selected=selected_b)),
+      if (comparison$nmodels > 1L)
+        selectInput("compareModel",paste("Model in",comparison$name),
+          choices=as.character(seq_len(comparison$nmodels)),selected="1"),
+      tags$span(class="ram-compare-swap-state",
+        if(swapped) "Roles swapped" else "Loaded structure is primary")
     )
   })
 
@@ -1690,23 +1715,29 @@ server <- function(input, output, session) {
     ram_extract_torsions(ram_model_at(second$pdb, choice))
   })
   comparison_data <- reactive({
-    first <- req(loaded())
-    second <- req(comparison_loaded())
-    req(input$compareChainA, input$compareChainB, input$bgtype,
-        input$validationMode)
-    original <- classified()
-    original <- original[original$chain == input$compareChainA, , drop=FALSE]
-    secondary <- ram_classify_torsions(comparison_torsions(),
-      reference_dir = file.path("static", input$bgtype),
+    req(loaded(),comparison_loaded(),input$compareChainA,input$compareChainB,
+        input$bgtype,input$validationMode)
+    main_data <- classified()
+    comparison_data_raw <- ram_classify_torsions(comparison_torsions(),
+      reference_dir=file.path("static",input$bgtype),
       selected_reference=plot_reference(),
       mode=input$validationMode,
       threshold_fn=ram_density_thresholds)
-    secondary <- ram_rama8000_classify(
-      secondary, file.path("static", "rama8000"))
-    secondary <- secondary[secondary$chain == input$compareChainB, , drop=FALSE]
-    if (!nrow(original) || !nrow(secondary))
-      return(data.frame())
-    result <- ram_compare_torsions(original, secondary)
+    comparison_data_raw <- ram_rama8000_classify(
+      comparison_data_raw,file.path("static","rama8000"))
+    if (isTRUE(compare_swapped())) {
+      first <- comparison_data_raw[
+        comparison_data_raw$chain==input$compareChainA,,drop=FALSE]
+      second <- main_data[
+        main_data$chain==input$compareChainB,,drop=FALSE]
+    } else {
+      first <- main_data[
+        main_data$chain==input$compareChainA,,drop=FALSE]
+      second <- comparison_data_raw[
+        comparison_data_raw$chain==input$compareChainB,,drop=FALSE]
+    }
+    if (!nrow(first) || !nrow(second)) return(data.frame())
+    result <- ram_compare_torsions(first,second)
     result$row_id <- seq_len(nrow(result))
     result
   })
@@ -1719,25 +1750,25 @@ server <- function(input, output, session) {
         row_index < 1L || row_index > nrow(data)) return(invisible(FALSE))
     row <- data[row_index, , drop=FALSE]
     selected_comparison(row$row_id[[1L]])
-    # Make the shared inspector and main sequence navigator follow the
-    # primary chain, without selecting residues hidden by main plot filters.
-    if (!is.na(row$residue_a[[1L]])) {
+    # Keep the global inspector synced only to the truly loaded structure.
+    # When comparison roles are swapped, that structure is side B.
+    main_side <- if (isTRUE(isolate(compare_swapped()))) "b" else "a"
+    number <- row[[paste0("residue_",main_side)]][[1L]]
+    if (!is.na(number)) {
+      chain <- row[[paste0("chain_",main_side)]][[1L]]
+      insertion <- row[[paste0("insertion_",main_side)]][[1L]]
       visible <- isolate(displayed())
-      matches <- which(visible$chain == row$chain_a[[1L]] &
-        visible$resi == row$residue_a[[1L]] &
-        visible$insertion_code == row$insertion_a[[1L]])
+      matches <- which(visible$chain==chain & visible$resi==number &
+        visible$insertion_code==insertion)
       if (length(matches)) selected_residue(list(
-        chain = row$chain_a[[1L]],
-        resi = as.integer(row$residue_a[[1L]]),
-        insertion_code = row$insertion_a[[1L]]
-      ))
+        chain=chain,resi=as.integer(number),insertion_code=insertion))
     }
     invisible(TRUE)
   }
-  observeEvent(list(input$compareChainA, input$compareChainB,
-                    input$compareModel, comparison_loaded()), {
+  observeEvent(list(input$compareChainA,input$compareChainB,
+                    input$compareModel,comparison_loaded(),compare_swapped()), {
     selected_comparison(NULL)
-  }, ignoreInit=TRUE)
+  },ignoreInit=TRUE)
   observeEvent(input$ramComparePlotPick, {
     choose_comparison(input$ramComparePlotPick)
   }, ignoreInit=TRUE)
@@ -1793,15 +1824,20 @@ server <- function(input, output, session) {
   # partner when the comparison is available.
   observeEvent(selected_residue(), {
     item <- selected_residue()
-    if (is.null(item) || is.null(isolate(input$compareChainA)) ||
-        !identical(item$chain, isolate(input$compareChainA)) ||
-        is.null(isolate(comparison_loaded()))) return()
-    index <- ram_comparison_find(isolate(comparison_data()), "a",
-               item$chain, item$resi, item$insertion_code)
-    if (!is.na(index) &&
-        !identical(isolate(selected_comparison()), index))
-      selected_comparison(index)
-  }, ignoreNULL=TRUE)
+    if (is.null(item) || is.null(isolate(comparison_loaded()))) return()
+    main_side <- if (isTRUE(isolate(compare_swapped()))) "b" else "a"
+    main_chain <- if (identical(main_side,"a"))
+      isolate(input$compareChainA) else isolate(input$compareChainB)
+    if (is.null(main_chain) || !identical(item$chain,main_chain)) return()
+    data <- isolate(comparison_data())
+    index <- ram_comparison_find(
+      data,main_side,item$chain,item$resi,item$insertion_code)
+    if (!is.na(index)) {
+      row_id <- data$row_id[[index]]
+      if (!identical(isolate(selected_comparison()),row_id))
+        selected_comparison(row_id)
+    }
+  },ignoreNULL=TRUE)
   filtered_comparison <- reactive({
     result <- comparison_data()
     if (!nrow(result)) return(result)
@@ -2341,9 +2377,15 @@ server <- function(input, output, session) {
   observeEvent(comparison_data(), {
     result <- comparison_data()
     if (!nrow(result)) return()
+    main <- req(loaded()); comparison <- req(comparison_loaded())
+    swapped <- isTRUE(compare_swapped())
     session$sendCustomMessage("ram-comparison", list(
-      nameA=req(loaded())$name,
-      nameB=req(comparison_loaded())$name,
+      nameA=if(swapped) comparison$name else main$name,
+      nameB=if(swapped) main$name else comparison$name,
+      matrix=plot_reference(),
+      limits=ram_density_thresholds(plot_reference()),
+      backgroundColors=active_palette(),
+      backgroundName=input$background,
       phiA=result$phi_a, psiA=result$psi_a,
       phiB=result$phi_b, psiB=result$psi_b,
       rowIds=result$row_id,
@@ -2354,12 +2396,14 @@ server <- function(input, output, session) {
       deltaPhi=result$delta_phi, deltaPsi=result$delta_psi,
       alignment=result$alignment
     ))
-    session$sendCustomMessage("ram-compare-config", list(
-      chainA=input$compareChainA, chainB=input$compareChainB,
-      modelA=current_model(), modelB=if (is.null(input$compareModel)) 1L
-        else as.integer(input$compareModel),
-      multipleA=req(loaded())$nmodels > 1L,
-      multipleB=req(comparison_loaded())$nmodels > 1L
+    comparison_model <- if (is.null(input$compareModel)) 1L else
+      as.integer(input$compareModel)
+    session$sendCustomMessage("ram-compare-config",list(
+      chainA=input$compareChainA,chainB=input$compareChainB,
+      modelA=if(swapped) comparison_model else current_model(),
+      modelB=if(swapped) current_model() else comparison_model,
+      multipleA=if(swapped) comparison$nmodels>1L else main$nmodels>1L,
+      multipleB=if(swapped) main$nmodels>1L else comparison$nmodels>1L
     ))
   })
   output$compareSelectionInfo <- renderUI({
@@ -2430,40 +2474,51 @@ server <- function(input, output, session) {
         insertion_code=as.character(row[[paste0("insertion_",side)]][[1L]]),
         modelIndex=model, multipleModels=multiple)
     }
-    second <- req(comparison_loaded())
-    session$sendCustomMessage("ram-comparison-selected",
-      list(rowId=id))
-    session$sendCustomMessage("ram-compare-pair", list(
-      a=pair("a",current_model(),req(loaded())$nmodels > 1L),
-      b=pair("b",if (is.null(input$compareModel)) 1L else
-                      as.integer(input$compareModel),second$nmodels > 1L)
+    main <- req(loaded()); comparison <- req(comparison_loaded())
+    swapped <- isTRUE(compare_swapped())
+    comparison_model <- if (is.null(input$compareModel)) 1L else
+      as.integer(input$compareModel)
+    session$sendCustomMessage("ram-comparison-selected",list(rowId=id))
+    session$sendCustomMessage("ram-compare-pair",list(
+      a=pair("a",
+        if(swapped) comparison_model else current_model(),
+        if(swapped) comparison$nmodels>1L else main$nmodels>1L),
+      b=pair("b",
+        if(swapped) current_model() else comparison_model,
+        if(swapped) main$nmodels>1L else comparison$nmodels>1L)
     ))
   })
   output$NGLCompare <- NGLVieweR::renderNGLVieweR({
     req(input$showComparison3D,input$compareChainA,input$compareChainB)
     req(comparison_data())
-    first <- req(loaded()); second <- req(comparison_loaded())
+    main <- req(loaded()); comparison <- req(comparison_loaded())
+    swapped <- isTRUE(compare_swapped())
+    first <- if(swapped) comparison else main
+    second <- if(swapped) main else comparison
+    comparison_model <- if (is.null(input$compareModel)) 1L else
+      as.integer(input$compareModel)
+    first_model <- if(swapped) comparison_model else current_model()
+    second_model <- if(swapped) current_model() else comparison_model
     model_a <- if (first$nmodels > 1L)
-      paste0(" and /",current_model()-1L) else ""
+      paste0(" and /",first_model-1L) else ""
     model_b <- if (second$nmodels > 1L)
-      paste0(" and /",if (is.null(input$compareModel)) 0L else
-                     as.integer(input$compareModel)-1L) else ""
-    sel_a <- paste0(":", input$compareChainA, model_a, " and protein")
-    sel_b <- paste0(":", input$compareChainB, model_b, " and protein")
+      paste0(" and /",second_model-1L) else ""
+    sel_a <- paste0(":",input$compareChainA,model_a," and protein")
+    sel_b <- paste0(":",input$compareChainB,model_b," and protein")
     widget <- NGLVieweR(data=first$source_id,format=first$viewer_format) %>%
       NGLVieweR::stageParameters(backgroundColor="#f7fafb") %>%
       addRepresentation("cartoon",param=list(
         sele=sel_a,color="#CE6A4D",name="ram-compare-chain-a")) %>%
       addRepresentation("ball+stick",param=list(
         sele="none",color="#ffc04a",scale=1.5,name="ram-compare-highlight-a"))
-    widget <- NGLVieweR::addStructure(widget, data=second$source_id,
+    widget <- NGLVieweR::addStructure(widget,data=second$source_id,
                                      format=second$viewer_format) %>%
       addRepresentation("cartoon",param=list(
         sele=sel_b,color="#317E9A",name="ram-compare-chain-b")) %>%
       addRepresentation("ball+stick",param=list(
         sele="none",color="#83e6f5",scale=1.5,name="ram-compare-highlight-b"))
-    NGLVieweR::setSuperpose(widget, reference=1,
-      sele_reference=sel_a, sele_target=sel_b)
+    NGLVieweR::setSuperpose(widget,reference=1,
+      sele_reference=sel_a,sele_target=sel_b)
   })
   observeEvent(input$NGLCompare_PDB, {
     if (is.null(isolate(comparison_loaded()))) return()

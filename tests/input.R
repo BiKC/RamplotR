@@ -16,6 +16,27 @@ assert(identical(ram_load_structure(uploaded, "protein.pdb",
   read_pdb = mock_pdb, read_cif = mock_cif)$atom$chain, "A"), "PDB upload")
 assert(identical(ram_load_structure(uploaded, "protein.mmcif",
   read_pdb = mock_pdb, read_cif = mock_cif)$atom$chain, "B"), "CIF upload")
+
+mock_pdb_with_hetero <- function(path, ATOM.only=TRUE, ...) {
+  protein <- data.frame(
+    type="ATOM",chain="A",resid="ALA",resno=1L,elety="CA",
+    x=0,y=0,z=0,stringsAsFactors=FALSE
+  )
+  if (isTRUE(ATOM.only)) return(list(atom=protein))
+  rbind_atoms <- rbind(
+    protein,
+    data.frame(type="HETATM",chain="B",resid="ATP",resno=401L,elety="P",
+               x=3,y=0,z=0,stringsAsFactors=FALSE),
+    data.frame(type="HETATM",chain="B",resid="HOH",resno=501L,elety="O",
+               x=2,y=0,z=0,stringsAsFactors=FALSE)
+  )
+  list(atom=rbind_atoms)
+}
+with_context <- ram_load_structure(uploaded,"protein.pdb",
+  read_pdb=mock_pdb_with_hetero,read_cif=mock_cif)
+assert(nrow(with_context$atom)==1L && nrow(with_context$hetero_atom)==1L &&
+       identical(as.character(with_context$hetero_atom$resid),"ATP"),
+       "PDB loading must preserve non-water HETATM records separately without changing the analysis atom table.")
 assert(inherits(try(ram_load_structure(uploaded, "bad.xyz",
   read_pdb = mock_pdb, read_cif = mock_cif), silent = TRUE), "try-error"),
   "Unknown extension must fail before parsing")

@@ -965,7 +965,7 @@ server <- function(input, output, session) {
         canonical_mapping(mapping)
         canonical_status(list(
           state="mapped",source="AlphaFold DB",
-          mapped_residues=nrow(mapping),
+          expanded_mapping_rows=nrow(mapping),
           accessions=unique(mapping$uniprot_accession)
         ))
       }
@@ -1017,13 +1017,15 @@ server <- function(input, output, session) {
     mapping <- ram_sifts_expand_safe(segments)
     canonical_segments(segments)
     canonical_mapping(mapping)
+    safe_n <- sum(segments$safe_linear,na.rm=TRUE)
     canonical_status(list(
-      state=if(nrow(mapping)) "mapped" else "partial",
+      state=if(nrow(segments) && safe_n==nrow(segments) && nrow(mapping))
+        "mapped" else "partial",
       source="PDBe SIFTS",
       endpoint=if(is.null(value$endpoint)) "" else as.character(value$endpoint),
       segments=nrow(segments),
-      safe_segments=sum(segments$safe_linear,na.rm=TRUE),
-      mapped_residues=nrow(mapping),
+      safe_segments=safe_n,
+      expanded_mapping_rows=nrow(mapping),
       accessions=unique(segments$uniprot_accession)
     ))
   },ignoreInit=TRUE)
@@ -1461,8 +1463,13 @@ server <- function(input, output, session) {
         if(!is.null(mapping$accessions) && length(mapping$accessions))
           provenance$canonical_uniprot_accessions <-
             paste(mapping$accessions,collapse=",")
-        if(!is.null(mapping$mapped_residues))
-          provenance$canonical_mapped_residues <- mapping$mapped_residues
+        provenance$canonical_mapped_residues <-
+          if("canonical_status" %in% names(data))
+            sum(data$canonical_status=="mapped",na.rm=TRUE) else 0L
+        if(!is.null(mapping$segments))
+          provenance$canonical_mapping_segments <- mapping$segments
+        if(!is.null(mapping$safe_segments))
+          provenance$canonical_safe_linear_segments <- mapping$safe_segments
         if(!is.null(mapping$endpoint) && nzchar(mapping$endpoint))
           provenance$canonical_mapping_endpoint <- mapping$endpoint
       }

@@ -2758,6 +2758,16 @@ server <- function(input, output, session) {
     if (is.null(row)) return(tags$span(class = "ram-inspector-empty",
       "Select a residue in the plot, table, sequence or 3D model. Review controls navigate to the next issue."))
     angle <- function(value) if (is.finite(value)) sprintf("%.1f°", value) else "Unavailable"
+    evidence <- ram_residue_evidence(row)
+    evidence_item <- function(item) {
+      level <- as.character(item$level[[1L]])
+      tags$div(class=paste("ram-evidence-item",paste0("ram-evidence-",level)),
+        tags$div(class="ram-evidence-item-head",
+          tags$strong(as.character(item$title[[1L]])),
+          tags$span(as.character(item$source[[1L]]))),
+        tags$p(as.character(item$detail[[1L]]))
+      )
+    }
     tags$div(class = "ram-inspector-data",
       tags$div(tags$strong(sprintf("%s %d%s · %s",
         if (nzchar(row$chain[[1L]])) paste("Chain", row$chain[[1L]]) else "Chain",
@@ -2797,9 +2807,25 @@ server <- function(input, output, session) {
                     row$confidence_category[[1L]])),
         if ("plddt" %in% names(row) && is.finite(row$plddt[[1L]]) &&
             row$plddt[[1L]] >= 90 &&
-            identical(as.character(row$region[[1L]]), "Not allowed"))
+            identical(as.character(row$rama8000_region[[1L]]), "Outlier"))
           tags$span(class = "ram-inspector-warning",
-            "High model confidence, unusual backbone geometry; inspect locally.")
+            "High model confidence with a Rama8000 outlier; inspect locally.")
+      ),
+      tags$details(class="ram-evidence-panel",
+        open=if(nrow(evidence)>0L) "open" else NULL,
+        tags$summary(
+          if(nrow(evidence))
+            sprintf("Why inspect this residue? · %d signal%s",
+              nrow(evidence),if(nrow(evidence)==1L) "" else "s")
+          else "Why inspect this residue? · no obvious issue"
+        ),
+        if(nrow(evidence))
+          tags$div(class="ram-evidence-list",
+            lapply(seq_len(nrow(evidence)),function(i)
+              evidence_item(evidence[i,,drop=FALSE])))
+        else
+          tags$p(class="ram-evidence-none",
+            "No unusual signal is present in the currently available backbone, prediction-confidence or attached official-validation evidence.")
       )
     )
   })

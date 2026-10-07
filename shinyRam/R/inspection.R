@@ -1,6 +1,121 @@
 # Pure residue inspection and pairwise comparison helpers.
 # Nothing in this file changes torsion extraction or scientific classification.
 
+ram_residue_evidence <- function(row, boundary_margin = 2) {
+  if (!is.data.frame(row) || nrow(row) != 1L)
+    stop("Residue evidence expects exactly one residue row.")
+  evidence <- list()
+  add <- function(level, title, detail, source) {
+    evidence[[length(evidence)+1L]] <<- data.frame(
+      level=level,title=title,detail=detail,source=source,
+      stringsAsFactors=FALSE
+    )
+  }
+  value <- function(name, default=NA) {
+    if (!name %in% names(row) || !length(row[[name]])) return(default)
+    row[[name]][[1L]]
+  }
+  phi <- suppressWarnings(as.numeric(value("phi",NA_real_)))
+  psi <- suppressWarnings(as.numeric(value("psi",NA_real_)))
+  native <- as.character(value("region",NA_character_))
+  standard <- as.character(value("rama8000_region",NA_character_))
+  plddt <- suppressWarnings(as.numeric(value("plddt",NA_real_)))
+
+  if (!is.finite(phi) || !is.finite(psi)) {
+    add("warning","Backbone angles unavailable",
+        "Phi/psi cannot be evaluated for this residue, commonly because it is terminal or required backbone atoms are missing.",
+        "Coordinates")
+  } else {
+    if (!is.na(standard) && standard == "Outlier") {
+      add("high","Rama8000 backbone outlier",
+          "The current six-class standard validation places this residue outside the allowed Rama8000 region.",
+          "Rama8000")
+    } else if (!is.na(standard) && standard == "Allowed") {
+      add("info","Rama8000 allowed region",
+          "The residue is outside the favored Rama8000 region but remains within the allowed region.",
+          "Rama8000")
+    }
+    if (!is.na(native) && native == "Not allowed") {
+      add("warning","Unusual RamplotR density position",
+          "The selected RamplotR reference distribution labels this position Not allowed. This is separate from Rama8000 outlier status.",
+          "RamplotR density")
+    }
+    density <- suppressWarnings(as.numeric(value("density",NA_real_)))
+    if (is.finite(density) &&
+        any(abs(density-c(85,98,99.95)) <= boundary_margin)) {
+      add("info","Near a RamplotR contour boundary",
+          sprintf("Density percentile %.1f lies within %.1f points of a display-classification contour.",
+                  density,boundary_margin),
+          "RamplotR density")
+    }
+  }
+
+  if (is.finite(plddt)) {
+    if (plddt < 50) {
+      add("warning","Very low prediction confidence",
+          sprintf("pLDDT %.1f indicates very low local model confidence; local geometry should be interpreted cautiously.",plddt),
+          "Prediction confidence")
+    } else if (plddt < 70) {
+      add("info","Low prediction confidence",
+          sprintf("pLDDT %.1f indicates low local model confidence.",plddt),
+          "Prediction confidence")
+    }
+    if (plddt >= 90 && !is.na(standard) && standard == "Outlier") {
+      add("high","High-confidence prediction with unusual backbone geometry",
+          sprintf("pLDDT %.1f is very high while Rama8000 classifies the backbone as an outlier; inspect the local structural context.",plddt),
+          "Combined evidence")
+    }
+  }
+
+  omega_status <- as.character(value("omega_status",NA_character_))
+  omega <- suppressWarnings(as.numeric(value("omega",NA_real_)))
+  if (!is.na(omega_status) && omega_status == "Twisted") {
+    add("high","Twisted peptide bond",
+        if (is.finite(omega)) sprintf("Peptide omega is %.1f degrees.",omega)
+        else "The preceding peptide bond is classified as twisted.",
+        "Local geometry")
+  } else if (!is.na(omega_status) && omega_status == "Cis") {
+    add("info","Cis peptide bond",
+        if (is.finite(omega)) sprintf("Peptide omega is %.1f degrees.",omega)
+        else "The preceding peptide bond is cis.",
+        "Local geometry")
+  }
+
+  official_rama <- tolower(as.character(value("wwpdb_rama",NA_character_)))
+  if (!is.na(official_rama) && official_rama == "outlier")
+    add("high","Official wwPDB Ramachandran outlier",
+        "The attached official validation report identifies this residue as a Ramachandran outlier.",
+        "wwPDB")
+  rotamer <- tolower(as.character(value("wwpdb_rotamer",NA_character_)))
+  if (!is.na(rotamer) && rotamer %in% c("outlier","outliers"))
+    add("warning","Official wwPDB rotamer outlier",
+        "The attached official validation report identifies the side-chain rotamer as an outlier.",
+        "wwPDB")
+  clashes <- suppressWarnings(as.numeric(value("wwpdb_clashes",NA_real_)))
+  if (is.finite(clashes) && clashes > 0)
+    add("warning","Official wwPDB local clash",
+        sprintf("The attached report records %d local clash%s for this residue.",
+                as.integer(clashes),if (clashes==1) "" else "es"),
+        "wwPDB")
+  bond <- suppressWarnings(as.numeric(value("wwpdb_bond_outliers",NA_real_)))
+  angle <- suppressWarnings(as.numeric(value("wwpdb_angle_outliers",NA_real_)))
+  if ((is.finite(bond) && bond > 0) || (is.finite(angle) && angle > 0))
+    add("warning","Official covalent-geometry outlier",
+        sprintf("The attached report records %d bond-length and %d bond-angle outlier%s.",
+          ifelse(is.finite(bond),as.integer(bond),0L),
+          ifelse(is.finite(angle),as.integer(angle),0L),
+          ifelse((ifelse(is.finite(bond),bond,0)+ifelse(is.finite(angle),angle,0))==1,
+                 "","s")),
+        "wwPDB")
+
+  if (!length(evidence))
+    return(data.frame(level=character(),title=character(),
+      detail=character(),source=character(),stringsAsFactors=FALSE))
+  out <- do.call(rbind,evidence)
+  priority <- match(out$level,c("high","warning","info"))
+  out[order(priority,out$source,out$title),,drop=FALSE]
+}
+
 ram_review_queue <- function(data, boundary_margin = 2) {
   if (!nrow(data)) return(data)
   missing <- is.na(data$phi) | is.na(data$psi) | is.na(data$region)

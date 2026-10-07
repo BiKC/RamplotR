@@ -61,6 +61,7 @@ For every matched residue RamplotR reports:
 - circular standard deviation of phi and psi;
 - number of models contributing each angle;
 - native RamplotR density-region agreement;
+- coarse backbone-state mode and agreement (Alpha-R, Beta, PPII, Alpha-L or Other);
 - Rama8000 Favored/Allowed/Outlier mode and agreement;
 - mean, standard deviation, minimum and maximum pLDDT.
 
@@ -79,8 +80,11 @@ navigation aid:
 
 These bands are interface thresholds, not statistical significance cutoffs.
 
-A separate outline marks residues whose Rama8000 category differs between
-models.
+The variability map separately marks residues whose coarse backbone state
+differs between models and residues whose Rama8000 category differs. The
+backbone-state label is assigned from wrapped phi/psi proximity to fixed
+canonical centres and is used only as a comparison bin. It is not a DSSP
+secondary-structure assignment or a validation result.
 
 ## Model-level provenance
 
@@ -116,6 +120,7 @@ evidence of molecular dynamics.
 A useful pattern is a residue with:
 
 - large phi/psi spread;
+- disagreement between broad backbone states;
 - changing Rama8000 category;
 - and/or large pLDDT variability across seeds.
 

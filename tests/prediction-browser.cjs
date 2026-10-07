@@ -145,6 +145,50 @@ const puppeteer = require("puppeteer-core");
     await page.screenshot({path:path.join(output,"prediction-esmfold.png"),
       fullPage:true});
 
+    // Pairwise comparison preserves prediction provenance independently on
+    // both sides. Set the comparison source before attaching its file so the
+    // reactive upload controls cannot discard the selected File object.
+    await page.click('.nav-tabs a[data-value="compare"]');
+    await page.evaluate(() =>
+      document.querySelector(
+        'input[name="compareInputSource"][value="upload"]').click());
+    await page.waitForFunction(() =>
+      !document.getElementById("ram-compare-upload")
+        .classList.contains("is-hidden"),{timeout:10000});
+    await page.select("#comparePredictionSource","esmfold");
+    await page.waitForFunction(() =>
+      window.Shiny?.shinyapp?.$inputValues?.comparePredictionSource==="esmfold",
+      {timeout:10000});
+    await (await page.$("#compareFile")).uploadFile(fixtureSeed2);
+    await page.waitForFunction(() => {
+      const input=document.getElementById("compareFile");
+      return input && input.files && input.files.length===1;
+    },{timeout:10000});
+    await new Promise(done=>setTimeout(done,1800));
+    await page.click("#compareSubmit");
+    await page.waitForFunction(() =>
+      document.querySelectorAll("#comparison tbody tr").length>0 &&
+      document.querySelectorAll(".ram-change-cell").length>20,
+      {timeout:30000});
+    const confidenceHeaders=await page.$eval("#comparison thead th",
+      nodes=>nodes.map(node=>node.textContent.trim()));
+    assert.ok(confidenceHeaders.includes("pLDDT A") &&
+              confidenceHeaders.includes("pLDDT B") &&
+              confidenceHeaders.includes("ΔpLDDT"),
+      "Prediction-vs-prediction comparison should expose pLDDT columns.");
+    await page.click(".ram-change-cell");
+    await page.waitForFunction(() => {
+      const panel=document.querySelector(".ram-compare-selection");
+      return panel && panel.textContent.includes("pLDDT 87.0") &&
+        panel.textContent.includes("pLDDT 67.0") &&
+        panel.textContent.includes("ΔpLDDT -20.0");
+    },{timeout:15000});
+    await page.screenshot({
+      path:path.join(output,"prediction-confidence-comparison.png"),
+      fullPage:true
+    });
+    await page.click('.nav-tabs a[data-value="plot"]');
+
     // A predicted model can discover experimental PDB counterparts without
     // leaving the RamplotR workflow. API calls are mocked here so CI tests the
     // client-side request contract and one-click comparison deterministically.

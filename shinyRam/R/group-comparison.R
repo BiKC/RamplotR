@@ -149,8 +149,8 @@ ram_group_conformation_compare <- function(reference, group_a, group_b,
   out <- ids
   numeric_fields <- c("phi_models","psi_models","phi_mean","phi_sd",
                       "psi_mean","psi_sd","rama8000_models",
-                      "rama8000_consistency")
-  char_fields <- c("rama8000_mode")
+                      "rama8000_consistency","basin_models","basin_consistency")
+  char_fields <- c("rama8000_mode","basin_mode")
   for(field in numeric_fields) {
     out[[paste0("a_",field)]] <- pick(a,ia,field)
     out[[paste0("b_",field)]] <- pick(b,ib,field)
@@ -198,6 +198,9 @@ ram_group_conformation_compare <- function(reference, group_a, group_b,
   out$rama8000_mode_changed <- !is.na(out$a_rama8000_mode) &
     !is.na(out$b_rama8000_mode) &
     out$a_rama8000_mode != out$b_rama8000_mode
+  out$basin_mode_changed <- !is.na(out$a_basin_mode) &
+    !is.na(out$b_basin_mode) &
+    out$a_basin_mode != out$b_basin_mode
 
   out$evidence_profile <- ifelse(
     !is.finite(out$angular_displacement),"Unavailable",
@@ -210,7 +213,8 @@ ram_group_conformation_compare <- function(reference, group_a, group_b,
           ifelse(out$angular_displacement>=15,"Moderate shift","Small shift")))))
   out$group_a <- label_a
   out$group_b <- label_b
-  out[order(-as.integer(out$high_support_shift),
+  out[order(-as.integer(out$basin_mode_changed),
+            -as.integer(out$high_support_shift),
             -as.integer(out$consistent_shift),
             -replace(out$angular_displacement,
                      !is.finite(out$angular_displacement),-Inf),

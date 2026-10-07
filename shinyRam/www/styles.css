@@ -1312,7 +1312,13 @@ body > .container-fluid { max-width: none; padding: 0; }
 }
 .ram-group-upload-card .form-group { margin-bottom:8px; }
 .ram-group-cell.is-consistent {
-  outline:2px solid #173f48; outline-offset:1px;
+  outline:1px solid #496d73; outline-offset:1px;
+}
+.ram-group-cell.is-high-support {
+  outline:3px double #173f48; outline-offset:1px;
+}
+.ram-group-cell.is-sparse {
+  opacity:.42;
 }
 .ram-group-cell.has-standard-change::after {
   content:""; position:absolute; inset:3px;

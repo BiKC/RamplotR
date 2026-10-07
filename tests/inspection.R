@@ -69,6 +69,19 @@ other <- rbind(ref[1,,drop=FALSE], transform(ref[1,,drop=FALSE],
 pair <- ram_compare_torsions(ref,other)
 assert(nrow(pair)==5L, "Alignment should preserve inserted residues")
 assert(sum(pair$alignment=="Insertion")==1L, "Expected insertion")
+quality <- ram_comparison_alignment_quality(pair)
+assert(quality$aligned==4L && quality$matches==4L &&
+       isTRUE(all.equal(quality$identity,1)) &&
+       isTRUE(all.equal(quality$coverage_a,1)) &&
+       isTRUE(all.equal(quality$coverage_b,0.8)),
+       "Alignment quality must report identity and both chain coverages.")
+substitution <- ref
+substitution$resn[[2L]] <- "ASP"
+sub_quality <- ram_comparison_alignment_quality(
+  ram_compare_torsions(ref,substitution))
+assert(sub_quality$substitutions==1L &&
+       isTRUE(all.equal(sub_quality$identity,0.75)),
+       "Aligned substitutions must reduce sequence identity without reducing coverage.")
 assert(identical(ram_comparison_find(pair,"a","A",2L), 3L),
   "Find the primary residue by exact PDB numbering")
 assert(identical(ram_comparison_find(pair,"b","A",88L), 2L),

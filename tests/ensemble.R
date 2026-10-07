@@ -96,7 +96,50 @@ assert(abs(prediction$model_summary$plddt_mean[[1L]]-87)<1e-12 &&
 assert(inherits(try(ram_prediction_ensemble_analyze(
   list(make_prediction(),make_prediction()),prediction_classifier,
   source="alphafold3"),silent=TRUE),"try-error"),
-  "AF3 must not be silently interpreted as a B-factor prediction ensemble.")
+  "AF3 ensembles must reject models without one-to-one confidence sidecars.")
+
+ram_prepare_prediction <- function(pdb,torsions,source,sidecar=NULL,
+                                   summary_file=NULL,model_id="") {
+  residues <- data.frame(
+    chain=torsions$chain,resi=torsions$resi,
+    insertion_code=torsions$insertion_code,
+    plddt=pdb$plddt,stringsAsFactors=FALSE
+  )
+  list(
+    source=source,residues=residues,pae=NULL,pae_rows=integer(),
+    ptm=pdb$ptm,iptm=pdb$iptm,ranking_score=pdb$ranking_score,
+    fraction_disordered=pdb$fraction_disordered,has_clash=pdb$has_clash,
+    notes=character(),model_id=model_id,
+    confidence_file=basename(sidecar),
+    summary_file=if(is.null(summary_file)) "" else basename(summary_file)
+  )
+}
+af3_a <- make_prediction(0,c(96,82))
+af3_b <- make_prediction(8,c(90,78))
+af3_a$ptm <- 0.82; af3_a$iptm <- 0.71; af3_a$ranking_score <- 0.76
+af3_a$fraction_disordered <- 0.10; af3_a$has_clash <- FALSE
+af3_b$ptm <- 0.79; af3_b$iptm <- 0.68; af3_b$ranking_score <- 0.70
+af3_b$fraction_disordered <- 0.14; af3_b$has_clash <- TRUE
+sidecars <- c(tempfile(fileext="_confidences.json"),
+              tempfile(fileext="_confidences.json"))
+summaries <- c(tempfile(fileext="_summary_confidences.json"),
+               tempfile(fileext="_summary_confidences.json"))
+file.create(c(sidecars,summaries))
+af3_ensemble <- ram_prediction_ensemble_analyze(
+  list(af3_a,af3_b),prediction_classifier,source="alphafold3",
+  labels=c("seed-1_sample-0","seed-1_sample-1"),
+  sidecars=sidecars,summary_files=summaries
+)
+assert(af3_ensemble$analyzed_models==2L &&
+       abs(af3_ensemble$summary$plddt_mean[
+         af3_ensemble$summary$resi==1L]-93)<1e-12,
+       "AF3 ensemble must aggregate pLDDT from matched model confidence data.")
+assert(identical(as.character(af3_ensemble$model_summary$model),
+                 c("seed-1_sample-0","seed-1_sample-1")) &&
+       isTRUE(all.equal(af3_ensemble$model_summary$ranking_score,c(0.76,0.70))) &&
+       identical(af3_ensemble$model_summary$has_clash,c(FALSE,TRUE)),
+       "AF3 ensemble must preserve per-sample ranking and clash provenance.")
+unlink(c(sidecars,summaries))
 assert(inherits(try(ram_prediction_ensemble_analyze(
   list(make_prediction()),prediction_classifier,
   source="esmfold"),silent=TRUE),"try-error"),

@@ -2906,12 +2906,45 @@ server <- function(input, output, session) {
           sprintf("%s residues with pLDDT SD ≥10",confidence_variable))
       ),
       tags$p(class="ram-confidence-explainer",
-        "These values quantify disagreement among prediction models/seeds. They do not demonstrate molecular motion or experimental conformational heterogeneity."),
+        if(identical(result$source,"alphafold3"))
+          "Residue-level disagreement is calculated from backbone geometry, Rama8000 and pLDDT. AF3 pTM, ipTM and ranking score are retained separately per sample and do not modify the residue variability map."
+        else
+          "These values quantify disagreement among prediction models/seeds. They do not demonstrate molecular motion or experimental conformational heterogeneity."),
       if(result$limited)
         tags$p(class="ram-confidence-warning",
           "Only the first 30 models were analysed.")
     )
   })
+
+  output$predictionEnsembleModelRows <- DT::renderDT({
+    result <- prediction_ensemble_matches()
+    req(result)
+    data <- result$model_summary
+    if(!nrow(data)) return(DT::datatable(data,rownames=FALSE))
+    fields <- c("model","residues","finite_phi_psi","rama8000_outliers",
+      "plddt_mean","plddt_min","ptm","iptm","ranking_score",
+      "fraction_disordered","has_clash")
+    fields <- fields[fields %in% names(data)]
+    shown <- data[,fields,drop=FALSE]
+    for(field in intersect(c("plddt_mean","plddt_min"),names(shown)))
+      shown[[field]] <- round(shown[[field]],1L)
+    for(field in intersect(c("ptm","iptm","ranking_score",
+                             "fraction_disordered"),names(shown)))
+      shown[[field]] <- round(shown[[field]],3L)
+    if("has_clash" %in% names(shown))
+      shown$has_clash <- ifelse(is.na(shown$has_clash),"",
+        ifelse(shown$has_clash,"Yes","No"))
+    names(shown) <- c(
+      model="Model/sample",residues="Residues",
+      finite_phi_psi="Finite φ/ψ",rama8000_outliers="Rama8000 outliers",
+      plddt_mean="pLDDT mean",plddt_min="pLDDT min",
+      ptm="pTM",iptm="ipTM",ranking_score="AF3 ranking score",
+      fraction_disordered="Disordered fraction",has_clash="AF3 clash flag"
+    )[names(shown)]
+    DT::datatable(shown,rownames=FALSE,selection="none",
+      options=list(pageLength=8,scrollX=TRUE,autoWidth=FALSE,dom="tip"),
+      class="compact stripe")
+  },server=FALSE)
 
   output$predictionEnsembleTrack <- renderUI({
     result <- prediction_ensemble_matches()

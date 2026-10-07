@@ -109,6 +109,12 @@ ram_ensemble_summary <- function(models) {
       classified_models=integer(),class_consistency=numeric(),
       region_mode=character(),changes_class=logical(),
       stringsAsFactors=FALSE)
+    if (exists("ram_backbone_basin", mode="function")) {
+      empty$basin_models <- integer()
+      empty$basin_consistency <- numeric()
+      empty$basin_mode <- character()
+      empty$basin_changes <- logical()
+    }
     if(optional_all("rama8000_region")) {
       empty$rama8000_models <- integer()
       empty$rama8000_consistency <- numeric()

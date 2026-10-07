@@ -758,18 +758,24 @@ const assert = require("node:assert/strict");
     // swapping reverses NGL source order rather than only changing labels.
     await (await page.$("#compareFile")).uploadFile(
       path.resolve("benchmarks/output/ui-preview/1BBB.pdb"));
-    await page.waitForFunction(expected =>
-      document.getElementById("compareFile")?.files?.[0]?.name===expected,
-      {timeout:10000},"1BBB.pdb");
-    await new Promise(resolve => setTimeout(resolve, 1800));
+    await page.waitForFunction(expected => {
+      const field=document.getElementById("compareFile");
+      const shiny=window.Shiny?.shinyapp?.$inputValues?.["compareFile:shiny.file"];
+      return field?.files?.[0]?.name===expected &&
+        shiny?.name===expected;
+    },{timeout:15000},"1BBB.pdb");
     await page.click("#compareSubmit");
+    // Wait first for the server-side comparison object to expose the new
+    // structure's chains, then separately for NGL's asynchronous reload.
     await page.waitForFunction(() => {
       const select=document.getElementById("compareChainB");
-      const models=window.getNGLStructure && window.getNGLStructure("NGLCompare");
-      return select && models && models.length===2 &&
-        models[0].structure.atomCount!==models[1].structure.atomCount &&
-        [...select.options].some(option=>option.value==="C");
+      return select && [...select.options].some(option=>option.value==="C");
     },{timeout:30000});
+    await page.waitForFunction(() => {
+      const models=window.getNGLStructure && window.getNGLStructure("NGLCompare");
+      return models && models.length===2 &&
+        models[0].structure.atomCount!==models[1].structure.atomCount;
+    },{timeout:35000});
     await page.evaluate(() => {
       const el=document.getElementById("compareChainB");
       if (el.selectize) el.selectize.setValue("C");
@@ -821,10 +827,12 @@ const assert = require("node:assert/strict");
     // primary after a role swap. Preserve that user choice across rerenders.
     await (await page.$("#compareFile")).uploadFile(
       path.resolve("benchmarks/output/ui-preview/1D3Z.pdb"));
-    await page.waitForFunction(expected =>
-      document.getElementById("compareFile")?.files?.[0]?.name===expected,
-      {timeout:10000},"1D3Z.pdb");
-    await new Promise(resolve => setTimeout(resolve, 1800));
+    await page.waitForFunction(expected => {
+      const field=document.getElementById("compareFile");
+      const shiny=window.Shiny?.shinyapp?.$inputValues?.["compareFile:shiny.file"];
+      return field?.files?.[0]?.name===expected &&
+        shiny?.name===expected;
+    },{timeout:15000},"1D3Z.pdb");
     await page.click("#compareSubmit");
     await page.waitForSelector("#compareModel",{timeout:30000});
     await page.evaluate(() => {

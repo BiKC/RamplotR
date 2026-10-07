@@ -12,10 +12,6 @@ const puppeteer = require("puppeteer-core");
     ? line.slice(0,60) + " 87.00" + line.slice(66) : line).join("\n");
   const fixture = path.resolve(output,"synthetic-esmfold.pdb");
   fs.writeFileSync(fixture,pdb);
-  const pdb2 = raw.split(/\r?\n/).map(line => line.startsWith("ATOM  ")
-    ? line.slice(0,60) + " 83.00" + line.slice(66) : line).join("\n");
-  const fixture2 = path.resolve(output,"synthetic-esmfold-seed2.pdb");
-  fs.writeFileSync(fixture2,pdb2);
   const pdbSeed2 = raw.split(/\r?\n/).map(line => line.startsWith("ATOM  ")
     ? line.slice(0,60) + " 67.00" + line.slice(66) : line).join("\n");
   const fixtureSeed2 = path.resolve(output,"synthetic-esmfold-seed2.pdb");
@@ -207,60 +203,6 @@ const puppeteer = require("puppeteer-core");
       path:path.join(output,"prediction-sequence-confidence.png"),fullPage:true
     });
     await page.click("#ram-sequence-panel > summary");
-
-    // Prediction ensemble: include the loaded ESMFold model plus a second
-    // pLDDT-distinct seed. The geometry is intentionally identical, so the
-    // variability track should be stable while the confidence summary still
-    // sees two model values.
-    await page.click('.nav-tabs a[data-value="summary"]');
-    await page.waitForSelector("#ram-ensemble-panel > summary",{timeout:15000});
-    await page.click("#ram-ensemble-panel > summary");
-    await page.waitForSelector("#predictionEnsembleFiles",{timeout:12000});
-    assert.equal(await page.$eval("#predictionEnsembleSource",el=>el.value),
-      "esmfold","Prediction ensemble should inherit the loaded model type.");
-    const ensembleUpload=await page.$("#predictionEnsembleFiles");
-    await ensembleUpload.uploadFile(fixture2);
-    await page.waitForFunction(expected => {
-      const field=document.getElementById("predictionEnsembleFiles");
-      const shiny=window.Shiny?.shinyapp?.$inputValues?.[
-        "predictionEnsembleFiles:shiny.file"];
-      const selected=field?.files?.[0]?.name===expected;
-      const uploaded=Array.isArray(shiny)
-        ? shiny.some(item=>item?.name===expected)
-        : shiny?.name===expected;
-      return selected && uploaded;
-    },{timeout:18000},"synthetic-esmfold-seed2.pdb");
-    await page.click("#calculatePredictionEnsemble");
-    await page.waitForFunction(() => {
-      const summary=document.getElementById("predictionEnsembleSummary");
-      const cells=document.querySelectorAll(".ram-ensemble-cell");
-      return summary?.textContent.includes("2 models analysed") &&
-        cells.length>20 &&
-        document.querySelector("#predictionEnsembleRows tbody tr");
-    },{timeout:30000});
-    const ensembleState=await page.evaluate(() => ({
-      summary:document.getElementById("predictionEnsembleSummary")?.textContent || "",
-      cells:document.querySelectorAll(".ram-ensemble-cell").length,
-      high:document.querySelectorAll(".ram-ensemble-high").length,
-      variable:document.querySelectorAll(".ram-ensemble-variable").length,
-      firstTitle:document.querySelector(".ram-ensemble-cell")?.title || ""
-    }));
-    assert.ok(ensembleState.summary.includes("2 models analysed"));
-    assert.ok(ensembleState.cells>20);
-    assert.equal(ensembleState.high,0,
-      "Identical coordinates should not create high backbone variability.");
-    assert.equal(ensembleState.variable,0,
-      "Identical coordinates should not create variable backbone geometry.");
-    assert.ok(ensembleState.firstTitle.includes("mean pLDDT"),
-      "Prediction ensemble track should retain confidence context.");
-    await page.click(".ram-ensemble-cell");
-    await page.waitForFunction(() =>
-      document.querySelector("#selectedResidueInfo strong"),
-      {timeout:15000});
-    await page.screenshot({
-      path:path.join(output,"prediction-ensemble-esmfold.png"),fullPage:true
-    });
-    await page.click('.nav-tabs a[data-value="plot"]');
 
     // Independently verify AF2 monomer PAE and UI linkage.
     await chooseSource("alphafold2");

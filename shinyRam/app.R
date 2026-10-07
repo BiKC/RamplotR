@@ -3050,10 +3050,8 @@ server <- function(input, output, session) {
         provenance <- result$provenance
         if(nrow(provenance)!=nrow(models))
           stop("Prediction ensemble provenance no longer matches model order.")
-        models$source <- provenance$source
-        models$input_role <- provenance$input_role
-        models$structure_model <- provenance$structure_model
-        models$coordinate_md5 <- provenance$coordinate_md5
+        for(field in setdiff(names(provenance),"model"))
+          models[[field]] <- provenance[[field]]
       }
       utils::write.csv(models,file,row.names=FALSE,na="")
     }

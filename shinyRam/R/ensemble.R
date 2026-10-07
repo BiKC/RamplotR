@@ -156,12 +156,30 @@ ram_ensemble_summary <- function(models) {
 
 ram_prediction_ensemble_analyze <- function(pdbs, classifier, source,
                                             labels = NULL,
-                                            max_models = 30L) {
+                                            max_models = 30L,
+                                            sidecars = NULL,
+                                            summary_files = NULL) {
   if(!is.list(pdbs) || length(pdbs) < 2L)
     stop("A prediction ensemble requires at least two predicted structures.")
-  permitted <- c("alphafold2","esmfold","other_prediction")
+  permitted <- c("alphafold2","alphafold3","esmfold","other_prediction")
   if(length(source)!=1L || !source %in% permitted)
-    stop("Prediction ensembles currently support AF2/ColabFold, ESMFold or other pLDDT-in-B-factor models.")
+    stop("Unsupported prediction-ensemble source.")
+  if(identical(source,"alphafold3")) {
+    if(!exists("ram_prepare_prediction",mode="function"))
+      stop("Load prediction-confidence functions before analysing AlphaFold 3 ensembles.")
+    if(is.null(sidecars) || length(sidecars)!=length(pdbs) ||
+       any(!nzchar(as.character(sidecars))) ||
+       any(!file.exists(as.character(sidecars))))
+      stop("Every AlphaFold 3 ensemble model needs its matching full confidences JSON.")
+    if(is.null(summary_files))
+      summary_files <- rep("",length(pdbs))
+    if(length(summary_files)!=length(pdbs))
+      stop("AlphaFold 3 summary-confidence files must align one-to-one with models.")
+    summary_files <- as.character(summary_files)
+    present <- nzchar(summary_files)
+    if(any(present & !file.exists(summary_files)))
+      stop("An AlphaFold 3 summary-confidence file is unavailable.")
+  }
   max_models <- suppressWarnings(as.integer(max_models))
   if(length(max_models)!=1L || is.na(max_models) ||
      max_models < 2L || max_models > 30L)
@@ -172,11 +190,24 @@ ram_prediction_ensemble_analyze <- function(pdbs, classifier, source,
   if(length(labels)!=length(pdbs) || any(!nzchar(labels)))
     stop("Every prediction model needs a label.")
 
+  prediction_meta <- vector("list",count)
   models <- lapply(seq_len(count),function(i) {
     pdb <- ram_model_at(pdbs[[i]],1L)
     torsions <- ram_extract_torsions(pdb)
     classified <- classifier(torsions)
-    confidence <- ram_prediction_from_atoms(pdb,torsions,source)
+    confidence <- if(identical(source,"alphafold3")) {
+      prepared <- ram_prepare_prediction(
+        pdb,torsions,source,
+        sidecar=as.character(sidecars[[i]]),
+        summary_file=if(nzchar(summary_files[[i]]))
+          summary_files[[i]] else NULL,
+        model_id=labels[[i]]
+      )
+      prediction_meta[[i]] <<- prepared
+      prepared$residues
+    } else {
+      ram_prediction_from_atoms(pdb,torsions,source)
+    }
     keys <- ram_prediction_key(classified$chain,classified$resi,
                                classified$insertion_code)
     confidence_keys <- ram_prediction_key(confidence$chain,confidence$resi,
@@ -202,6 +233,18 @@ ram_prediction_ensemble_analyze <- function(pdbs, classifier, source,
         base::mean(table$plddt[is.finite(table$plddt)]) else NA_real_,
       plddt_min=if ("plddt" %in% names(table) && any(is.finite(table$plddt)))
         base::min(table$plddt[is.finite(table$plddt)]) else NA_real_,
+      ptm=if(!is.null(prediction_meta[[i]])) prediction_meta[[i]]$ptm else NA_real_,
+      iptm=if(!is.null(prediction_meta[[i]])) prediction_meta[[i]]$iptm else NA_real_,
+      ranking_score=if(!is.null(prediction_meta[[i]]))
+        prediction_meta[[i]]$ranking_score else NA_real_,
+      fraction_disordered=if(!is.null(prediction_meta[[i]]))
+        prediction_meta[[i]]$fraction_disordered else NA_real_,
+      has_clash=if(!is.null(prediction_meta[[i]]))
+        prediction_meta[[i]]$has_clash else NA,
+      confidence_file=if(!is.null(prediction_meta[[i]]))
+        prediction_meta[[i]]$confidence_file else "",
+      summary_file=if(!is.null(prediction_meta[[i]]))
+        prediction_meta[[i]]$summary_file else "",
       stringsAsFactors=FALSE
     )
   }))
@@ -214,6 +257,7 @@ ram_prediction_ensemble_analyze <- function(pdbs, classifier, source,
     available_models=length(pdbs),
     common_residues=sum(summary$models_present==count),
     source=source,
+    prediction_meta=prediction_meta,
     limited=count<length(pdbs)
   )
 }

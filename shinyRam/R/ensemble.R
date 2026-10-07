@@ -2,6 +2,64 @@
 # angular statistics; an average of +179° and -179° is 180°, not zero.
 # Does not infer prediction confidence or a single "best" model.
 
+ram_af3_sample_stem <- function(name, role=c("model","confidence","summary")) {
+  role <- match.arg(role)
+  value <- basename(as.character(name))
+  pattern <- switch(role,
+    model="(?i)_model\\.(cif|mmcif|mcif)$",
+    confidence="(?i)_confidences\\.json$",
+    summary="(?i)_summary_confidences\\.json$")
+  stem <- sub(pattern,"",value,perl=TRUE)
+  if(identical(stem,value) || !nzchar(stem)) return(NA_character_)
+  tolower(stem)
+}
+
+ram_af3_pair_files <- function(model_names,model_paths,
+                               confidence_names,confidence_paths,
+                               summary_names=character(),
+                               summary_paths=character()) {
+  if(length(model_names)!=length(model_paths) ||
+     length(confidence_names)!=length(confidence_paths))
+    stop("AF3 upload names and paths are inconsistent.")
+  if(length(model_names)<2L)
+    stop("Upload at least two AlphaFold 3 sample models.")
+  model_stem <- vapply(model_names,ram_af3_sample_stem,character(1),role="model")
+  confidence_stem <- vapply(confidence_names,ram_af3_sample_stem,
+                            character(1),role="confidence")
+  if(anyNA(model_stem) || anyNA(confidence_stem))
+    stop("Use official AF3 sample filenames ending in _model.cif and _confidences.json.")
+  if(anyDuplicated(model_stem) || anyDuplicated(confidence_stem))
+    stop("AF3 sample filenames must identify each seed/sample uniquely.")
+  if(length(setdiff(model_stem,confidence_stem)) ||
+     length(setdiff(confidence_stem,model_stem)))
+    stop("Every AF3 model must have exactly one matching full confidences JSON.")
+
+  summary_path <- rep("",length(model_stem))
+  if(length(summary_names) || length(summary_paths)) {
+    if(length(summary_names)!=length(summary_paths))
+      stop("AF3 summary upload names and paths are inconsistent.")
+    summary_stem <- vapply(summary_names,ram_af3_sample_stem,
+                           character(1),role="summary")
+    if(anyNA(summary_stem) || anyDuplicated(summary_stem))
+      stop("AF3 summary files must use unique *_summary_confidences.json names.")
+    extras <- setdiff(summary_stem,model_stem)
+    if(length(extras))
+      stop("An AF3 summary-confidence file has no matching model.")
+    summary_path[match(summary_stem,model_stem)] <- as.character(summary_paths)
+  }
+  data.frame(
+    label=model_stem,
+    model_name=as.character(model_names),
+    model_path=as.character(model_paths),
+    confidence_name=as.character(confidence_names[
+      match(model_stem,confidence_stem)]),
+    confidence_path=as.character(confidence_paths[
+      match(model_stem,confidence_stem)]),
+    summary_path=summary_path,
+    stringsAsFactors=FALSE
+  )
+}
+
 ram_ensemble_circular <- function(values) {
   z <- as.numeric(values[is.finite(values)])
   if(!length(z)) return(c(mean=NA_real_,sd=NA_real_))

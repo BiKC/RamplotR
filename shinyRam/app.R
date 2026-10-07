@@ -2511,33 +2511,49 @@ server <- function(input, output, session) {
           tags$div(class="ram-prediction-ensemble-head",
             tags$h4("Prediction ensemble"),
             tags$p(class="ram-confidence-explainer",
-              "Upload independently generated AF2/ColabFold, ESMFold or other pLDDT-in-B-factor models. RamplotR compares model-to-model geometry and confidence; this variation is prediction uncertainty/heterogeneity, not experimental dynamics.")
+              "Compare independently generated prediction models or seeds. RamplotR keeps residue-level backbone variation, pLDDT and standard validation separate from model-level ranking metrics; prediction disagreement is not experimental dynamics.")
           ),
           tags$div(class="ram-prediction-ensemble-controls",
             selectInput("predictionEnsembleSource","Prediction model type",
               choices=c("AlphaFold 2 / ColabFold"="alphafold2",
+                        "AlphaFold 3 sample set"="alphafold3",
                         "ESMFold"="esmfold",
                         "Other model with pLDDT in B-factor"="other_prediction"),
               selected=if(structure$declared_source %in%
-                c("esmfold","other_prediction")) structure$declared_source
-                else "alphafold2",
+                c("alphafold3","esmfold","other_prediction"))
+                  structure$declared_source else "alphafold2",
               selectize=FALSE),
             fileInput("predictionEnsembleFiles",
-              "Additional prediction models",
+              "Prediction model files",
               multiple=TRUE,
               accept=c(".pdb",".ent",".cif",".mmcif",".mcif")),
-            if(!identical(structure$declared_source,"alphafold3"))
+            conditionalPanel(
+              condition="input.predictionEnsembleSource === 'alphafold3'",
+              fileInput("predictionEnsembleConfidenceFiles",
+                "AF3 full confidences JSON",
+                multiple=TRUE,accept=c(".json")),
+              fileInput("predictionEnsembleSummaryFiles",
+                "AF3 summary confidences JSON (optional)",
+                multiple=TRUE,accept=c(".json")),
+              tags$p(class="ram-field-hint",
+                "AF3 files are paired by their official seed/sample filename stem: *_model.cif ↔ *_confidences.json ↔ optional *_summary_confidences.json. Upload order is ignored.")
+            ),
+            conditionalPanel(
+              condition="input.predictionEnsembleSource !== 'alphafold3'",
               checkboxInput("includeLoadedPrediction",
                 paste("Include currently loaded model:",structure$name),value=TRUE)
-            else
-              tags$p(class="ram-confidence-warning",
-                "The loaded AlphaFold 3 model is not auto-added: matching atom-confidence JSON is required for ensemble confidence analysis."),
+            ),
             actionButton("calculatePredictionEnsemble",
               "Analyse prediction ensemble",class="btn-primary btn-sm")
           ),
           tags$p(class="ram-field-hint",
-            "AlphaFold 3 ensembles are not accepted in this first version because per-model atom confidence needs its matching JSON sidecar; they are not silently treated as AF2."),
+            "AF3 requires each sample's matching full confidence JSON. pTM, ipTM and ranking score remain model-level provenance and are not folded into the residue variability measure."),
           uiOutput("predictionEnsembleSummary"),
+          tags$details(class="ram-confidence-panel ram-ensemble-model-panel",
+            tags$summary("Model-level confidence and provenance"),
+            tags$div(class="ram-residue-table",
+              DT::DTOutput("predictionEnsembleModelRows"))
+          ),
           uiOutput("predictionEnsembleTrack"),
           tags$div(class="ram-residue-table",
             DT::DTOutput("predictionEnsembleRows")),
@@ -2644,16 +2660,23 @@ server <- function(input, output, session) {
   prediction_ensemble_input_key <- reactive({
     structure <- req(loaded())
     uploaded <- input$predictionEnsembleFiles
-    file_signature <- if(is.null(uploaded) || !nrow(uploaded)) "" else
-      paste(uploaded$name,uploaded$size,uploaded$type,uploaded$datapath,
+    signature <- function(files) if(is.null(files) || !nrow(files)) "" else
+      paste(files$name,files$size,files$type,files$datapath,
             sep=":",collapse="|")
+    source <- if(is.null(input$predictionEnsembleSource)) "" else
+      input$predictionEnsembleSource
     include_loaded <- isTRUE(input$includeLoadedPrediction) &&
+      !identical(source,"alphafold3") &&
       !identical(structure$declared_source,"alphafold3")
     paste(
-      if(is.null(input$predictionEnsembleSource)) "" else input$predictionEnsembleSource,
+      source,
       include_loaded,
       if(include_loaded) current_model() else "",
-      file_signature,
+      signature(uploaded),
+      if(identical(source,"alphafold3"))
+        signature(input$predictionEnsembleConfidenceFiles) else "",
+      if(identical(source,"alphafold3"))
+        signature(input$predictionEnsembleSummaryFiles) else "",
       sep="::"
     )
   })

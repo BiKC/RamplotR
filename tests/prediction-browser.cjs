@@ -90,11 +90,8 @@ const puppeteer = require("puppeteer-core");
       'input[name="inputSource"][value="upload"]').click());
     await page.waitForFunction(()=>!document.getElementById("ram-upload-wrap")
       .classList.contains("is-hidden"));
-    const upload=await page.$("#structfile");
-    await upload.uploadFile(fixture);
-    // Select prediction provenance through the same visible native dropdown a
-    // researcher uses. A Selectize-backed hidden input may silently revert
-    // scripted changes and analyse an AF/ESM prediction as experimental.
+    // Set provenance before selecting the file so the reactive upload panel
+    // cannot replace the selected File object after Puppeteer attaches it.
     async function chooseSource(value) {
       const settings=await page.$("#ram-prediction-upload");
       const opened=await page.evaluate(el=>el.open,settings);
@@ -108,10 +105,13 @@ const puppeteer = require("puppeteer-core");
     await chooseSource("esmfold");
     await page.waitForFunction(()=>document.getElementById("ram-confidence-sidecars")
       .classList.contains("is-hidden"));
-    // Let Shiny finish the file upload after the prediction source is set.
-    // Waiting before changing the source can allow the reactive upload UI to
-    // re-render and discard the selected file.
-    await new Promise(done=>setTimeout(done,1300));
+    const upload=await page.$("#structfile");
+    await upload.uploadFile(fixture);
+    await page.waitForFunction(() => {
+      const input=document.getElementById("structfile");
+      return input && input.files && input.files.length===1;
+    },{timeout:10000});
+    await new Promise(done=>setTimeout(done,1800));
     await page.click("#submit");
     try {
       await page.waitForFunction(() => {

@@ -133,6 +133,16 @@ stopifnot(all(is.finite(summary$ca_distance_map_rmsd_angstrom)),
           all(summary$common_positions>=100),
           summary$ca_distance_map_rmsd_angstrom[[4L]]<1e-8,
           summary$above_30deg[[4L]]==0L)
+# This is a biological sanity check specific to the well-characterized
+# adenylate-kinase crystal pair, NOT a calibrated state-classification cutoff.
+# Its known open/closed contrast should dominate both same-crystal controls.
+reference_distance <- summary$ca_distance_map_rmsd_angstrom[[1L]]
+control_distances <- summary$ca_distance_map_rmsd_angstrom[2:3]
+if(reference_distance<=3*max(control_distances) ||
+   summary$above_30deg[[1L]]<=max(summary$above_30deg[2:3]))
+  stop("The known adenylate-kinase open/closed contrast is no longer ",
+       "clearly distinguishable from same-crystal controls; review mapping, ",
+       "source revision and case-study assumptions before interpreting it.")
 utils::write.csv(summary,file.path(output,"comparison-summary.csv"),
                  row.names=FALSE)
 # Literature domain divisions approximate E. coli AK, NOT curated residue

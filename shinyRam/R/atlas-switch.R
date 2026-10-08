@@ -234,7 +234,7 @@ ram_atlas_comparison_pair_index <- function(comparison,atlas_residue) {
 ram_atlas_canonical_side <- function(torsions, mapping, accession,
                                       chain, asym_id) {
   required_map <- c("chain","resi","insertion_code","struct_asym_id",
-    "uniprot_accession","uniprot_resi","observed")
+    "label_seq_id","uniprot_accession","uniprot_resi","observed")
   required_atoms <- c("chain","resi","insertion_code")
   if(!is.data.frame(mapping) || !all(required_map %in% names(mapping)) ||
      !is.data.frame(torsions) ||
@@ -252,17 +252,20 @@ ram_atlas_canonical_side <- function(torsions, mapping, accession,
     mapping$uniprot_accession==accession &
     !is.na(mapping$observed) & mapping$observed &
     is.finite(mapping$uniprot_resi) &
+    is.finite(mapping$label_seq_id) &
     !is.na(mapping$resi) & !is.na(mapping$insertion_code),,
     drop=FALSE]
   if(!nrow(map)) return(data.frame(uniprot_resi=integer(),
     index=integer()))
   map <- unique(map[,c("chain","resi","insertion_code",
-                         "uniprot_resi"),drop=FALSE])
+                         "label_seq_id","uniprot_resi"),drop=FALSE])
   local <- paste(map$chain,map$resi,map$insertion_code,sep="\r")
   target <- as.character(map$uniprot_resi)
-  # Reject both sides of every conflict, not just the second record.
+  label <- as.character(map$label_seq_id)
+  # Reject both sides of each conflict, including label-sequence collisions.
   ambiguous <- duplicated(local) | duplicated(local,fromLast=TRUE) |
-    duplicated(target) | duplicated(target,fromLast=TRUE)
+    duplicated(target) | duplicated(target,fromLast=TRUE) |
+    duplicated(label) | duplicated(label,fromLast=TRUE)
   map <- map[!ambiguous,,drop=FALSE]
   if(!nrow(map)) return(data.frame(uniprot_resi=integer(),
     index=integer()))

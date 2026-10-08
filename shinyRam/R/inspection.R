@@ -478,8 +478,19 @@ ram_align_residues <- function(a, b, max_cells = 4e6) {
              index_b=rev(ib[seq_len(k)]))
 }
 
-ram_compare_torsions <- function(a, b) {
-  pairing <- ram_align_residues(a, b)
+ram_compare_torsions <- function(a, b, pairing=NULL) {
+  if(is.null(pairing)) {
+    pairing <- ram_align_residues(a,b)
+  } else {
+    if(!is.data.frame(pairing) ||
+       !all(c("index_a","index_b") %in% names(pairing)) ||
+       anyNA(pairing[,c("index_a","index_b"),drop=FALSE]) ||
+       any(pairing$index_a < 1L | pairing$index_a > nrow(a) |
+           pairing$index_b < 1L | pairing$index_b > nrow(b)) ||
+       anyDuplicated(pairing$index_a) || anyDuplicated(pairing$index_b))
+      stop("Canonical alignment has invalid or ambiguous source indices.",
+           call.=FALSE)
+  }
   value <- function(data, indices, key, missing) {
     out <- rep(missing, nrow(pairing))
     valid <- !is.na(indices)
@@ -550,6 +561,8 @@ ram_compare_torsions <- function(a, b) {
       !is.na(result$rama8000_region_b) &
       result$rama8000_region_a != result$rama8000_region_b
   }
+  if("uniprot_resi" %in% names(pairing))
+    result$uniprot_resi <- as.integer(pairing$uniprot_resi)
   result$alignment <- ifelse(is.na(pairing$index_a), "Insertion",
                       ifelse(is.na(pairing$index_b), "Deletion",
                       ifelse(result$amino_a == result$amino_b,

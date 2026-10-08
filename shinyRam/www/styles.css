@@ -1522,3 +1522,9 @@ body > .container-fluid { max-width: none; padding: 0; }
   .ram-atlas-controls > button { align-self:stretch; }
   .ram-atlas-inventory .ram-counterpart-results { max-height:none; }
 }
+
+/* Atlas paging remains a deliberate network action. */
+.ram-atlas-inventory > .btn { justify-self:start; margin:10px 0 4px; }
+@media(max-width:580px) {
+  .ram-atlas-inventory > .btn { justify-self:stretch; }
+}

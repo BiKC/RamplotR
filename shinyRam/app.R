@@ -30,6 +30,7 @@ source(file.path("R", "backbone.R"), local = TRUE)
 source(file.path("R", "conformation.R"), local = TRUE)
 source(file.path("R", "canonical.R"), local = TRUE)
 source(file.path("R", "atlas-sifts.R"), local = TRUE)
+source(file.path("R", "atlas-cohort.R"), local = TRUE)
 source(file.path("R", "atlas.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
 source(file.path("R", "inspection.R"), local = TRUE)
@@ -1929,6 +1930,7 @@ server <- function(input, output, session) {
     if(is.null(payload)) return(NULL)
     results <- payload$results
     exact <- atlas_exact_results()
+    verified <- ram_atlas_cohort_summary(exact,payload$accession)
     get <- function(item,key,default="") {
       value <- item[[key]]
       if(is.null(value) || !length(value) || is.na(value[[1L]])) default
@@ -1950,6 +1952,22 @@ server <- function(input, output, session) {
           sprintf(" Metadata unavailable for %d returned entities.",unresolved) else "",
         if(isTRUE(payload$duplicate_count>0L))
           sprintf(" %d duplicate entity IDs collapsed.",payload$duplicate_count) else ""),
+      if(verified$verified_entities>0L)
+        tags$div(class="ram-atlas-verified-cohort",
+          tags$strong(sprintf(
+            "%d verified experimental entities · %d distinct observed UniProt positions",
+            verified$verified_entities,verified$observed_positions)),
+          tags$p(class="ram-field-hint",
+            sprintf(paste0(
+              "%d exact SIFTS residue rows; %d ambiguous local residue IDs. ",
+              "Counts are verified-entity support, not distinct conformational ",
+              "states, independent replicates or sequence completeness."),
+              verified$exact_rows,verified$ambiguous_local_residues)),
+          tags$div(class="ram-export-actions",
+            downloadButton("downloadAtlasCanonical",
+              "Export verified residue mapping CSV"),
+            downloadButton("downloadAtlasSupport",
+              "Export UniProt position support CSV"))),
       if(length(payload$failed_entity_ids))
         tags$details(class="ram-details",
           tags$summary(sprintf("Show %d entity IDs with unavailable metadata",
@@ -2027,6 +2045,34 @@ server <- function(input, output, session) {
           "The currently reported experimental search cohort has been retrieved.")
     )
   })
+
+  output$downloadAtlasCanonical <- downloadHandler(
+    filename=function() {
+      cohort <- req(atlas_payload())
+      paste0("ramplotr_atlas_",ram_uniprot_accession(cohort$accession),
+             "_exact_residues.csv")
+    },
+    content=function(file) {
+      cohort <- req(atlas_payload())
+      rows <- ram_atlas_cohort_table(isolate(atlas_exact_results()),
+                                     cohort$accession)
+      if(!nrow(rows)) stop("No verified SIFTS residue data to export.")
+      utils::write.csv(rows,file,row.names=FALSE,na="")
+    }
+  )
+  output$downloadAtlasSupport <- downloadHandler(
+    filename=function() {
+      cohort <- req(atlas_payload())
+      paste0("ramplotr_atlas_",ram_uniprot_accession(cohort$accession),
+             "_observed_position_support.csv")
+    },
+    content=function(file) {
+      cohort <- req(atlas_payload())
+      positions <- ram_atlas_cohort_position_support(
+        isolate(atlas_exact_results()),cohort$accession)
+      utils::write.csv(positions,file,row.names=FALSE,na="")
+    }
+  )
 
   observeEvent(input$ramAtlasComparePick, {
     candidate <- input$ramAtlasComparePick

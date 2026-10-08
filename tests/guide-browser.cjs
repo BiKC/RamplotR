@@ -61,6 +61,14 @@ const assert=require("node:assert/strict");
             top:r.top,bottom:r.bottom,width:r.width};});
         const grid=root.getBoundingClientRect();
         const documentWidth=document.documentElement.clientWidth;
+        const compareSource=document.querySelector(".ram-compare-source")
+          .getBoundingClientRect();
+        const compareSubmit=document.getElementById("compareSubmit")
+          .getBoundingClientRect();
+        const compareButtonInside=compareSubmit.width>70 &&
+          compareSubmit.left>=compareSource.left-2 &&
+          compareSubmit.right<=compareSource.right+2 &&
+          compareSubmit.bottom<=compareSource.bottom+2;
         const visible=fields.every(x=>x.width>=110&&x.left>=grid.left-2&&
           x.right<=grid.right+2);
         const overlaps=labelRects.some((x,i)=>labelRects.some((y,j)=>
@@ -76,7 +84,7 @@ const assert=require("node:assert/strict");
           cardsRect[0].top<cardsRect[1].bottom-1 &&
           cardsRect[0].bottom>cardsRect[1].top+1;
         return {fields,labels:labelRects,gridWidth:grid.width,visible,
-          overlaps,cardOverlaps,
+          overlaps,cardOverlaps,compareButtonInside,
           docScrollWidth:document.documentElement.scrollWidth,
           documentWidth};
       });
@@ -86,6 +94,8 @@ const assert=require("node:assert/strict");
         "Group form labels overlap at "+width+": "+JSON.stringify(diagnostics));
       assert.equal(diagnostics.cardOverlaps,false,
         "Group upload cards overlap at "+width+": "+JSON.stringify(diagnostics));
+      assert.equal(diagnostics.compareButtonInside,true,
+        "Load comparison button clipped at "+width+": "+JSON.stringify(diagnostics));
       await page.screenshot({path:path.join(dir,name),fullPage:true});
     }
     await checkLayout(1440,900,"group-layout-desktop.png");

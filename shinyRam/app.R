@@ -2209,7 +2209,7 @@ server <- function(input, output, session) {
     tags$div(class="ram-panel",
       tags$h4("Local backbone-change candidates"),
       tags$p(class="ram-field-hint",
-        paste("Compare backbone φ/ψ between the first two geometric-group",
+        paste("Compare backbone φ/ψ between any two selected geometric-group",
         "representatives. Exact SIFTS positions, complete N/CA/C atoms and",
         "continuous peptide bonds are required. These are exploratory",
         "change candidates, not DSSP classes or validated functional states.")),

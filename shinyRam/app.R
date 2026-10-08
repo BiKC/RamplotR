@@ -31,6 +31,7 @@ source(file.path("R", "conformation.R"), local = TRUE)
 source(file.path("R", "canonical.R"), local = TRUE)
 source(file.path("R", "atlas-sifts.R"), local = TRUE)
 source(file.path("R", "atlas-cohort.R"), local = TRUE)
+source(file.path("R", "atlas-geometry.R"), local = TRUE)
 source(file.path("R", "atlas.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
 source(file.path("R", "inspection.R"), local = TRUE)
@@ -657,6 +658,7 @@ ui <- fluidPage(
                       class="btn-primary")),
                   uiOutput("atlasStatus"),
                   uiOutput("atlasResults"),
+                  uiOutput("atlasGeometryPanel"),
                   tags$p(class="ram-field-hint",
                     "Results load 50 experimental entities at a time. Canonical residue coverage, construct equivalence, and conformational-state identity must be verified before interpreting structural states.")
                 )
@@ -730,6 +732,7 @@ server <- function(input, output, session) {
   atlas_exact_request <- reactiveVal(0L)
   atlas_exact_selected <- reactiveVal(NULL)
   atlas_exact_results <- reactiveVal(list())
+  atlas_geometry_result <- reactiveVal(NULL)
   canonical_segments <- reactiveVal(ram_canonical_empty_segments())
   canonical_mapping <- reactiveVal(ram_canonical_empty_map())
   canonical_status <- reactiveVal(NULL)
@@ -1912,7 +1915,10 @@ server <- function(input, output, session) {
           source=as.character(value$source),endpoint=as.character(value$endpoint),
           matched_sifts_rows=as.integer(value$matched_sifts_rows),
           unlinked_sifts_rows=as.integer(value$unlinked_sifts_rows)),
-          summary,list(mapping=mapped))
+          summary,list(mapping=mapped,
+            ca_points=if(is.null(value$ca_points)) list() else value$ca_points,
+            ca_warning=if(is.null(value$ca_warning)) "" else
+              as.character(value$ca_warning)))
       }
     }
     atlas_exact_results(outcomes)
@@ -2021,7 +2027,14 @@ server <- function(input, output, session) {
                     "%d observed; %d conflicting positions; %d unmatched ",
                     "SIFTS rows. Not a complete structure-state assessment."),
                     verify$unique_residues,verify$observed_residues,
-                    verify$conflicting_residues,verify$unlinked_sifts_rows)))),
+                    verify$conflicting_residues,verify$unlinked_sifts_rows)),
+                  if(identical(verify$state,"mapped"))
+                    tags$span(if(length(verify$ca_points))
+                      sprintf(" %d mapped C-alpha coordinates available for geometry comparison.",
+                        length(verify$ca_points))
+                      else if(nzchar(verify$ca_warning))
+                        paste(" Geometry unavailable:",verify$ca_warning)
+                      else " No C-alpha coordinates available.")))),
             tags$div(class="ram-counterpart-actions",
               tags$a("RCSB entry",
                 href=paste0("https://www.rcsb.org/structure/",id),
@@ -2046,6 +2059,94 @@ server <- function(input, output, session) {
           "The currently reported experimental search cohort has been retrieved.")
     )
   })
+
+  # An experimental atlas geometry comparison is deliberately user-triggered.
+  # The same canonical core is used for every distance and no group is given
+  # a biological state name by the software.
+  observeEvent(atlas_exact_results(), {
+    atlas_geometry_result(NULL)
+  },ignoreInit=TRUE)
+
+  output$atlasGeometryPanel <- renderUI({
+    cohort <- req(atlas_payload())
+    verified <- atlas_exact_results()
+    candidates <- tryCatch(
+      ram_atlas_geometry_entities(verified,cohort$accession),
+      error=function(e) list())
+    eligible <- names(candidates)[vapply(candidates,function(x)
+      nrow(x$coordinates)>=30L,logical(1L))]
+    if(length(eligible)<2L) {
+      if(length(verified)<2L) return(NULL)
+      return(tags$p(class="ram-field-hint",
+        "Geometry comparison requires at least two verified entities with 30 observed, unambiguous C-alpha positions each."))
+    }
+    prior <- isolate(input$atlasGeometryEntities)
+    prior <- intersect(prior,eligible)
+    if(length(prior)<2L) prior <- head(eligible,6L)
+    tags$section(class="ram-panel",
+      tags$h3("Experimental geometry groups"),
+      tags$p(class="ram-field-hint",paste0(
+        "Compare common canonical C-alpha distance maps. Groups are ",
+        "exploratory geometric similarities, not verified functional states. ",
+        "Only observed residues with exact SIFTS coordinates count.")),
+      selectInput("atlasGeometryEntities","Verified experimental entities",
+        choices=eligible,selected=prior,multiple=TRUE),
+      numericInput("atlasGeometryCutoff","Distance-map RMSD group cutoff (Å)",
+        value=1.5,min=0.1,max=10,step=0.1),
+      actionButton("atlasRunGeometry","Compare structural geometries",
+        class="btn-primary btn-sm"),
+      uiOutput("atlasGeometrySummary"),
+      plotOutput("atlasGeometryPlot",height="260px"),
+      tableOutput("atlasGeometryTable"))
+  })
+
+  observeEvent(input$atlasRunGeometry, {
+    cohort <- isolate(atlas_payload())
+    if(is.null(cohort)) return()
+    output <- tryCatch(ram_atlas_geometry_groups(
+      isolate(atlas_exact_results()),cohort$accession,
+      isolate(input$atlasGeometryEntities),
+      min_core=30L,min_fraction=0.6,
+      cutoff=isolate(input$atlasGeometryCutoff),max_core=300L),
+      error=function(e) list(error=conditionMessage(e)))
+    atlas_geometry_result(output)
+  },ignoreInit=TRUE)
+
+  output$atlasGeometrySummary <- renderUI({
+    result <- atlas_geometry_result()
+    if(is.null(result)) return(NULL)
+    if(!is.null(result$error))
+      return(tags$p(class="ram-confidence-warning",result$error))
+    tags$div(class="ram-field-hint",
+      tags$p(sprintf(paste0(
+        "%d entities compared on %d common observed UniProt C-alpha positions ",
+        "(%d evenly sampled for distance calculations). %d exploratory ",
+        "geometric group(s) at %.2f Å distance-map RMSD."),
+        length(result$selected),length(result$common_positions),
+        length(result$sampled_positions),
+        length(unique(result$assignment$geometric_group)),
+        result$cutoff)),
+      tags$p("Average-linkage hierarchical clustering of intrachain C-alpha distance differences. Rigid-body alignment is not required; this is not experimental evidence for functional state identity."),
+      tags$p(paste("Representative entries:",
+        paste(unname(result$representatives),collapse=", "))))
+  })
+
+  output$atlasGeometryPlot <- renderPlot({
+    result <- atlas_geometry_result()
+    req(!is.null(result),is.null(result$error))
+    graphics::plot(result$hclust,main="Experimental geometry similarity",
+      xlab="",sub="",ylab="C-alpha distance-map RMSD (Å)")
+    graphics::abline(h=result$cutoff,lty=2,col="gray50")
+  })
+
+  output$atlasGeometryTable <- renderTable({
+    result <- atlas_geometry_result()
+    req(!is.null(result),is.null(result$error))
+    table <- result$assignment
+    names(table) <- c("PDB entity","Chain","Mapped C-alpha",
+      "Common core fraction","Geometry group")
+    table
+  },striped=TRUE,spacing="xs",rownames=FALSE)
 
   output$downloadAtlasCanonical <- downloadHandler(
     filename=function() {

@@ -78,7 +78,8 @@ ram_atlas_entity_torsions <- function(record,asym_id) {
     is.finite(mapped$label_seq_id) &
     is.finite(mapped$uniprot_resi),,drop=FALSE]
   if(!nrow(mapped)) return(empty)
-  mapped <- unique(mapped[,c("label_seq_id","uniprot_resi"),drop=FALSE])
+  mapped <- unique(mapped[,c("label_seq_id","uniprot_resi","chain",
+    "resi","insertion_code"),drop=FALSE])
   # Both label->UniProt and UniProt->label assignments must be one-to-one.
   bad <- duplicated(mapped$label_seq_id) |
     duplicated(mapped$label_seq_id,fromLast=TRUE) |
@@ -93,6 +94,8 @@ ram_atlas_entity_torsions <- function(record,asym_id) {
     phi=phi[matched],psi=psi[matched],
     struct_asym_id=asym_id,
     label_seq_id=as.integer(mapped$label_seq_id),
+    chain=as.character(mapped$chain),resi=as.integer(mapped$resi),
+    insertion_code=as.character(mapped$insertion_code),
     stringsAsFactors=FALSE)
   result[order(result$uniprot_resi),,drop=FALSE]
 }
@@ -111,7 +114,10 @@ ram_atlas_torsion_delta <- function(a,b,id_a,id_b,threshold=30) {
   pos <- sort(unique(c(a$uniprot_resi,b$uniprot_resi)))
   ia <- match(pos,a$uniprot_resi)
   ib <- match(pos,b$uniprot_resi)
-  fetch <- function(table,index,column) table[[column]][index]
+  fetch <- function(table,index,column,missing=NA_real_) {
+    if(column %in% names(table)) table[[column]][index]
+    else rep(missing,length(index))
+  }
   pa <- fetch(a,ia,"phi"); qa <- fetch(a,ia,"psi")
   pb <- fetch(b,ib,"phi"); qb <- fetch(b,ib,"psi")
   wrap <- function(a,b) {
@@ -122,6 +128,14 @@ ram_atlas_torsion_delta <- function(a,b,id_a,id_b,threshold=30) {
   dp <- wrap(pa,pb); dq <- wrap(qa,qb)
   change <- sqrt(dp^2+dq^2)
   data.frame(uniprot_resi=pos,entity_a=id_a,entity_b=id_b,
+    chain_a=fetch(a,ia,"chain",NA_character_),
+    resi_a=as.integer(fetch(a,ia,"resi")),
+    insertion_a=fetch(a,ia,"insertion_code",NA_character_),
+    label_seq_a=as.integer(fetch(a,ia,"label_seq_id")),
+    chain_b=fetch(b,ib,"chain",NA_character_),
+    resi_b=as.integer(fetch(b,ib,"resi")),
+    insertion_b=fetch(b,ib,"insertion_code",NA_character_),
+    label_seq_b=as.integer(fetch(b,ib,"label_seq_id")),
     phi_a=pa,psi_a=qa,phi_b=pb,psi_b=qb,
     delta_phi=dp,delta_psi=dq,angular_shift=change,
     comparable=is.finite(change),
@@ -149,7 +163,8 @@ ram_atlas_candidate_regions <- function(differences) {
     peak_shift=round(max(data$angular_shift[idx]),1))))
 }
 
-ram_atlas_group_switches <- function(verified,geometry,threshold=30) {
+ram_atlas_group_switches <- function(verified,geometry,threshold=30,
+  representative_ids=NULL) {
   if(!is.list(geometry) || is.null(geometry$representatives) ||
      is.null(geometry$assignment))
     stop("Run an Atlas experimental geometry comparison first.",
@@ -158,9 +173,14 @@ ram_atlas_group_switches <- function(verified,geometry,threshold=30) {
   if(length(representatives)<2L)
     stop("Only one geometric group; no between-group representative comparison.",
          call.=FALSE)
-  # Compare the first two geometry-group medoids. Additional group comparisons
-  # should eventually be user-selectable and independently reported.
-  ids <- representatives[1:2]
+  # Any two distinct geometric-group medoids may be compared, without
+  # silently treating them as independent biological states.
+  ids <- if(is.null(representative_ids)) representatives[1:2] else
+    as.character(representative_ids)
+  if(length(ids)!=2L || anyNA(ids) || any(!ids %in% representatives) ||
+     identical(ids[[1L]],ids[[2L]]))
+    stop("Choose two distinct experimental geometry-group representatives.",
+         call.=FALSE)
   available <- ram_atlas_geometry_entities(verified,geometry$accession)
   tables <- lapply(ids,function(id) {
     structure <- available[[id]]

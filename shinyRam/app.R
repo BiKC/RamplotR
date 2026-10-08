@@ -1963,11 +1963,12 @@ server <- function(input, output, session) {
               "Counts are verified-entity support, not distinct conformational ",
               "states, independent replicates or sequence completeness."),
               verified$exact_rows,verified$ambiguous_local_residues)),
-          tags$div(class="ram-export-actions",
-            downloadButton("downloadAtlasCanonical",
-              "Export verified residue mapping CSV"),
-            downloadButton("downloadAtlasSupport",
-              "Export UniProt position support CSV"))),
+          if(verified$exact_rows>0L)
+            tags$div(class="ram-export-actions",
+              downloadButton("downloadAtlasCanonical",
+                "Export verified residue mapping CSV"),
+              downloadButton("downloadAtlasSupport",
+                "Export UniProt position support CSV"))),
       if(length(payload$failed_entity_ids))
         tags$details(class="ram-details",
           tags$summary(sprintf("Show %d entity IDs with unavailable metadata",

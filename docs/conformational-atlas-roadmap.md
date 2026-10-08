@@ -27,10 +27,15 @@ conformational states.
   experimental polymer entities by UniProt accession, reports
   method/resolution and reference sequence coverage, and opens a chosen
   candidate in Compare.
-- Experimental inventory pagination is implemented on
-  `feature/atlas-pagination-cohort` and is pending CI/merge. It preserves
+- Phase 1 experimental cohort pagination is merged in PR #48. It preserves
   page offsets, deduplicates polymer entities, records failed metadata IDs,
-  detects changes to the archive hit count, and loads the next page on demand.
+  detects changes to the archive hit count and loads further pages on demand.
+  RCSB is not a frozen archive snapshot: a changed hit count forces restart,
+  and live API compatibility should be checked separately from mocked CI tests.
+- Next implementation slice: direct per-residue SIFTS annotations from PDBe's
+  updated mmCIF `_pdbx_sifts_xref_db` category, with explicit asym/auth chain
+  mapping, insertion-code handling, partial coverage and conflicting targets.
+  Do not infer any interior residue mapping solely from range endpoints.
 - **Not implemented yet:** exact per-entity canonical SIFTS residue coverage,
   experimental structural-state clustering, fragment switch regions and
   prediction-vs-experiment coverage.

@@ -42,6 +42,7 @@ source(file.path("R", "geometry.R"), local = TRUE)
 source(file.path("R", "experimental.R"), local = TRUE)
 source(file.path("R", "ensemble.R"), local = TRUE)
 source(file.path("R", "group-comparison.R"), local = TRUE)
+source(file.path("R", "guide.R"), local = TRUE)
 
 # Chain colours and contour colours are designed together for a recognisable
 # RamplotR publication identity. Region meaning is encoded by ordered contrast,
@@ -143,6 +144,8 @@ ui <- fluidPage(
             tags$p("Enter a PDB accession or use a local PDB/mmCIF file.")
           )
         ),
+        tags$div(class="ram-source-guide",
+          actionLink("openGuide","New here? Explore the workflow guide")),
         tags$div(
           class = "ram-source-controls",
           tags$div(
@@ -599,16 +602,27 @@ ui <- fluidPage(
                 tags$details(id="ram-group-comparison-panel",
                   class="ram-details ram-group-comparison-panel",
                   tags$summary("Compare groups of structures"),
-                  tags$p(class="ram-field-hint",
-                    "Compare repeated structural states such as apo vs holo, WT vs mutant, or experimental vs predicted sets. Structures are sequence-aligned to one reference chain before circular φ/ψ summaries are calculated."),
-                  tags$div(class="ram-group-compare-controls",
-                    selectInput("groupReferenceChain","Reference chain",
-                      choices=character(),selectize=FALSE),
-                    numericInput("groupMinIdentity","Minimum chain identity (%)",
-                      value=70,min=20,max=100,step=5),
-                    numericInput("groupMinCoverage","Minimum reference coverage (%)",
-                      value=70,min=20,max=100,step=5)
+                  tags$div(class="ram-group-intro",
+                    tags$p("Compare experimental states, mutants or prediction sets after loading a reference structure. Each file contributes model 1 and the best-matching protein chain."),
+                    actionLink("groupGuide","How do group comparisons work?")
                   ),
+                  tags$div(class="ram-group-step-heading",
+                    tags$span("1"), tags$strong("Choose a reference and chain-match criteria")),
+                  tags$div(class="ram-group-compare-controls",
+                    tags$div(class="ram-group-field",
+                      selectInput("groupReferenceChain","Reference chain",
+                        choices=character(),selectize=FALSE)),
+                    tags$div(class="ram-group-field",
+                      numericInput("groupMinIdentity","Minimum chain identity (%)",
+                        value=70,min=20,max=100,step=5)),
+                    tags$div(class="ram-group-field",
+                      numericInput("groupMinCoverage","Minimum reference coverage (%)",
+                        value=70,min=20,max=100,step=5))
+                  ),
+                  tags$p(class="ram-field-hint",
+                    "Identity and coverage refer to matching uploaded chains to the selected reference, not to a threshold for biological state changes."),
+                  tags$div(class="ram-group-step-heading",
+                    tags$span("2"), tags$strong("Upload structures for both conditions")),
                   tags$div(class="ram-group-upload-grid",
                     tags$section(class="ram-group-upload-card",
                       textInput("groupALabel","Group A label",value="Group A"),
@@ -616,30 +630,34 @@ ui <- fluidPage(
                         "Include loaded structure in Group A",value=TRUE),
                       fileInput("groupAFiles","Additional Group A structures",
                         multiple=TRUE,
-                        accept=c(".pdb",".ent",".cif",".mmcif",".mcif"))
+                        accept=c(".pdb",".ent",".cif",".mmcif",".mcif")),
+                      tags$p(class="ram-field-hint",
+                        "The structure loaded at the top of RamplotR can be your first Group A member.")
                     ),
                     tags$section(class="ram-group-upload-card",
                       textInput("groupBLabel","Group B label",value="Group B"),
                       fileInput("groupBFiles","Group B structures",
                         multiple=TRUE,
-                        accept=c(".pdb",".ent",".cif",".mmcif",".mcif"))
+                        accept=c(".pdb",".ent",".cif",".mmcif",".mcif")),
+                      tags$p(class="ram-field-hint",
+                        "Upload at least one structure for your comparison condition.")
                     )
                   ),
                   tags$p(class="ram-field-hint",
-                    "Each uploaded file contributes model 1. Best-matching protein chains are selected automatically using the identity and reference-coverage thresholds above."),
-                  actionButton("runGroupComparison","Analyse groups",
-                    class="btn-primary btn-sm"),
+                    "For meaningful within-group variation, add several independent structures per condition where possible. Members use their first model."),
+                  tags$div(class="ram-group-step-heading",
+                    tags$span("3"), tags$strong("Analyse and inspect residue-level differences")),
+                  tags$div(class="ram-group-run-row",
+                    actionButton("runGroupComparison","Analyse groups",
+                      class="btn-primary btn-sm"),
+                    tags$span("Results and CSV exports appear after a successful analysis.")
+                  ),
                   uiOutput("groupComparisonSummary"),
                   uiOutput("groupComparisonTrack"),
                   uiOutput("groupComparisonSelectionInfo"),
                   tags$div(class="ram-residue-table",
                     DT::DTOutput("groupComparisonRows")),
-                  tags$div(class="ram-ensemble-actions",
-                    downloadButton("downloadGroupComparison",
-                      "Export residue comparison CSV"),
-                    downloadButton("downloadGroupMembers",
-                      "Export matched structure/chain CSV")
-                  )
+                  uiOutput("groupComparisonExports")
                 )
               )
             ),
@@ -648,8 +666,9 @@ ui <- fluidPage(
               tags$div(class="ram-subtab-content",
                 tags$div(class="ram-result-head",
                   tags$div(tags$h2("Conformational Atlas"),
-                    tags$p("Discover experimental structures for a UniProt protein. State clustering and local switch regions will follow."))),
+                    tags$p("Find experimental PDB counterparts, verify exact UniProt residue mapping, and explore geometric groups and candidate backbone changes."))),
                 tags$section(class="ram-panel",
+                  actionLink("atlasGuide","Read the experimental Atlas walkthrough"),
                   tags$p(class="ram-field-hint",
                     "Searches public RCSB PDB by UniProt cross-reference, restricted to experimental entries. Results are candidate polymer entities, not distinct conformational states."),
                   tags$div(class="ram-atlas-controls",
@@ -665,6 +684,10 @@ ui <- fluidPage(
                     "Results load 50 experimental entities at a time. Canonical residue coverage, construct equivalence, and conformational-state identity must be verified before interpreting structural states.")
                 )
               )
+            ),
+            tabPanel(
+              title = "Guide", value = "guide",
+              ram_guide_ui()
             ),
             tabPanel(
               title = "Summary", value = "summary",
@@ -719,6 +742,23 @@ ui <- fluidPage(
 # downstream result is a reactive expression, so adjusting settings never
 # refetches the structure or recomputes backbone torsions.
 server <- function(input, output, session) {
+  # Simple task navigation. These links never modify the loaded analysis.
+  guide_targets <- c(
+    openGuide="guide",groupGuide="guide",atlasGuide="guide",
+    guideGoPlot="plot",guideGoResidues="residues",
+    guideGoSummary="summary",guideGoSummary2="summary",
+    guideGoCompare="compare",guideGoGroups="compare",guideGoAtlas="atlas"
+  )
+  for (id in names(guide_targets)) {
+    local({
+      trigger <- id
+      target <- unname(guide_targets[[id]])
+      observeEvent(input[[trigger]], {
+        updateTabsetPanel(session, "analysisTabs", selected=target)
+      }, ignoreInit=TRUE)
+    })
+  }
+
   loaded <- reactiveVal(NULL)
   comparison_loaded <- reactiveVal(NULL)
   external_validation <- reactiveVal(NULL)
@@ -3323,6 +3363,17 @@ server <- function(input, output, session) {
         else as.character(item$insertion_code)
     ))
   },ignoreInit=TRUE)
+
+  output$groupComparisonExports <- renderUI({
+    matches <- group_comparison_matches()
+    if (is.null(matches)) return(NULL)
+    tags$div(class="ram-ensemble-actions ram-group-downloads",
+      downloadButton("downloadGroupComparison",
+        "Export residue comparison CSV"),
+      downloadButton("downloadGroupMembers",
+        "Export matched structure/chain CSV")
+    )
+  })
 
   output$downloadGroupComparison <- downloadHandler(
     filename=function() safe_filename("group-conformation-comparison.csv"),

@@ -2134,8 +2134,16 @@ server <- function(input, output, session) {
   output$atlasGeometryPlot <- renderPlot({
     result <- atlas_geometry_result()
     req(!is.null(result),is.null(result$error))
-    graphics::plot(result$hclust,main="Experimental geometry similarity",
-      xlab="",sub="",ylab="C-alpha distance-map RMSD (Å)")
+    if(length(result$selected)==2L) {
+      distance <- result$distance_matrix[1L,2L]
+      graphics::barplot(distance,names.arg=paste(result$selected,
+        collapse=" vs "),ylab="C-alpha distance-map RMSD (Å)",
+        main="Pairwise experimental geometry",
+        ylim=c(0,max(distance,result$cutoff)*1.2))
+    } else {
+      graphics::plot(result$hclust,main="Experimental geometry similarity",
+        xlab="",sub="",ylab="C-alpha distance-map RMSD (Å)")
+    }
     graphics::abline(h=result$cutoff,lty=2,col="gray50")
   })
 

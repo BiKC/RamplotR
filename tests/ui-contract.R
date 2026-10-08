@@ -13,7 +13,8 @@ required <- c(
   "ligands", "dna", "rna", "spinning", "rocking", "colorscheme",
   "bg1", "bg2", "bg3", "bg4", "plotly", "NGL",
   "comparePlot", "compareSwap", "NGLCompare",
-  "regionselect", "regions", "summary"
+  "regionselect", "regions", "summary",
+  "atlasAccession", "atlasDiscover", "atlasStatus", "atlasResults"
 )
 missing <- required[!vapply(required, function(id) {
   grepl(paste0('"', id, '"'), ui, fixed = TRUE)
@@ -27,6 +28,7 @@ stopifnot(
   !grepl('tags$script(src = "https://cdn.plot.ly', ui, fixed = TRUE),
   grepl('src = "custom.js"', ui, fixed = TRUE),
   grepl('src = "canonical-mapping.js"', ui, fixed = TRUE),
+  grepl('src = "atlas-discovery.js"', ui, fixed = TRUE),
   grepl('src = "experimental-search.js"', ui, fixed = TRUE),
   grepl('class = "ram-workspace"', ui, fixed = TRUE),
   grepl('class = "ram-charts"', ui, fixed = TRUE),

@@ -71,6 +71,31 @@ _pdbx_sifts_xref_db.observed
         request.respond({status:200,
           headers:{...cors,"content-type":"text/plain"},
           body:mockCif});
+      } else if (url === "https://www.ebi.ac.uk/pdbe/static/entry/1ubq_updated.cif") {
+        const mockCif = `data_1ubq
+#
+loop_
+_pdbx_poly_seq_scheme.asym_id
+_pdbx_poly_seq_scheme.entity_id
+_pdbx_poly_seq_scheme.seq_id
+_pdbx_poly_seq_scheme.pdb_strand_id
+_pdbx_poly_seq_scheme.pdb_seq_num
+_pdbx_poly_seq_scheme.pdb_ins_code
+X 1 1 A 201 .
+X 1 2 A 202 .
+#
+loop_
+_pdbx_sifts_xref_db.entity_id
+_pdbx_sifts_xref_db.asym_id
+_pdbx_sifts_xref_db.seq_id
+_pdbx_sifts_xref_db.unp_acc
+_pdbx_sifts_xref_db.unp_num
+_pdbx_sifts_xref_db.observed
+1 X 1 P00533 51 1
+1 X 2 P00533 52 1
+#`;
+        request.respond({status:200,
+          headers:{...cors,"content-type":"text/plain"},body:mockCif});
       } else if (url === "https://data.rcsb.org/rest/v1/core/polymer_entity/1CRN/1") {
         request.respond({status:200,headers:cors,body:JSON.stringify({
           rcsb_polymer_entity_container_identifiers:{
@@ -154,6 +179,17 @@ _pdbx_sifts_xref_db.observed
     const afterPaging=await page.$eval("#atlasResults",el=>el.textContent);
     assert.match(afterPaging,/2 enriched polymer entities in 2 PDB entries/);
     assert.match(afterPaging,/55.0% UniProt sequence coverage/);
+    const verifier=await page.$$(".ram-atlas-verify");
+    assert.equal(verifier.length,2,"Expected one verifier per experimental entity.");
+    await verifier[1].click();
+    await page.waitForFunction(() => {
+      const text=document.querySelector("#atlasResults")?.textContent || "";
+      return text.includes("2 verified experimental entities") &&
+        text.includes("3 distinct observed UniProt positions") &&
+        text.includes("Export verified residue mapping CSV");
+    },{timeout:25000});
+    assert.ok(await page.$("#downloadAtlasCanonical"));
+    assert.ok(await page.$("#downloadAtlasSupport"));
     await page.screenshot({path:path.join(output,"atlas-inventory-desktop.png"),
       fullPage:true});
     await page.setViewport({width:390,height:844});

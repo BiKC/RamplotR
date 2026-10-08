@@ -80,6 +80,7 @@ jobs:
           Rscript tests/canonical.R
           Rscript tests/atlas.R
           Rscript tests/atlas-sifts.R
+          Rscript tests/atlas-cohort.R
         shell: bash
       - name: Verify peptide continuity and torsion calculations
         run: Rscript tests/peptide.R

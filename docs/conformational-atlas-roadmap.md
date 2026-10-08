@@ -40,6 +40,10 @@ conformational states.
   PDBe updated mmCIF and polymer sequence-number cross-references. Insertions,
   unmapped rows and conflicts are explicit. Live PDBe retrieval still merits
   deployment verification separately from mocked CI.
+- Verified SIFTS mappings can now be combined into a per-UniProt-position
+  experimental cohort summary and downloadable residue/position-support CSVs
+  on `feature/atlas-canonical-cohort`. Only explicitly verified entities
+  count; ambiguous coordinates do not contribute position support.
 - **Not implemented yet:** automatic cohort-wide canonical coverage validation,
   experimental structural-state clustering, fragment switch regions and
   prediction-vs-experiment coverage.

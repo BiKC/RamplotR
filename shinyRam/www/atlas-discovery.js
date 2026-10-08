@@ -15,9 +15,12 @@
       throw new Error("Enter a valid UniProt accession.");
     return value;
   }
-  function searchRequest(accession, rows = MAX_RESULTS) {
+  function searchRequest(accession, rows = MAX_RESULTS, start = 0) {
     const acc = validateAccession(accession);
     const limit = Math.min(MAX_RESULTS, Math.max(1, Math.floor(Number(rows) || MAX_RESULTS)));
+    const offset = Number(start);
+    if (!Number.isSafeInteger(offset) || offset < 0 || offset > 1000000)
+      throw new Error("Invalid Atlas page offset.");
     return {
       query: {
         type: "terminal",
@@ -30,7 +33,8 @@
       },
       return_type: "polymer_entity",
       request_options: {
-        paginate: {start: 0, rows: limit},
+        paginate: {start: offset, rows: limit},
+        sort: [{sort_by: "rcsb_id", direction: "asc"}],
         results_content_type: ["experimental"]
       }
     };
@@ -119,7 +123,9 @@
     const requestId = clean(payload && payload.request_id);
     const accession = clean(payload && payload.accession).toUpperCase();
     try {
-      const query = searchRequest(accession, payload && payload.rows);
+      const query = searchRequest(accession, payload && payload.rows,
+        payload && payload.start == null ? 0 : payload.start);
+      const offset = query.request_options.paginate.start;
       const response = await fetchJSON(SEARCH, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
@@ -142,18 +148,26 @@
         return normalizeEntity(hit, entity, entry, accession);
       });
       const results = records.filter(Boolean);
+      const failedEntityIds = hits.filter((hit,i) => !records[i])
+        .map(hit => clean(hit && hit.identifier))
+        .filter(identifier => /^[A-Za-z0-9]{4}_[1-9][0-9]*$/.test(identifier));
       notify("ramAtlasResults", {
         request_id: requestId,
         accession,
+        start: offset,
         total_count: response && Number.isFinite(Number(response.total_count))
-          ? Number(response.total_count) : results.length,
+          ? Number(response.total_count) : offset + hits.length,
         returned_count: hits.length,
+        next_offset: offset + hits.length,
         incomplete_metadata: hits.length - results.length,
+        failed_entity_ids: failedEntityIds,
         results
       });
     } catch (err) {
       notify("ramAtlasResults", {
         request_id: requestId, accession,
+        start: Number.isSafeInteger(Number(payload && payload.start))
+          ? Number(payload.start) : 0,
         state: "error",
         message: err && err.message ? err.message : "Atlas search failed."
       });

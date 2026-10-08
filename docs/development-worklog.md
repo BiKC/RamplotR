@@ -64,8 +64,12 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
   - RCSB method, resolution and entity/reference coverage metadata;
   - bounded, capped retrieval with explicit partial-result notices;
   - comparison handoff and desktop/mobile regression coverage.
-- No active feature PR immediately after PR #47 merge. Next intended branch:
-  `feature/atlas-pagination-cohort`.
+- Active implementation branch: `feature/atlas-pagination-cohort`.
+  It adds paged RCSB experimental search, stable sort/offset tracking, metadata
+  failure IDs, deduplication, archive-total change detection, a Load Next control
+  and dedicated R/Node/browser regression coverage.
+- Pending verification: open PR and wait for scientific/browser CI. After merge,
+  move to exact SIFTS canonical coverage on selected experimental entities.
 - Roadmap: `docs/conformational-atlas-roadmap.md`.
 - Browser CI for PR #47 passed. Windows scientific tests passed; Ubuntu
   scientific runner for the last CSS/test-only update had not completed setup

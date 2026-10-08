@@ -40,6 +40,8 @@ jobs:
         run: |
           node --check shinyRam/www/custom.js
           node --check shinyRam/www/canonical-mapping.js
+          node --check shinyRam/www/atlas-discovery.js
+          node tests/atlas-discovery.test.cjs
           node --check shinyRam/www/experimental-search.js
           node --check shinyRam/www/compare.js
           node --check shinyRam/www/prediction.js

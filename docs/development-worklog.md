@@ -58,37 +58,39 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 
 ## Active work
 
-- Active branch: `feature/conformational-atlas-foundation`.
-- The implementation roadmap is in
-  `docs/conformational-atlas-roadmap.md`.
-- Current slice: Phase 0A, canonical SIFTS/UniProt residue coordinates.
-  - normalize PDBe SIFTS mapping segments;
-  - expand only provably one-to-one author-number/UniProt ranges;
-  - preserve unresolved/nonlinear ranges instead of inventing residue mappings;
-  - add direct UniProt coordinates for AlphaFold DB models;
-  - expose canonical coordinates in residue inspection;
-  - add pure regression tests before moving to archive-scale Atlas retrieval.
-- PR #45 added a transparent, comparison-only coarse phi/psi state
-  (Alpha-R, Beta, PPII, Alpha-L or Other) across pairwise comparison,
-  prediction/NMR ensembles, group comparison, residue evidence and exports.
-- The state is explicitly not a validation category, DSSP secondary-structure
-  assignment, statistical significance test or claim of molecular dynamics.
-- The integrated Compare workflow is covered at desktop/laptop and 390x844 mobile widths.
-- Before continuing after a reconnect, inspect this section and the Atlas
-  roadmap before starting another branch.
+- Baseline is current `main` after the canonical-coordinate implementation
+  (commit `c2615795ff202e5019d9abc03b130125e77a565b`).
+- Canonical mapping (Phase 0A) already exists in `main`:
+  `shinyRam/R/canonical.R`, `canonical-mapping.js`, inspector/summary
+  integration and tests. Do not reimplement it on the older
+  `feature/conformational-atlas-foundation` branch.
+- Active branch: `feature/atlas-experimental-inventory`.
+- Current slice: Phase 1 inventory discovery for a UniProt accession:
+  - experimental polymer-entity discovery from RCSB Search;
+  - bounded metadata retrieval, entity/reference coverage and limitations;
+  - an Atlas tab with comparison handoff to the existing Compare workflow;
+  - unit tests plus scientific CI/UI contract checks.
+- This is inventory discovery, not experimental conformational-state clustering.
+  It must not report a "state count" until a clustering analysis is implemented.
+- Long-term roadmap: `docs/conformational-atlas-roadmap.md`.
+- Manuscript remains separate on `arxiv-preprint` / PR #20.
+- Before continuing after a reconnect, inspect `main`, recent PRs,
+  and this worklog. Do not restore older branches over new work.
 
 ## Next implementation steps
 
-1. Finish Phase 0A canonical mapping on the active Atlas branch and merge it
-   with tests.
-2. Benchmark the current coarse backbone-state layer before giving it a
-   stronger scientific interpretation.
-3. Implement the experimental Atlas retrieval layer around canonical UniProt
-   coordinates, with explicit mapping/coverage exclusions.
-4. Only then add archive-scale state discovery, switch-region analysis and
-   prediction-state clustering.
-5. Keep the manuscript branch separate until these new workflows and their
-   scientific claims are stable.
+1. Finish and verify the experimental inventory branch; merge after the
+   scientific regression suite passes.
+2. Add exact SIFTS canonical coverage per returned entity/chain, preserving
+   unmapped/ambiguous residues and isoform differences.
+3. Add pagination and caching so proteins with hundreds of PDB entities are
+   analysed as complete, auditable cohorts rather than truncated search hits.
+4. Implement state discovery via established archive clusters when available,
+   with explicit structural/alignment validation and representative structures.
+5. Implement fragment-level switch regions, prediction-state clustering and
+   prediction-to-experimental state coverage.
+6. Benchmark coarse backbone-state bins before making biological claims.
+7. Keep the manuscript branch separate until analysis and validation stabilize.
 
 ## Branch hygiene
 
@@ -116,5 +118,5 @@ Old feature/fix/chore branches are retained in GitHub but are **not active work*
 - `rebuild/compare-prediction-confidence-20261007`
 
 The only long-lived non-main branch intentionally kept for active content is
-`arxiv-preprint` / PR #20. The only implementation branch currently active is
-the one named in **Active work** above.
+`arxiv-preprint` / PR #20. The active implementation branch is the one named in **Active work**
+above; all older feature branches are historical unless explicitly reopened.

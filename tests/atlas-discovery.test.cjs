@@ -18,7 +18,13 @@ assert.deepEqual(atlas.parseEntityId("1abc_2"), {pdb_id:"1ABC",entity_id:"2"});
 assert.equal(atlas.parseEntityId("bad/name"), null);
 const hit = {identifier:"1ABC_2"};
 const entity = {
-  rcsb_polymer_entity_container_identifiers: {auth_asym_ids:["A","B","A"]},
+  rcsb_polymer_entity_container_identifiers: {
+    auth_asym_ids:["A","B","A"],
+    reference_sequence_identifiers:[{
+      database_name:"UniProt",database_accession:"P00533",
+      reference_sequence_coverage:0.78,entity_sequence_coverage:0.99
+    }]
+  },
   rcsb_polymer_entity: {pdbx_description:"Test protein"}
 };
 const entry = {
@@ -27,14 +33,21 @@ const entry = {
   rcsb_accession_info:{initial_release_date:"2025-04-01"},
   struct:{title:"My experimental structure"}
 };
-assert.deepEqual(atlas.normalizeEntity(hit,entity,entry), {
+assert.deepEqual(atlas.normalizeEntity(hit,entity,entry,"P00533"), {
   pdb_id:"1ABC",entity_id:"2",chains:["A","B"],chain:"A",
-  description:"Test protein",method:"X-RAY DIFFRACTION",
+  description:"Test protein",
+  reference_sequence_coverage:0.78,entity_sequence_coverage:0.99,
+  matching_uniprot_reference:true,method:"X-RAY DIFFRACTION",
   resolution:1.9,release_date:"2025-04-01",
   title:"My experimental structure"
 });
-assert.equal(atlas.normalizeEntity(hit,null,entry),null);
-assert.equal(atlas.normalizeEntity({identifier:"not-an-id"},entity,entry),null);
+assert.equal(atlas.normalizeEntity(hit,null,entry,"P00533"),null);
+assert.equal(atlas.normalizeEntity({identifier:"not-an-id"},entity,entry,"P00533"),null);
+
+assert.equal(atlas.normalizeEntity(hit,entity,entry,"Q99999")
+  .matching_uniprot_reference,false);
+assert.equal(atlas.normalizeEntity(hit,entity,entry,"Q99999")
+  .reference_sequence_coverage,null);
 
 (async () => {
   let active = 0, peak = 0;

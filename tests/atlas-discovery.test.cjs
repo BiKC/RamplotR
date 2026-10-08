@@ -13,6 +13,11 @@ assert.equal(q.query.parameters.value, "P00533");
 assert.equal(q.return_type, "polymer_entity");
 assert.deepEqual(q.request_options.results_content_type, ["experimental"]);
 assert.deepEqual(q.request_options.paginate, {start: 0, rows: 50});
+assert.deepEqual(q.request_options.sort,[{sort_by:"rcsb_id",direction:"asc"}]);
+const q2=atlas.searchRequest("P00533",50,50);
+assert.deepEqual(q2.request_options.paginate,{start:50,rows:50});
+assert.throws(()=>atlas.searchRequest("P00533",50,-1),/offset/);
+assert.throws(()=>atlas.searchRequest("P00533",50,1.5),/offset/);
 
 assert.deepEqual(atlas.parseEntityId("1abc_2"), {pdb_id:"1ABC",entity_id:"2"});
 assert.equal(atlas.parseEntityId("bad/name"), null);

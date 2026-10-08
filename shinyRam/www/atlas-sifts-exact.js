@@ -221,6 +221,7 @@
           if(!xyz.every(n=>Number.isFinite(n)&&Math.abs(n)<100000))
             continue;
           const existing=output.get(key);
+          if(existing && existing.ambiguous) continue;
           // Prefer the primary unlabelled conformer to alternate A.
           const preferred=alternative==="." || alternative==="?";
           if(!existing || (preferred && !existing.preferred))

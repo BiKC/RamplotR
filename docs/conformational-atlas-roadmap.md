@@ -92,6 +92,10 @@ Selectable Atlas group representatives and a residue-level evidence panel are un
 
 After PR #56, the active follow-up branch adds a dedicated Atlas-to-Compare action that loads **both** experimental group representatives. It auto-focuses an Atlas position only after confirming matching chain/residue/insertion-code identifiers in both sequence-alignment rows. If a canonical correspondence is not represented in that alignment, RamplotR warns and does not select an incorrect residue. This remains exploratory structural evidence, not functional-state classification.
 
+## October 8 canonical comparison upgrade
+
+The post-PR #57 work changes the Atlas-to-Compare matching method. Both verified structures are now paired using **shared observed exact SIFTS UniProt positions**, including PDB insertion codes and explicit asym/author chains. Normal sequence alignment remains available for other comparisons and as a user-chosen fallback. The Atlas mode reports matched and excluded residue denominators instead of treating unverified positions as structure deletions. Residue substitutions remain visible but require biological interpretation; sharing a UniProt coordinate is not proof of construct or state equivalence.
+
 ## Scientific principles
 
 1. Keep evidence types separate. Rama8000 validation, native RamplotR density,

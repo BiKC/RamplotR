@@ -226,3 +226,79 @@ ram_atlas_comparison_pair_index <- function(comparison,atlas_residue) {
   if(length(indices)!=1L) return(NA_integer_)
   indices[[1L]]
 }
+
+
+# Build a coordinate-safe, canonical UniProt alignment directly from verified
+# PDBe SIFTS residues. Never infer relationships from PDB numbering, sequence
+# index offsets, or an alignment heuristic in this mode.
+ram_atlas_canonical_side <- function(torsions, mapping, accession,
+                                      chain, asym_id) {
+  required_map <- c("chain","resi","insertion_code","struct_asym_id",
+    "label_seq_id","uniprot_accession","uniprot_resi","observed")
+  required_atoms <- c("chain","resi","insertion_code")
+  if(!is.data.frame(mapping) || !all(required_map %in% names(mapping)) ||
+     !is.data.frame(torsions) ||
+     !all(required_atoms %in% names(torsions)) ||
+     length(chain)!=1L || is.na(chain) || !nzchar(chain) ||
+     length(asym_id)!=1L || is.na(asym_id) || !nzchar(asym_id))
+    stop("Canonical comparison requires an exact verified chain mapping.",
+      call.=FALSE)
+  accession <- ram_uniprot_accession(accession)
+  map <- mapping[
+    !is.na(mapping$chain) & mapping$chain==chain &
+    !is.na(mapping$struct_asym_id) &
+    mapping$struct_asym_id==asym_id &
+    !is.na(mapping$uniprot_accession) &
+    mapping$uniprot_accession==accession &
+    !is.na(mapping$observed) & mapping$observed &
+    is.finite(mapping$uniprot_resi) &
+    is.finite(mapping$label_seq_id) &
+    !is.na(mapping$resi) & !is.na(mapping$insertion_code),,
+    drop=FALSE]
+  if(!nrow(map)) return(data.frame(uniprot_resi=integer(),
+    index=integer()))
+  map <- unique(map[,c("chain","resi","insertion_code",
+                         "label_seq_id","uniprot_resi"),drop=FALSE])
+  local <- paste(map$chain,map$resi,map$insertion_code,sep="\r")
+  target <- as.character(map$uniprot_resi)
+  label <- as.character(map$label_seq_id)
+  # Reject both sides of each conflict, including label-sequence collisions.
+  ambiguous <- duplicated(local) | duplicated(local,fromLast=TRUE) |
+    duplicated(target) | duplicated(target,fromLast=TRUE) |
+    duplicated(label) | duplicated(label,fromLast=TRUE)
+  map <- map[!ambiguous,,drop=FALSE]
+  if(!nrow(map)) return(data.frame(uniprot_resi=integer(),
+    index=integer()))
+  atom_id <- paste(torsions$chain,torsions$resi,
+                   torsions$insertion_code,sep="\r")
+  duplicated_atom <- duplicated(atom_id) |
+    duplicated(atom_id,fromLast=TRUE)
+  local <- paste(map$chain,map$resi,map$insertion_code,sep="\r")
+  indices <- match(local,atom_id)
+  good <- !is.na(indices) & !duplicated_atom[indices]
+  map <- map[good,,drop=FALSE]
+  indices <- indices[good]
+  out <- data.frame(uniprot_resi=as.integer(map$uniprot_resi),
+    index=as.integer(indices))
+  out[order(out$uniprot_resi),,drop=FALSE]
+}
+
+ram_atlas_canonical_pairing <- function(a,b,map_a,map_b,accession,
+                                        chain_a,asym_a,chain_b,asym_b) {
+  side_a <- ram_atlas_canonical_side(a,map_a,accession,chain_a,asym_a)
+  side_b <- ram_atlas_canonical_side(b,map_b,accession,chain_b,asym_b)
+  common <- sort(intersect(side_a$uniprot_resi,side_b$uniprot_resi))
+  # Only exact, observed, common canonical positions enter the comparison.
+  # Other residues are excluded, NOT called structural deletions.
+  pairing <- data.frame(
+    index_a=as.integer(side_a$index[match(common,side_a$uniprot_resi)]),
+    index_b=as.integer(side_b$index[match(common,side_b$uniprot_resi)]),
+    uniprot_resi=as.integer(common))
+  list(pairing=pairing,
+    matched=length(common),
+    mapped_a=nrow(side_a),mapped_b=nrow(side_b),
+    total_a=nrow(a),total_b=nrow(b),
+    excluded_a=nrow(a)-length(common),
+    excluded_b=nrow(b)-length(common),
+    source="Exact observed PDBe SIFTS UniProt positions")
+}

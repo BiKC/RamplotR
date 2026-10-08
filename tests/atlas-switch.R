@@ -133,4 +133,67 @@ assert(is.na(ram_atlas_comparison_pair_index(aligned,no_mapping)),
 duplicate <- rbind(aligned,aligned[3L,,drop=FALSE])
 assert(is.na(ram_atlas_comparison_pair_index(duplicate,target)),
   "Ambiguous alignment pairs must not be auto-selected.")
+# Same verified UniProt positions, but substantially different author numbering.
+# Sequence offsets must never be used to build this alignment.
+second_map <- transform(b$mapping,chain="B",resi=resi+900L)
+second_record <- b
+second_record$mapping <- second_map
+first_torsions <- ram_atlas_entity_torsions(a,"X")
+second_torsions <- ram_atlas_entity_torsions(second_record,"X")
+canonical <- ram_atlas_canonical_pairing(first_torsions,second_torsions,
+  a$mapping,second_map,"P12345","A","X","B","X")
+assert(canonical$matched==40L &&
+       identical(canonical$pairing$uniprot_resi,1:40) &&
+       identical(canonical$pairing$index_a,1:40) &&
+       identical(canonical$pairing$index_b,1:40),
+  "Canonical alignment should preserve exact matched UniProt positions across numbering changes.")
+assert(first_torsions$resi[[10L]] != second_torsions$resi[[10L]],
+  "Test must use different author residue numbering.")
+
+# Non-overlapping accession and ambiguous one-to-many mapping cannot silently
+# turn into positional matches.
+foreign_map <- transform(second_map,uniprot_accession="Q99999")
+foreign <- ram_atlas_canonical_pairing(first_torsions,second_torsions,
+  a$mapping,foreign_map,"P12345","A","X","B","X")
+assert(foreign$matched==0L,
+  "Different accession must not produce canonical matches.")
+duplicate_map <- rbind(second_map,
+  transform(second_map[10L,,drop=FALSE],uniprot_resi=900L))
+ambiguous <- ram_atlas_canonical_pairing(first_torsions,second_torsions,
+  a$mapping,duplicate_map,"P12345","A","X","B","X")
+assert(ambiguous$matched==39L &&
+       !10L %in% ambiguous$pairing$uniprot_resi,
+  "Conflicting canonical SIFTS residue must be excluded entirely.")
+label_conflict <- second_map
+label_conflict$label_seq_id[[11L]] <- label_conflict$label_seq_id[[10L]]
+label_ambiguous <- ram_atlas_canonical_pairing(first_torsions,second_torsions,
+  a$mapping,label_conflict,"P12345","A","X","B","X")
+assert(label_ambiguous$matched==38L &&
+       !any(c(10L,11L) %in% label_ambiguous$pairing$uniprot_resi),
+  "Duplicate label_seq_id must exclude both conflicting canonical residues.")
+
+# Insertion codes are part of the local author identifier.
+insertion_map <- a$mapping
+insertion_map$insertion_code[[10L]] <- "A"
+wrong_insertion <- ram_atlas_canonical_pairing(first_torsions,second_torsions,
+  insertion_map,second_map,"P12345","A","X","B","X")
+assert(wrong_insertion$matched==39L,
+  "PDB insertion codes must match observed torsion records exactly.")
+inserted_torsions <- first_torsions
+inserted_torsions$insertion_code[[10L]] <- "A"
+correct_insertion <- ram_atlas_canonical_pairing(inserted_torsions,
+  second_torsions,insertion_map,second_map,
+  "P12345","A","X","B","X")
+assert(correct_insertion$matched==40L,
+  "A genuinely observed insertion code should still pair by UniProt.")
+
+# No assumed gaps: only residues verified on both sides are compared.
+truncated <- second_torsions[-(1:7),,drop=FALSE]
+partial <- ram_atlas_canonical_pairing(first_torsions,truncated,
+  a$mapping,second_map,"P12345","A","X","B","X")
+assert(partial$matched==33L &&
+       identical(partial$pairing$uniprot_resi,8:40) &&
+       partial$total_a==40L && partial$total_b==33L,
+  "Partial constructs must report the common mapped core and true denominators.")
+
 message("Experimental Atlas backbone switch-region tests passed.")

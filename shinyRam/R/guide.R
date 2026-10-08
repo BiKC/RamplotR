@@ -155,7 +155,7 @@ ram_guide_ui <- function() {
         step(5, "Investigate local differences",
           "Choose two geometric-group representatives, then select Find local backbone changes. Click a canonical residue to see paired φ/ψ and exact PDB residue identifiers."),
         step(6, "Inspect both representative structures in 2D/3D",
-          "Click Inspect both structures in 2D/3D. The representatives open in Compare, where RamplotR highlights the pair only when both exact author residue identifiers match. A mismatch is reported rather than guessed.")
+          "Click Inspect both structures in 2D/3D. Compare now uses shared, observed UniProt positions from the exact verified SIFTS mappings, even when author numbering or constructs differ. Unmapped residues are excluded and the compared coverage is shown. A missing or ambiguous mapping is never replaced by a guessed match.")
       ),
       tags$p("Atlas groups are exploratory geometric similarities, not confirmed functional states. SIFTS verification does not establish construct equivalence; the default 1.5 Å and 30° cutoffs have not been validated as universal state boundaries."),
       jump("guideGoAtlas", "Open Atlas")

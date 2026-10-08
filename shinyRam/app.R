@@ -546,6 +546,7 @@ ui <- fluidPage(
                   )
                 ),
                 uiOutput("compareChainControls"),
+                uiOutput("atlasCanonicalNotice"),
                 tags$div(class = "ram-compare-status", uiOutput("compareSummary")),
                 uiOutput("compareChangeTrack"),
                 tags$div(class = "ram-compare-toolbar",
@@ -778,6 +779,7 @@ server <- function(input, output, session) {
   atlas_switch_result <- reactiveVal(NULL)
   atlas_selected_position <- reactiveVal(NULL)
   atlas_pair_handoff <- reactiveVal(NULL)
+  atlas_alignment_context <- reactiveVal(NULL)
   canonical_segments <- reactiveVal(ram_canonical_empty_segments())
   canonical_mapping <- reactiveVal(ram_canonical_empty_map())
   canonical_status <- reactiveVal(NULL)
@@ -1009,6 +1011,7 @@ server <- function(input, output, session) {
     invisible(TRUE)
   }
   observeEvent(input$submit, {
+    atlas_alignment_context(NULL)
     source_type <- input$inputSource
     is_upload <- identical(source_type,"upload")
     is_afdb <- identical(source_type,"afdb")
@@ -1204,6 +1207,7 @@ server <- function(input, output, session) {
   }
 
   observeEvent(input$compareSubmit, {
+    atlas_alignment_context(NULL)
     is_upload <- identical(input$compareInputSource, "upload")
     if (is_upload && (is.null(input$compareFile) ||
                       is.null(input$compareFile$datapath))) {
@@ -2391,7 +2395,35 @@ server <- function(input, output, session) {
       return()
     pdb_a <- substr(ids[[1L]],1L,4L)
     pdb_b <- substr(ids[[2L]],1L,4L)
+    geometry <- isolate(atlas_geometry_result())
+    verified <- isolate(atlas_exact_results())
+    available <- tryCatch(
+      ram_atlas_geometry_entities(verified,geometry$accession),
+      error=function(e) list())
+    if(any(!ids %in% names(available))) {
+      showNotification("Exact verified Atlas representatives are unavailable.",
+        type="error",duration=12)
+      return()
+    }
+    if(!identical(as.character(row$chain_a[[1L]]),
+                  as.character(available[[ids[[1L]]]]$chain)) ||
+       !identical(as.character(row$chain_b[[1L]]),
+                  as.character(available[[ids[[2L]]]]$chain))) {
+      showNotification("The Atlas residue no longer matches the verified representative chains.",
+        type="error",duration=12)
+      return()
+    }
+    context <- list(pdb_a=pdb_a,pdb_b=pdb_b,
+      entity_a=ids[[1L]],entity_b=ids[[2L]],
+      accession=geometry$accession,
+      chain_a=as.character(row$chain_a[[1L]]),
+      chain_b=as.character(row$chain_b[[1L]]),
+      asym_a=available[[ids[[1L]]]]$struct_asym_id,
+      asym_b=available[[ids[[2L]]]]$struct_asym_id,
+      map_a=verified[[ids[[1L]]]]$mapping,
+      map_b=verified[[ids[[2L]]]]$mapping)
     atlas_pair_handoff(NULL)
+    atlas_alignment_context(NULL)
     # An unrelated primary protein cannot serve as the Atlas representative.
     first_ok <- isTRUE(load_primary_structure("pdb",pdb_a))
     if(!first_ok) {
@@ -2409,6 +2441,7 @@ server <- function(input, output, session) {
     }
     updateRadioButtons(session,"inputSource",selected="pdb")
     updateTextInput(session,"PDB",value=pdb_a)
+    atlas_alignment_context(context)
     atlas_pair_handoff(list(
       pdb_a=pdb_a,pdb_b=pdb_b,entity_a=ids[[1L]],entity_b=ids[[2L]],
       position=as.integer(pos),residue=row))
@@ -2767,7 +2800,28 @@ server <- function(input, output, session) {
         secondary_data$chain == input$compareChainB, , drop=FALSE]
     }
     if (!nrow(first) || !nrow(second)) return(data.frame())
-    result <- ram_compare_torsions(first, second)
+    context <- atlas_alignment_context()
+    comparison_model <- if(is.null(input$compareModel)) 1L else
+      suppressWarnings(as.integer(input$compareModel))
+    canonical <- !is.null(context) && !isTRUE(compare_swapped()) &&
+      identical(loaded()$pdb_accession,context$pdb_a) &&
+      identical(comparison$source_id,context$pdb_b) &&
+      identical(input$compareChainA,context$chain_a) &&
+      identical(input$compareChainB,context$chain_b) &&
+      identical(current_model(),1L) &&
+      identical(comparison_model,1L)
+    if(canonical) {
+      mapped <- ram_atlas_canonical_pairing(first,second,
+        context$map_a,context$map_b,context$accession,
+        context$chain_a,context$asym_a,
+        context$chain_b,context$asym_b)
+      result <- if(nrow(mapped$pairing))
+        ram_compare_torsions(first,second,pairing=mapped$pairing)
+      else data.frame()
+      attr(result,"atlas_canonical") <- mapped
+    } else {
+      result <- ram_compare_torsions(first,second)
+    }
     result$row_id <- seq_len(nrow(result))
     result
   })
@@ -2930,6 +2984,38 @@ server <- function(input, output, session) {
                        , drop=FALSE]
     result
   })
+  output$atlasCanonicalNotice <- renderUI({
+    ctx <- atlas_alignment_context()
+    if(is.null(ctx)) return(NULL)
+    result <- comparison_data()
+    meta <- attr(result,"atlas_canonical")
+    if(!is.null(meta)) {
+      tags$div(class="ram-panel",
+        tags$strong("Verified UniProt comparison"),
+        tags$p(class="ram-field-hint",
+          sprintf(paste0("%d common observed canonical positions in %s. ",
+            "Verified mapping covers %d/%d primary and %d/%d comparison residues. ",
+            "Other residues are excluded, not called insertions or deletions."),
+            meta$matched,ctx$accession,meta$mapped_a,meta$total_a,
+            meta$mapped_b,meta$total_b)),
+        if(meta$matched==0L)
+          tags$p(class="ram-confidence-warning",
+            "No verified common pairs. RamplotR will not substitute a guessed alignment."),
+        actionButton("atlasUseSequenceAlignment","Switch to sequence alignment",
+          class="btn-default btn-sm"))
+    } else {
+      tags$div(class="ram-field-hint",
+        tags$p("Atlas matching applies only to the originally selected chains and first structural models. The current view uses sequence alignment."),
+        actionButton("atlasUseSequenceAlignment","Discard Atlas mapping",
+          class="btn-default btn-sm"))
+    }
+  })
+  observeEvent(input$atlasUseSequenceAlignment, {
+    atlas_alignment_context(NULL)
+    atlas_pair_handoff(NULL)
+    selected_comparison(NULL)
+  },ignoreInit=TRUE)
+
   output$compareSummary <- renderUI({
     result <- req(comparison_data())
     if (!nrow(result)) return(tags$p("Select two nonempty protein chains."))
@@ -2966,11 +3052,18 @@ server <- function(input, output, session) {
       class="ram-compare-summary-block",
       tags$div(class="ram-compare-summary-groups",
         group("Alignment",
-          metric(quality$aligned,"aligned residues"),
-          metric(pct(quality$identity),"sequence identity"),
-          metric(pct(quality$coverage_a),"primary coverage"),
-          metric(pct(quality$coverage_b),"comparison coverage"),
-          metric(sum(!aligned),"insertions / deletions")
+          metric(quality$aligned,
+            if(!is.null(attr(result,"atlas_canonical"))) "exact UniProt pairs"
+            else "aligned residues"),
+          metric(pct(quality$identity),
+            if(!is.null(attr(result,"atlas_canonical")))
+              "identity among paired residues" else "sequence identity"),
+          if(is.null(attr(result,"atlas_canonical")))
+            metric(pct(quality$coverage_a),"primary coverage"),
+          if(is.null(attr(result,"atlas_canonical")))
+            metric(pct(quality$coverage_b),"comparison coverage"),
+          if(is.null(attr(result,"atlas_canonical")))
+            metric(sum(!aligned),"insertions / deletions")
         ),
         group("Backbone",
           metric(sum(shifts>=30),"pairs with ≥30° combined shift"),
@@ -3104,6 +3197,7 @@ server <- function(input, output, session) {
     if(show_delta) fields <- c(fields,"delta_plddt")
     fields <- c(fields,"class_changed","rama8000_region_a","rama8000_region_b",
       "rama8000_changed","alignment")
+    if("uniprot_resi" %in% names(result)) fields <- c("uniprot_resi",fields)
     shown <- result[,fields,drop=FALSE]
     shown$pos_a <- ifelse(is.na(shown$residue_a),"—",
       paste0(shown$residue_a,shown$insertion_a))
@@ -3122,6 +3216,10 @@ server <- function(input, output, session) {
       "angular_displacement","shift_band")
     labels <- c("Chain A","Pos A","AA A","Chain B","Pos B","AA B",
       "Δφ (°)","Δψ (°)","Backbone shift (°)","Shift band")
+    if("uniprot_resi" %in% names(shown)) {
+      display <- c("uniprot_resi",display)
+      labels <- c("UniProt position",labels)
+    }
     if(all(c("basin_a","basin_b","basin_changed") %in% names(shown))) {
       shown$basin_changed <- ifelse(shown$basin_changed,"Yes","No")
       display <- c(display,"basin_a","basin_b","basin_changed")
@@ -3145,7 +3243,8 @@ server <- function(input, output, session) {
       "Rama8000 changed","Alignment")
     shown <- shown[,display,drop=FALSE]
     DT::datatable(shown,rownames=FALSE,colnames=labels,selection="single",
-      options=list(pageLength=15,scrollX=show_conf_a||show_conf_b||show_delta,
+      options=list(pageLength=15,scrollX=show_conf_a||show_conf_b||show_delta ||
+                      "uniprot_resi" %in% names(shown),
                    autoWidth=FALSE,dom="ftip"),
       class="compact stripe hover")
   }, server=FALSE)
@@ -3674,6 +3773,10 @@ server <- function(input, output, session) {
     }
 
     tags$div(class="ram-compare-selection",
+      if("uniprot_resi" %in% names(row))
+        tags$p(class="ram-field-hint",
+          sprintf("Verified UniProt position %d · exact PDBe SIFTS mapping",
+            row$uniprot_resi[[1L]])),
       tags$div(class="ram-compare-selection-pair",
         tags$span(class="ram-compare-primary",
           tags$small("Primary"), tags$strong(label("a")),

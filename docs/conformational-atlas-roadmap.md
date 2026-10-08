@@ -88,6 +88,10 @@ conformational states.
 
 Selectable Atlas group representatives and a residue-level evidence panel are under development. Exact local PDB identifiers are preserved; linked 3D inspection is only a partial handoff to existing Compare, not automatic synced focus. Manual CI verification is pending.
 
+## October 8 linked inspection continuation
+
+After PR #56, the active follow-up branch adds a dedicated Atlas-to-Compare action that loads **both** experimental group representatives. It auto-focuses an Atlas position only after confirming matching chain/residue/insertion-code identifiers in both sequence-alignment rows. If a canonical correspondence is not represented in that alignment, RamplotR warns and does not select an incorrect residue. This remains exploratory structural evidence, not functional-state classification.
+
 ## Scientific principles
 
 1. Keep evidence types separate. Rama8000 validation, native RamplotR density,

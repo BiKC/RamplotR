@@ -777,6 +777,7 @@ server <- function(input, output, session) {
   atlas_geometry_result <- reactiveVal(NULL)
   atlas_switch_result <- reactiveVal(NULL)
   atlas_selected_position <- reactiveVal(NULL)
+  atlas_pair_handoff <- reactiveVal(NULL)
   canonical_segments <- reactiveVal(ram_canonical_empty_segments())
   canonical_mapping <- reactiveVal(ram_canonical_empty_map())
   canonical_status <- reactiveVal(NULL)
@@ -862,30 +863,24 @@ server <- function(input, output, session) {
 
   prediction_downloads <- character()
   session$onSessionEnded(function() unlink(prediction_downloads))
-  observeEvent(input$submit, {
-    source_type <- input$inputSource
-    if (!source_type %in% c("pdb", "upload", "afdb")) return()
-    is_upload <- identical(source_type, "upload")
-    is_afdb <- identical(source_type, "afdb")
+  # Shared loader: user submissions and explicit Atlas representative-pair
+  # inspection both use the same primary PDB parsing and NGL preparation.
+  load_primary_structure <- function(source_type,source_label,
+    declared_source="experimental",sidecar="",summary_file="") {
+    if (length(source_type)!=1L || is.na(source_type) ||
+        !source_type %in% c("pdb","upload","afdb")) return(invisible(FALSE))
+    is_upload <- identical(source_type,"upload")
+    is_afdb <- identical(source_type,"afdb")
     if (is_upload && (is.null(input$structfile) ||
                       is.null(input$structfile$datapath))) {
-      showNotification("Choose a PDB or mmCIF file first.", type = "error")
-      return()
+      showNotification("Choose a PDB or mmCIF file first.",type="error")
+      return(invisible(FALSE))
     }
-    source_label <- if (is_upload) input$structfile$datapath else if (is_afdb)
-      toupper(trimws(input$afdbAccession)) else toupper(trimws(input$PDB))
-    declared_source <- if (is_afdb) "alphafold_db" else if (is_upload)
-      input$predictionSource else "experimental"
-    if (is.null(declared_source) || !nzchar(declared_source))
-      declared_source <- "experimental"
-    sidecar <- if (is_upload && !is.null(input$predictionJson))
-      input$predictionJson$datapath else ""
-    summary_file <- if (is_upload && !is.null(input$predictionSummaryJson))
-      input$predictionSummaryJson$datapath else ""
-    key <- paste(source_type, source_label, declared_source,
-                 sidecar, summary_file, sep = ":")
+    key <- paste(source_type,source_label,declared_source,sidecar,
+                 summary_file,sep=":")
     previous <- isolate(loaded())
-    if (!is.null(previous) && identical(previous$key, key)) return()
+    if (!is.null(previous) && identical(previous$key,key))
+      return(invisible(TRUE))
     withProgress(message = "Analysing structure", value = 0, {
       incProgress(0.15, detail = "Loading coordinates")
       afdb_files <- NULL
@@ -1011,7 +1006,25 @@ server <- function(input, output, session) {
                     ram_uniprot_accession(source_label) else NULL))
       incProgress(0.25, detail = "Preparing interactive views")
     })
-  }, ignoreInit = TRUE)
+    invisible(TRUE)
+  }
+  observeEvent(input$submit, {
+    source_type <- input$inputSource
+    is_upload <- identical(source_type,"upload")
+    is_afdb <- identical(source_type,"afdb")
+    source_label <- if (is_upload) input$structfile$datapath else if (is_afdb)
+      toupper(trimws(input$afdbAccession)) else toupper(trimws(input$PDB))
+    declared_source <- if (is_afdb) "alphafold_db" else if (is_upload)
+      input$predictionSource else "experimental"
+    if (is.null(declared_source) || !nzchar(declared_source))
+      declared_source <- "experimental"
+    sidecar <- if (is_upload && !is.null(input$predictionJson))
+      input$predictionJson$datapath else ""
+    summary_file <- if (is_upload && !is.null(input$predictionSummaryJson))
+      input$predictionSummaryJson$datapath else ""
+    load_primary_structure(source_type,source_label,declared_source,
+      sidecar,summary_file)
+  }, ignoreInit=TRUE)
 
   # Canonical UniProt coordinates are an additive annotation. PDB author
   # numbering remains the local coordinate system used by selection and NGL.
@@ -2357,35 +2370,49 @@ server <- function(input, output, session) {
             "· ψ",format_angle(row$psi_b[[1L]]))))),
       tags$p(class="ram-field-hint",
         "These are first-model experimental torsions at the same exact SIFTS UniProt position. A large shift is an inspection candidate, not proof of a functional transition."),
-      actionButton("atlasInspectCompare","Open representative in Compare",
+      tags$p(class="ram-field-hint",
+        "Opens both selected experimental representatives in Compare. This replaces the current primary analysis."),
+      actionButton("atlasInspectCompare","Inspect both structures in 2D/3D",
         class="btn-default btn-sm"))
   })
   observeEvent(input$atlasInspectCompare, {
     result <- isolate(atlas_switch_result())
     pos <- isolate(atlas_selected_position())
     if(is.null(result) || !is.null(result$error) || is.null(pos)) return()
-    structure <- isolate(loaded())
-    if(is.null(structure)) {
-      showNotification("Load a primary structure first. Atlas residue details remain available here.",
-        type="warning",duration=10)
-      return()
-    }
-    entry <- result$representatives[[2L]]
-    id <- substr(entry,1L,4L)
     row <- result$residues[result$residues$uniprot_resi==pos,,drop=FALSE]
-    if(nrow(row)!=1L || is.na(row$chain_b[[1L]])) {
-      showNotification("The selected position has no mapped second-representative residue.",
-        type="warning",duration=10)
+    if(nrow(row)!=1L || anyNA(row[,c("chain_a","resi_a",
+        "insertion_a","chain_b","resi_b","insertion_b"),drop=FALSE])) {
+      showNotification("Both experimental residues must have exact author identifiers before paired 3D inspection.",
+        type="warning",duration=12)
       return()
     }
-    success <- load_comparison_structure(pdb_id=id,
-      preferred_chain_b=as.character(row$chain_b[[1L]]))
-    if(isTRUE(success)) {
-      updateTabsetPanel(session,"analysisTabs",selected="compare")
-      showNotification(paste0("Loaded ",entry," in Compare. The primary structure is unchanged; ",
-        "check chain alignment and use the residue identifiers from Atlas to inspect position ",pos,"."),
-        type="message",duration=12)
+    ids <- as.character(result$representatives)
+    if(length(ids)!=2L || any(!grepl("^[A-Z0-9]{4}_[1-9][0-9]*$",ids)))
+      return()
+    pdb_a <- substr(ids[[1L]],1L,4L)
+    pdb_b <- substr(ids[[2L]],1L,4L)
+    atlas_pair_handoff(NULL)
+    # An unrelated primary protein cannot serve as the Atlas representative.
+    first_ok <- isTRUE(load_primary_structure("pdb",pdb_a))
+    if(!first_ok) {
+      showNotification(paste("Could not load Atlas representative",ids[[1L]]),
+        type="error",duration=12)
+      return()
     }
+    second_ok <- isTRUE(load_comparison_structure(pdb_id=pdb_b,
+      preferred_chain_a=as.character(row$chain_a[[1L]]),
+      preferred_chain_b=as.character(row$chain_b[[1L]])))
+    if(!second_ok) {
+      showNotification(paste("Primary loaded, but comparison representative",
+        ids[[2L]],"could not be loaded."),type="error",duration=12)
+      return()
+    }
+    updateRadioButtons(session,"inputSource",selected="pdb")
+    updateTextInput(session,"PDB",value=pdb_a)
+    atlas_pair_handoff(list(
+      pdb_a=pdb_a,pdb_b=pdb_b,entity_a=ids[[1L]],entity_b=ids[[2L]],
+      position=as.integer(pos),residue=row))
+    updateTabsetPanel(session,"analysisTabs",selected="compare")
   },ignoreInit=TRUE)
 
   output$atlasSwitchExport <- renderUI({
@@ -2768,6 +2795,35 @@ server <- function(input, output, session) {
     }
     invisible(TRUE)
   }
+  # Once the correct models and chains are aligned, use the existing
+  # shared comparison selection to focus the same exact PDB residue pair.
+  observe({
+    handoff <- atlas_pair_handoff()
+    req(handoff)
+    primary <- req(loaded())
+    secondary <- req(comparison_loaded())
+    if(!identical(primary$pdb_accession,handoff$pdb_a) ||
+       !identical(secondary$name,handoff$pdb_b) ||
+       isTRUE(compare_swapped())) return()
+    chain_a <- req(input$compareChainA)
+    chain_b <- req(input$compareChainB)
+    if(!identical(chain_a,as.character(handoff$residue$chain_a[[1L]])) ||
+       !identical(chain_b,as.character(handoff$residue$chain_b[[1L]])))
+      return()
+    aligned <- req(comparison_data())
+    if(!nrow(aligned)) return()
+    matched <- ram_atlas_comparison_pair_index(aligned,handoff$residue)
+    atlas_pair_handoff(NULL)
+    if(is.na(matched)) {
+      showNotification(sprintf(paste0("UniProt position %d could not be ",
+        "matched to both exact PDB residues in the sequence alignment. ",
+        "Inspect the alignment before drawing conclusions."),
+        handoff$position),type="warning",duration=18)
+      return()
+    }
+    choose_comparison(matched)
+  },priority=-2)
+
   observeEvent(list(input$compareChainA, input$compareChainB,
                     input$compareModel, comparison_loaded(), compare_swapped()), {
     selected_comparison(NULL)

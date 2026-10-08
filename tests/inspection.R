@@ -68,6 +68,22 @@ ref <- data.frame(
 other <- rbind(ref[1,,drop=FALSE], transform(ref[1,,drop=FALSE],
   resn="ASP",resi=88L,phi=-110,psi=85), ref[2:4,,drop=FALSE])
 pair <- ram_compare_torsions(ref,other)
+verified_pairing <- data.frame(index_a=c(1L,3L),index_b=c(1L,4L),
+  uniprot_resi=c(81L,83L))
+verified_result <- ram_compare_torsions(ref,other,verified_pairing)
+assert(nrow(verified_result)==2L &&
+       identical(verified_result$uniprot_resi,c(81L,83L)) &&
+       identical(verified_result$residue_a,c(1L,3L)) &&
+       identical(verified_result$residue_b,c(1L,3L)),
+  "Exact canonical index pairs must drive the same scientific comparison fields.")
+bad_pairing <- rbind(verified_pairing,verified_pairing[1L,,drop=FALSE])
+assert(inherits(try(ram_compare_torsions(ref,other,bad_pairing),
+                    silent=TRUE),"try-error"),
+  "Canonical comparison cannot reuse the same atomic residue in two pairs.")
+invalid_index <- transform(verified_pairing,index_b=c(1L,100L))
+assert(inherits(try(ram_compare_torsions(ref,other,invalid_index),
+                    silent=TRUE),"try-error"),
+  "Canonical pairing must reject out-of-range atomic indices.")
 assert(nrow(pair)==5L, "Alignment should preserve inserted residues")
 assert(all(c("basin_a","basin_b","basin_changed") %in% names(pair)),
        "Pairwise comparison must expose coarse backbone-state transitions")

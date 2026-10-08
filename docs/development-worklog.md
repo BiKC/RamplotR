@@ -93,22 +93,30 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
   - two-structure distance plot and >=3-structure dendrogram;
   - Ubuntu/Windows scientific tests, independent wwPDB, structure benchmark
     and live Shiny browser workflow all passed after fixing two plot regressions.
-- Active branch: `feature/atlas-local-backbone-switches`, based on current
-  `main` after PR #51.
-  - Extract model-1 N/CA/C atoms (alongside CA) from PDBe updated mmCIF,
-    restricted to observed, exact SIFTS label-asym/seq positions.
-  - Calculate φ/ψ only across consecutive polymer label positions whose
-    C-N peptide bond is 1.0–1.9 Å, preserving missing-data exclusions.
-  - Compare the first two *exploratory geometric group* medoids at shared
-    UniProt positions using circular Δφ/Δψ and a visible threshold.
-  - Detect contiguous candidate change segments, including isolated residues,
-    and offer a residue-level CSV export and sequence plot.
-  - Add JS, scientific R, and live-browser regression coverage.
-  - This is not a structural-alphabet classifier, statistical significance
-    test, validated functional state discovery or a ligand association.
-- After merge, independently benchmark real experimental apo/holo cases,
-  inspect model/isoform/construct compatibility, and allow comparison of any
-  two group representatives instead of just the first two.
+- PR #52 merged to `main` (`8c721a7067b6062720cbf417d1e07474848f5805`):
+  - model-1 N/CA/C extraction alongside exact SIFTS-mapped C-alpha;
+  - φ/ψ calculation guarded by native polymer adjacency, full backbone
+    atoms and 1.0–1.9 Å C–N peptide continuity;
+  - residue-wise circular Δφ/Δψ at shared UniProt positions between
+    the first two exploratory geometric group representatives;
+  - adjustable angular-change threshold, candidate contiguous regions,
+    canonical residue plot/table and CSV export;
+  - explicit missing-data, ambiguity and source-provenance rules.
+- Scientific Ubuntu/Windows tests, structure benchmark, independent wwPDB
+  validation and full Shiny browser suite all passed on the final PR #52
+  commit. CI now runs the Atlas browser regression before the older prediction
+  upload test; the latter also passed on the final run.
+- No active implementation branch after PR #52. Next milestones:
+  1. real biological case study and numeric calibration with E. coli
+     adenylate kinase open 4AKE vs closed 1AKE (literature-supported pair);
+  2. construct/isoform compatibility and full-cohort comparison;
+  3. arbitrary pair of experimental group medoids and local switch-region
+     inspection in linked 3D;
+  4. prediction-to-experimental state coverage;
+  5. a separately benchmarked fragment-level structural alphabet.
+- Current switch regions remain exploratory, based on two representatives
+  and a user-selectable navigation threshold, not a statistical or functional
+  state classification.
 - Live PDBe API/CORS and updated mmCIF schema still need a deployment smoke
   test. CI mocks the network responses.
 - Do not equate verified PDB-entity counts with independent observations or
@@ -127,20 +135,19 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 
 ## Next implementation steps
 
-1. **Validate live PDBe/RCSB retrieval** with representative real PDB entries
-   and the deployed app's browser/CORS environment. CI uses mock responses.
-2. **Benchmark geometry grouping** on known apo/holo/open/closed cases,
-   including identical structures, construct variants, missing residues,
-   alternative crystal forms and multi-domain hinge movements. The current
-   1.5 Å distance-map cutoff is exploratory, not biologically calibrated.
-3. **Improve construct and isoform checks** before accepting a candidate
-   cohort as structurally comparable. Do not silently pool isoforms.
-4. **Add local switch-region evidence**: residue-aligned backbone angles and
-   fragment-level conformational fingerprints for each geometric group.
-5. **Compare prediction ensembles to experimental geometric groups**, with
-   canonical coverage, explicit missing-data categories and confidence.
-6. Only then consider context associations with ligand/mutation/partner and
-   revise the publication once benchmark claims are supportable.
+1. Validate live PDBe/RCSB endpoints and CORS in the deployed browser;
+   browser CI currently mocks external responses.
+2. Benchmark experimental geometry and local backbone differences with curated
+   real structure pairs, starting with E. coli adenylate kinase 4AKE (open)
+   versus 1AKE (closed). Include same-state replicates and construct controls
+   before calibrating any distance or angular thresholds.
+3. Extend local φ/ψ comparison to user-selected pairs of geometric groups,
+   then all supporting structures with uncertainty/coverage reporting.
+4. Make switch-region selection navigate to both corresponding 3D structures,
+   Ramachandran plots and precise canonical/local residue identifiers.
+5. Add prediction state clustering and experimental state coverage only after
+   the experimental reference-state method is validated.
+6. Keep the manuscript separate until biological benchmark claims are sound.
 
 ## Branch hygiene
 

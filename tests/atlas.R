@@ -7,7 +7,8 @@ rec <- function(pdb,entity) list(pdb_id=pdb,entity_id=as.character(entity),
 base_records <- lapply(seq_len(48L),function(i) rec("1ABC",i))
 first <- ram_atlas_merge_page(NULL,list(
   accession="P12345",start=0L,total_count=75L,
-  returned_count=50L,incomplete_metadata=2L,results=base_records))
+  returned_count=50L,incomplete_metadata=2L,
+  failed_entity_ids=c("1ABC_49","1ABC_50"),results=base_records))
 assert(first$next_offset==50L && first$total_count==75L &&
        first$enriched_count==48L && first$incomplete_metadata==2L &&
        first$pages==1L && isTRUE(first$has_more),
@@ -16,7 +17,10 @@ second_records <- c(list(rec("1ABC",1L)),
                     lapply(seq_len(23L),function(i) rec("2XYZ",i)))
 second <- ram_atlas_merge_page(first,list(
   accession="P12345",start=50L,total_count=75L,
-  returned_count=25L,incomplete_metadata=1L,results=second_records))
+  returned_count=25L,incomplete_metadata=1L,
+  failed_entity_ids="2XYZ_24",results=second_records))
+assert(identical(second$failed_entity_ids,c("1ABC_49","1ABC_50","2XYZ_24")),
+       "Failed metadata entity IDs should remain auditable across pages.")
 assert(second$next_offset==75L && second$enriched_count==71L &&
        second$incomplete_metadata==3L && second$duplicate_count==1L &&
        second$pages==2L && !isTRUE(second$has_more),

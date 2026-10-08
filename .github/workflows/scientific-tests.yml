@@ -1,9 +1,10 @@
 name: Scientific regression tests
 
+# Validate a new non-draft PR, or when a draft is marked ready.
+# Ordinary pushes and PR updates do not trigger these jobs.
 on:
-  push:
-    branches: [main, "upgrade/**"]
   pull_request:
+    types: [opened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -11,6 +12,7 @@ permissions:
 
 jobs:
   regression:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: R scientific tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:

@@ -195,6 +195,14 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 - Manuscript PR #20 remains separate; it does not yet describe an Atlas state
   discovery algorithm.
 
+
+## October 8 feature branch
+
+- Active branch: `feature/atlas-residue-inspection-manual-ci`, based on main `0aceaed8`.
+- Atlas now offers selecting any two distinct geometry representatives, displays exact SIFTS author residue identifiers and paired angles in a selectable table, and loads a chosen second representative in Compare when a primary structure exists.
+- The Compare handoff does not load the first representative into the primary viewer, does not automatically select the aligned canonical position, and requires checking comparability. Full coordinated 3D focus remains unfinished.
+- CI policy revised: seven validation/benchmark workflows run for a newly opened non-draft PR or on `ready_for_review`, not on pushes or subsequent PR commits (`synchronize` excluded). Draft PRs skip jobs until marked ready. Manual `workflow_dispatch` remains as fallback. The README screenshot curation workflow is intentionally manual-only because it writes generated artifacts back to the repository. Use PR #56 readiness to trigger final CI and review results before merge.
+
 ## Next implementation steps
 
 1. Verify **deployed-browser** PDBe and RCSB CORS in RamplotR's actual

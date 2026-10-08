@@ -1,25 +1,10 @@
 name: Independent wwPDB validation
 
+# Validate a new non-draft PR, or when a draft is marked ready.
+# Ordinary pushes and PR updates do not trigger these jobs.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "shinyRam/R/**"
-      - "benchmarks/wwpdb_helpers.R"
-      - "benchmarks/compare_wwpdb.R"
-      - "tests/wwpdb.R"
-      - "tests/wwpdb-baseline.R"
-      - "validation/**"
-      - ".github/workflows/wwpdb-validation.yml"
   pull_request:
-    paths:
-      - "shinyRam/R/**"
-      - "benchmarks/wwpdb_helpers.R"
-      - "benchmarks/compare_wwpdb.R"
-      - "tests/wwpdb.R"
-      - "tests/wwpdb-baseline.R"
-      - "validation/**"
-      - ".github/workflows/wwpdb-validation.yml"
+    types: [opened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -27,6 +12,7 @@ permissions:
 
 jobs:
   independent-validation:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:

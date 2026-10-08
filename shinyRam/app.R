@@ -776,6 +776,7 @@ server <- function(input, output, session) {
   atlas_exact_results <- reactiveVal(list())
   atlas_geometry_result <- reactiveVal(NULL)
   atlas_switch_result <- reactiveVal(NULL)
+  atlas_selected_position <- reactiveVal(NULL)
   canonical_segments <- reactiveVal(ram_canonical_empty_segments())
   canonical_mapping <- reactiveVal(ram_canonical_empty_map())
   canonical_status <- reactiveVal(NULL)
@@ -2196,6 +2197,7 @@ server <- function(input, output, session) {
   # functional state or claim ligand-driven transitions.
   observeEvent(atlas_geometry_result(), {
     atlas_switch_result(NULL)
+    atlas_selected_position(NULL)
   },ignoreInit=TRUE)
 
   output$atlasSwitchPanel <- renderUI({
@@ -2207,10 +2209,18 @@ server <- function(input, output, session) {
     tags$div(class="ram-panel",
       tags$h4("Local backbone-change candidates"),
       tags$p(class="ram-field-hint",
-        paste("Compare backbone φ/ψ between the first two geometric-group",
+        paste("Compare backbone φ/ψ between any two selected geometric-group",
         "representatives. Exact SIFTS positions, complete N/CA/C atoms and",
         "continuous peptide bonds are required. These are exploratory",
         "change candidates, not DSSP classes or validated functional states.")),
+      selectInput("atlasSwitchRepresentativeA","Reference geometry group",
+        choices=stats::setNames(unname(geometry$representatives),
+          paste("Group",names(geometry$representatives),unname(geometry$representatives))),
+        selected=unname(geometry$representatives)[[1L]]),
+      selectInput("atlasSwitchRepresentativeB","Other geometry group",
+        choices=stats::setNames(unname(geometry$representatives),
+          paste("Group",names(geometry$representatives),unname(geometry$representatives))),
+        selected=unname(geometry$representatives)[[2L]]),
       numericInput("atlasSwitchThreshold",
         "Combined circular φ/ψ change threshold (degrees)",
         value=30,min=5,max=180,step=5),
@@ -2219,6 +2229,9 @@ server <- function(input, output, session) {
       uiOutput("atlasSwitchSummary"),
       plotOutput("atlasSwitchPlot",height="230px"),
       tableOutput("atlasSwitchRegions"),
+      tags$p(class="ram-field-hint","Click a residue to inspect the angles and exact experimental PDB identifiers."),
+      DT::DTOutput("atlasSwitchResidues"),
+      uiOutput("atlasSwitchResidueInspector"),
       uiOutput("atlasSwitchExport"))
   })
 
@@ -2227,9 +2240,12 @@ server <- function(input, output, session) {
     if(is.null(geometry) || !is.null(geometry$error)) return()
     result <- tryCatch(ram_atlas_group_switches(
       isolate(atlas_exact_results()),geometry,
-      isolate(input$atlasSwitchThreshold)),
+      isolate(input$atlasSwitchThreshold),
+      representative_ids=c(isolate(input$atlasSwitchRepresentativeA),
+        isolate(input$atlasSwitchRepresentativeB))),
       error=function(e) list(error=conditionMessage(e)))
     atlas_switch_result(result)
+    atlas_selected_position(NULL)
   },ignoreInit=TRUE)
 
   output$atlasSwitchSummary <- renderUI({
@@ -2276,6 +2292,101 @@ server <- function(input, output, session) {
       "Mean angular change (°)","Peak change (°)")
     regions
   },striped=TRUE,spacing="xs",rownames=FALSE)
+
+  output$atlasSwitchResidues <- DT::renderDT({
+    result <- atlas_switch_result()
+    req(!is.null(result),is.null(result$error))
+    rows <- result$residues
+    if(!nrow(rows)) return(DT::datatable(data.frame()))
+    view <- rows[,c("uniprot_resi","chain_a","resi_a","insertion_a",
+      "chain_b","resi_b","insertion_b","phi_a","psi_a",
+      "phi_b","psi_b","angular_shift","candidate"),drop=FALSE]
+    for(col in c("phi_a","psi_a","phi_b","psi_b","angular_shift"))
+      view[[col]] <- round(view[[col]],1)
+    view$candidate <- ifelse(view$candidate,"Candidate","")
+    DT::datatable(view,rownames=FALSE,selection="single",
+      colnames=c("UniProt","Chain A","PDB res. A","Ins. A",
+        "Chain B","PDB res. B","Ins. B","φ A","ψ A",
+        "φ B","ψ B","Shift (°)","Review"),
+      options=list(pageLength=12,scrollX=TRUE,dom="ftip",
+        order=list(list(11,"desc"))),
+      class="compact stripe hover")
+  },server=FALSE)
+  observeEvent(input$atlasSwitchResidues_rows_selected, {
+    result <- isolate(atlas_switch_result())
+    if(is.null(result) || !is.null(result$error)) return()
+    ix <- suppressWarnings(as.integer(input$atlasSwitchResidues_rows_selected))
+    if(length(ix)!=1L || is.na(ix) || ix<1L ||
+       ix>nrow(result$residues)) return()
+    atlas_selected_position(result$residues$uniprot_resi[[ix]])
+  },ignoreInit=TRUE)
+  output$atlasSwitchResidueInspector <- renderUI({
+    result <- atlas_switch_result()
+    pos <- atlas_selected_position()
+    if(is.null(result) || !is.null(result$error) || is.null(pos))
+      return(NULL)
+    rows <- result$residues[result$residues$uniprot_resi==pos,,drop=FALSE]
+    if(nrow(rows)!=1L) return(NULL)
+    row <- rows[1L,,drop=FALSE]
+    format_angle <- function(x) if(is.finite(x)) sprintf("%.1f°",x)
+      else "Unavailable"
+    local_id <- function(side) {
+      chain <- row[[paste0("chain_",side)]][[1L]]
+      resi <- row[[paste0("resi_",side)]][[1L]]
+      insertion <- row[[paste0("insertion_",side)]][[1L]]
+      if(is.na(chain) || is.na(resi)) return("Not mapped/observed")
+      paste0("Chain ",chain,", residue ",resi,
+        if(!is.na(insertion) && nzchar(insertion)) insertion else "")
+    }
+    tags$section(class="ram-panel ram-atlas-residue-inspector",
+      tags$h4(sprintf("UniProt residue %d",pos)),
+      tags$p(class="ram-field-hint",
+        if(isTRUE(row$comparable[[1L]]))
+          sprintf("Circular φ/ψ displacement: %.1f°%s",
+            row$angular_shift[[1L]],
+            if(isTRUE(row$candidate[[1L]])) " · above review threshold" else "")
+        else "Incomplete torsions: no paired angle displacement can be calculated."),
+      tags$div(class="ram-atlas-inspection-pair",
+        tags$div(tags$strong(result$representatives[[1L]]),
+          tags$p(local_id("a")),
+          tags$p(paste("φ",format_angle(row$phi_a[[1L]]),
+            "· ψ",format_angle(row$psi_a[[1L]])))),
+        tags$div(tags$strong(result$representatives[[2L]]),
+          tags$p(local_id("b")),
+          tags$p(paste("φ",format_angle(row$phi_b[[1L]]),
+            "· ψ",format_angle(row$psi_b[[1L]]))))),
+      tags$p(class="ram-field-hint",
+        "These are first-model experimental torsions at the same exact SIFTS UniProt position. A large shift is an inspection candidate, not proof of a functional transition."),
+      actionButton("atlasInspectCompare","Open representative in Compare",
+        class="btn-default btn-sm"))
+  })
+  observeEvent(input$atlasInspectCompare, {
+    result <- isolate(atlas_switch_result())
+    pos <- isolate(atlas_selected_position())
+    if(is.null(result) || !is.null(result$error) || is.null(pos)) return()
+    structure <- isolate(loaded())
+    if(is.null(structure)) {
+      showNotification("Load a primary structure first. Atlas residue details remain available here.",
+        type="warning",duration=10)
+      return()
+    }
+    entry <- result$representatives[[2L]]
+    id <- substr(entry,1L,4L)
+    row <- result$residues[result$residues$uniprot_resi==pos,,drop=FALSE]
+    if(nrow(row)!=1L || is.na(row$chain_b[[1L]])) {
+      showNotification("The selected position has no mapped second-representative residue.",
+        type="warning",duration=10)
+      return()
+    }
+    success <- load_comparison_structure(pdb_id=id,
+      preferred_chain_b=as.character(row$chain_b[[1L]]))
+    if(isTRUE(success)) {
+      updateTabsetPanel(session,"analysisTabs",selected="compare")
+      showNotification(paste0("Loaded ",entry," in Compare. The primary structure is unchanged; ",
+        "check chain alignment and use the residue identifiers from Atlas to inspect position ",pos,"."),
+        type="message",duration=12)
+    }
+  },ignoreInit=TRUE)
 
   output$atlasSwitchExport <- renderUI({
     result <- atlas_switch_result()

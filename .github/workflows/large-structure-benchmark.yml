@@ -1,10 +1,10 @@
 name: Large-structure scaling benchmark
 
+# Validate a new non-draft PR, or when a draft is marked ready.
+# Ordinary pushes and PR updates do not trigger these jobs.
 on:
   pull_request:
-    paths:
-      - "benchmarks/scale.R"
-      - ".github/workflows/large-structure-benchmark.yml"
+    types: [opened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   scaling:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

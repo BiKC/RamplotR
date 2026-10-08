@@ -1,14 +1,10 @@
 name: Multi-protein experimental Atlas benchmark
 
+# Validate a new non-draft PR, or when a draft is marked ready.
+# Ordinary pushes and PR updates do not trigger these jobs.
 on:
   pull_request:
-    paths:
-      - "scripts/atlas-multiprotein-*"
-      - "benchmarks/atlas-multiprotein-cases.json"
-      - ".github/workflows/atlas-multiprotein-benchmark.yml"
-      - "shinyRam/R/atlas-geometry.R"
-      - "shinyRam/R/atlas-switch.R"
-      - "shinyRam/www/atlas-sifts-exact.js"
+    types: [opened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -16,6 +12,7 @@ permissions:
 
 jobs:
   multiprotein-case-study:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: Live ADK, maltose-binding and ribose-binding protein cases
     runs-on: ubuntu-latest
     timeout-minutes: 22

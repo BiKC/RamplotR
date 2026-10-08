@@ -1,13 +1,10 @@
 name: Experimental Atlas biological benchmark
 
+# Validate a new non-draft PR, or when a draft is marked ready.
+# Ordinary pushes and PR updates do not trigger these jobs.
 on:
   pull_request:
-    paths:
-      - "scripts/atlas-adk-*"
-      - ".github/workflows/atlas-biological-benchmark.yml"
-      - "shinyRam/R/atlas-geometry.R"
-      - "shinyRam/R/atlas-switch.R"
-      - "shinyRam/www/atlas-sifts-exact.js"
+    types: [opened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -15,6 +12,7 @@ permissions:
 
 jobs:
   adk-case-study:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: Live 4AKE/1AKE SIFTS + crystal-chain controls
     runs-on: ubuntu-latest
     timeout-minutes: 18

@@ -1,13 +1,10 @@
 name: Structure validation and benchmark
 
+# Validate a new non-draft PR, or when a draft is marked ready.
+# Ordinary pushes and PR updates do not trigger these jobs.
 on:
-  push:
-    branches: ["upgrade/validation-benchmarks"]
   pull_request:
-    paths:
-      - "shinyRam/R/**"
-      - "benchmarks/**"
-      - ".github/workflows/structure-validation.yml"
+    types: [opened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -15,6 +12,7 @@ permissions:
 
 jobs:
   structure:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

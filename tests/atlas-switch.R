@@ -98,4 +98,20 @@ assert(identical(report$representatives,c("1ABC_1","2XYZ_1")) &&
        report$comparable>=35L &&
        any(report$residues$candidate),
        "Representative comparison must report local torsion evidence.")
+assert(all(c("chain_a","resi_a","insertion_a","label_seq_a",
+  "chain_b","resi_b","insertion_b","label_seq_b") %in% names(report$residues)),
+  "Atlas residue inspection must retain exact local residue identifiers.")
+assert(all(report$residues$resi_a[!is.na(report$residues$resi_a)] ==
+  report$residues$uniprot_resi[!is.na(report$residues$resi_a)]+100L),
+  "Exact SIFTS author numbering should be preserved.")
+reversed <- ram_atlas_group_switches(verified,geometry,30,
+  representative_ids=c("2XYZ_1","1ABC_1"))
+assert(identical(reversed$representatives,c("2XYZ_1","1ABC_1")) &&
+  isTRUE(all.equal(reversed$residues$delta_phi,-report$residues$delta_phi,
+    check.attributes=FALSE)),
+  "Reversing representatives should reverse wrapped phi change.")
+invalid <- try(ram_atlas_group_switches(verified,geometry,30,
+  representative_ids=c("1ABC_1","1ABC_1")),silent=TRUE)
+assert(inherits(invalid,"try-error"),
+  "The same group representative must not be selected twice.")
 message("Experimental Atlas backbone switch-region tests passed.")

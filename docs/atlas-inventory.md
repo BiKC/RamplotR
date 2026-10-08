@@ -69,7 +69,31 @@ can affect distances, and a global distance map does not identify which
 local backbone residues change. Those checks are separate roadmap steps.
 
 The geometry analysis uses data from explicitly verified structures only.
-It does not download every experimental entry from the RCSB inventory. Ambiguous local residue mappings
+It does not download every experimental entry from the RCSB inventory.
+
+## Local backbone-change candidates
+
+After comparing experimental geometry groups, RamplotR can compare the first
+two group representatives at their exact UniProt-mapped positions. It extracts
+model-1 **N, Cα and C** backbone atoms from the same PDBe updated mmCIF file.
+It calculates φ/ψ only when consecutive native polymer sequence positions
+have complete backbone atoms and a 1.0–1.9 Å C–N peptide connection. Gaps,
+ambiguous atoms and mapping conflicts never generate extrapolated torsions.
+
+Circular Δφ/Δψ values are wrapped independently across ±180°. A combined
+angular displacement is used solely to find noteworthy local differences.
+The default 30° navigation threshold can be changed in the Atlas. Consecutive
+canonical positions above threshold are grouped into *candidate change
+segments*, with isolated residues reported separately as one-position
+segments. The plot and residue CSV retain missing-comparison positions.
+
+The first version compares just two representative experimental structures,
+**not** all structures within each group, and does not perform a statistical
+group test. A difference in φ/ψ does not prove a biological functional
+transition, ligand effect, protein-block assignment, or error in either
+experimental model. A rigid domain shift can also occur with little or no
+local torsion change. Neither the geometric distance cutoff nor the local
+30° threshold has yet been calibrated on curated biological case studies. Ambiguous local residue mappings
 remain in the residue export but never count as canonical position support. Ambiguous and unresolved positions are not silently
 assigned a canonical coordinate.
 

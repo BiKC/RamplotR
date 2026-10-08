@@ -32,6 +32,7 @@ source(file.path("R", "canonical.R"), local = TRUE)
 source(file.path("R", "atlas-sifts.R"), local = TRUE)
 source(file.path("R", "atlas-cohort.R"), local = TRUE)
 source(file.path("R", "atlas-geometry.R"), local = TRUE)
+source(file.path("R", "atlas-switch.R"), local = TRUE)
 source(file.path("R", "atlas.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
 source(file.path("R", "inspection.R"), local = TRUE)
@@ -659,6 +660,7 @@ ui <- fluidPage(
                   uiOutput("atlasStatus"),
                   uiOutput("atlasResults"),
                   uiOutput("atlasGeometryPanel"),
+                  uiOutput("atlasSwitchPanel"),
                   tags$p(class="ram-field-hint",
                     "Results load 50 experimental entities at a time. Canonical residue coverage, construct equivalence, and conformational-state identity must be verified before interpreting structural states.")
                 )
@@ -733,6 +735,7 @@ server <- function(input, output, session) {
   atlas_exact_selected <- reactiveVal(NULL)
   atlas_exact_results <- reactiveVal(list())
   atlas_geometry_result <- reactiveVal(NULL)
+  atlas_switch_result <- reactiveVal(NULL)
   canonical_segments <- reactiveVal(ram_canonical_empty_segments())
   canonical_mapping <- reactiveVal(ram_canonical_empty_map())
   canonical_status <- reactiveVal(NULL)
@@ -1916,6 +1919,8 @@ server <- function(input, output, session) {
           matched_sifts_rows=as.integer(value$matched_sifts_rows),
           unlinked_sifts_rows=as.integer(value$unlinked_sifts_rows)),
           summary,list(mapping=mapped,
+            backbone_atoms=if(is.null(value$backbone_atoms)) list()
+              else value$backbone_atoms,
             ca_points=if(is.null(value$ca_points)) list() else value$ca_points,
             ca_warning=if(is.null(value$ca_warning)) "" else
               as.character(value$ca_warning)))
@@ -2145,6 +2150,113 @@ server <- function(input, output, session) {
       "Common core fraction","Geometry group")
     table
   },striped=TRUE,spacing="xs",rownames=FALSE)
+
+  # Local torsion comparisons are secondary evidence for the previously
+  # computed exploratory global geometric groups. They do not assign a
+  # functional state or claim ligand-driven transitions.
+  observeEvent(atlas_geometry_result(), {
+    atlas_switch_result(NULL)
+  },ignoreInit=TRUE)
+
+  output$atlasSwitchPanel <- renderUI({
+    geometry <- atlas_geometry_result()
+    if(is.null(geometry) || !is.null(geometry$error)) return(NULL)
+    if(length(geometry$representatives)<2L)
+      return(tags$p(class="ram-field-hint",
+        "One geometry group at this cutoff. There is no between-group representative backbone comparison."))
+    tags$div(class="ram-panel",
+      tags$h4("Local backbone-change candidates"),
+      tags$p(class="ram-field-hint",
+        paste("Compare backbone φ/ψ between the first two geometric-group",
+        "representatives. Exact SIFTS positions, complete N/CA/C atoms and",
+        "continuous peptide bonds are required. These are exploratory",
+        "change candidates, not DSSP classes or validated functional states.")),
+      numericInput("atlasSwitchThreshold",
+        "Combined circular φ/ψ change threshold (degrees)",
+        value=30,min=5,max=180,step=5),
+      actionButton("atlasRunSwitch","Find local backbone changes",
+        class="btn-primary btn-sm"),
+      uiOutput("atlasSwitchSummary"),
+      plotOutput("atlasSwitchPlot",height="230px"),
+      tableOutput("atlasSwitchRegions"),
+      uiOutput("atlasSwitchExport"))
+  })
+
+  observeEvent(input$atlasRunSwitch, {
+    geometry <- isolate(atlas_geometry_result())
+    if(is.null(geometry) || !is.null(geometry$error)) return()
+    result <- tryCatch(ram_atlas_group_switches(
+      isolate(atlas_exact_results()),geometry,
+      isolate(input$atlasSwitchThreshold)),
+      error=function(e) list(error=conditionMessage(e)))
+    atlas_switch_result(result)
+  },ignoreInit=TRUE)
+
+  output$atlasSwitchSummary <- renderUI({
+    result <- atlas_switch_result()
+    if(is.null(result))return(NULL)
+    if(!is.null(result$error))
+      return(tags$p(class="ram-confidence-warning",result$error))
+    tags$div(class="ram-field-hint",
+      tags$p(sprintf(
+        "%s versus %s: %d of %d canonical positions have both valid φ/ψ pairs; %d candidate residue(s) at ≥%.0f°.",
+        result$representatives[[1L]],result$representatives[[2L]],
+        result$comparable,result$total_positions,
+        sum(result$residues$candidate),result$threshold)),
+      tags$p(sprintf(
+        "%d contiguous candidate segment(s), including isolated positions. Missing and broken-backbone angles are excluded.",
+        nrow(result$regions))))
+  })
+
+  output$atlasSwitchPlot <- renderPlot({
+    result <- atlas_switch_result()
+    req(!is.null(result),is.null(result$error))
+    data <- result$residues
+    if(!nrow(data) || !any(is.finite(data$angular_shift))) {
+      graphics::plot.new()
+      graphics::text(0.5,0.5,"No comparable complete backbone torsions",
+        cex=0.95)
+    } else {
+      shift <- data$angular_shift
+      graphics::plot(data$uniprot_resi,shift,type="h",lwd=2,
+        xlab="UniProt residue",ylab="Wrapped φ/ψ displacement (°)",
+        main="Local backbone differences")
+      graphics::abline(h=result$threshold,lty=2,col="gray50")
+      graphics::points(data$uniprot_resi[data$candidate],
+        shift[data$candidate],pch=16)
+    }
+  })
+
+  output$atlasSwitchRegions <- renderTable({
+    result <- atlas_switch_result()
+    req(!is.null(result),is.null(result$error))
+    if(!nrow(result$regions))return(NULL)
+    regions <- result$regions
+    names(regions) <- c("Start UniProt","End UniProt","Residues",
+      "Mean angular change (°)","Peak change (°)")
+    regions
+  },striped=TRUE,spacing="xs",rownames=FALSE)
+
+  output$atlasSwitchExport <- renderUI({
+    result <- atlas_switch_result()
+    if(is.null(result) || !is.null(result$error) ||
+       !nrow(result$residues))return(NULL)
+    downloadButton("downloadAtlasSwitch",
+      "Export canonical φ/ψ differences CSV")
+  })
+  output$downloadAtlasSwitch <- downloadHandler(
+    filename=function() {
+      result <- req(atlas_switch_result())
+      paste0("ramplotr_atlas_",result$representatives[[1L]],"_",
+        result$representatives[[2L]],"_backbone_changes.csv")
+    },
+    content=function(file) {
+      result <- req(atlas_switch_result())
+      if(!is.null(result$error))
+        stop("Backbone change comparison failed.")
+      utils::write.csv(result$residues,file,row.names=FALSE,na="")
+    }
+  )
 
   output$downloadAtlasCanonical <- downloadHandler(
     filename=function() {

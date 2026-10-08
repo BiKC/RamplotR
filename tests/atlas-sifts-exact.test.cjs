@@ -78,6 +78,16 @@ assert.equal(ca.length,2,"Unobserved SIFTS residues must not be sent as C-alpha 
 assert.deepEqual(ca.map(x=>x.label_seq_id),[1,2]);
 assert.deepEqual([ca[0].x,ca[0].y,ca[0].z],[1,2,3]);
 assert.equal(result.rows[1].label_seq_id,2);
+const backbone=sifts.extractMappedBackbone(withAtoms,result);
+assert.equal(backbone.length,3,"Two C-alpha records and one nitrogen expected.");
+assert.deepEqual(backbone.map(x=>x.atom_name),["CA","CA","N"]);
+assert.deepEqual(backbone.find(x=>x.atom_name==="N").label_seq_id,2);
+const withC=withAtoms.replace("ATOM N X 2", "ATOM C X 2");
+assert.equal(sifts.extractMappedBackbone(withC,result)
+  .filter(x=>x.atom_name==="C").length,1);
+assert.deepEqual(sifts.extractMappedCA(withAtoms,result),ca,
+  "Adding backbone extraction must preserve the original C-alpha API.");
+
 assert.throws(()=>sifts.extractMappedCA(withAtoms.replace(
   "_atom_site.Cartn_z","_atom_site.unknown"),result),/lacks/);
 console.log("Exact SIFTS mmCIF parser tests passed.");

@@ -106,14 +106,15 @@ const puppeteer = require("puppeteer-core");
     await chooseSource("esmfold");
     await page.waitForFunction(()=>document.getElementById("ram-confidence-sidecars")
       .classList.contains("is-hidden"));
-    const upload=await page.$("#structfile");
+    // Let the source-selection reactive UI settle before attaching the file.
+    // The Shiny upload control can be replaced during the first render flush.
+    await new Promise(done=>setTimeout(done,1600));
+    const upload=await page.waitForSelector("#structfile",{timeout:15000});
     await upload.uploadFile(fixture);
     await page.waitForFunction(() => {
       const input=document.getElementById("structfile");
       return input && input.files && input.files.length===1;
     },{timeout:10000});
-    // With provenance stable, Shiny can finish the upload without the file
-    // input being replaced by a reactive re-render.
     await new Promise(done=>setTimeout(done,1800));
     await page.click("#submit");
     try {

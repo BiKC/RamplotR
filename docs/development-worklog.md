@@ -93,10 +93,22 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
   - two-structure distance plot and >=3-structure dendrogram;
   - Ubuntu/Windows scientific tests, independent wwPDB, structure benchmark
     and live Shiny browser workflow all passed after fixing two plot regressions.
-- No active implementation PR after #51. Next: benchmark distance thresholds on
-  biological case studies, check construct/isoform equivalence and identify
-  local backbone switch regions tied to the experimental geometry groups.
-  Do not label geometric groups as biological functional states.
+- Active branch: `feature/atlas-local-backbone-switches`, based on current
+  `main` after PR #51.
+  - Extract model-1 N/CA/C atoms (alongside CA) from PDBe updated mmCIF,
+    restricted to observed, exact SIFTS label-asym/seq positions.
+  - Calculate φ/ψ only across consecutive polymer label positions whose
+    C-N peptide bond is 1.0–1.9 Å, preserving missing-data exclusions.
+  - Compare the first two *exploratory geometric group* medoids at shared
+    UniProt positions using circular Δφ/Δψ and a visible threshold.
+  - Detect contiguous candidate change segments, including isolated residues,
+    and offer a residue-level CSV export and sequence plot.
+  - Add JS, scientific R, and live-browser regression coverage.
+  - This is not a structural-alphabet classifier, statistical significance
+    test, validated functional state discovery or a ligand association.
+- After merge, independently benchmark real experimental apo/holo cases,
+  inspect model/isoform/construct compatibility, and allow comparison of any
+  two group representatives instead of just the first two.
 - Live PDBe API/CORS and updated mmCIF schema still need a deployment smoke
   test. CI mocks the network responses.
 - Do not equate verified PDB-entity counts with independent observations or

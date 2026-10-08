@@ -74,12 +74,12 @@ jobs:
           exit 1
       - name: Exercise real browser and capture screenshots
         run: node tests/ui-browser.cjs
+      - name: Verify experimental Atlas inventory and backbone changes in real browser
+        run: node tests/atlas-browser.cjs
       - name: Verify AlphaFold and ESMFold uploads in the live browser
         run: node tests/prediction-browser.cjs
       - name: Verify official wwPDB evidence, density UI and NMR ensemble
         run: node tests/structure-verification-browser.cjs
-      - name: Verify experimental Atlas inventory in real browser
-        run: node tests/atlas-browser.cjs
       - name: Archive desktop/mobile screenshot previews and logs
         if: always()
         uses: actions/upload-artifact@v4

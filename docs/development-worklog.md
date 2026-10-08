@@ -223,6 +223,14 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 - Added synthetic tests for differing PDB numbering, insertion codes, ambiguous records, missing segments, accession mismatches, and canonical pair input validity.
 - CI policy: once PR #58 is marked Ready for review, seven workflows run. Do not merge on incomplete/failed checks. Live Shinylive CORS and independent biological-state validation remain future tasks.
 
+## PR #58 merged and verified (October 8, 2026)
+
+- PR #58, **exact SIFTS/UniProt Atlas comparisons**, merged into `main` at `0a00835b7c52c3dc70d9e9b4171c3169ad86e57f`.
+- All seven GitHub Actions checks passed on final head `675f17aaad769b296930e72446a03abe2cc1af9e`: scientific Ubuntu/Windows, browser preview, independent wwPDB validation, structure benchmark, experimental ADK benchmark, multi-protein benchmark and large-structure scaling.
+- The first browser run identified a **real regression**: normal self-comparison summary no longer said "sequence identity". Restored that wording for ordinary alignment, retained "identity among paired residues" only for exact Atlas comparisons, then reran all checks successfully.
+- Exact SIFTS-linked UniProt positions now drive the Atlas comparison table, linked Ramachandran and 3D selection. Original PDB chain, residue and insertion IDs remain available. Unverified/absent positions are excluded rather than inferred as biological deletions; the UI reports mapping coverage. User-selected ordinary sequence alignment remains available.
+- Next priorities: live deployed-browser RCSB/PDBe CORS verification, harder construct/isoform controls, and independent-fold biological benchmarks. **Do not** claim geometric groups are validated functional states.
+
 ## Next implementation steps
 
 1. Verify **deployed-browser** PDBe and RCSB CORS in RamplotR's actual

@@ -1,10 +1,7 @@
 name: Large-structure scaling benchmark
 
+# Run explicitly from GitHub Actions when ready for validation.
 on:
-  pull_request:
-    paths:
-      - "benchmarks/scale.R"
-      - ".github/workflows/large-structure-benchmark.yml"
   workflow_dispatch:
 
 permissions:

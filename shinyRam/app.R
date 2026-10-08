@@ -29,6 +29,7 @@ source(file.path("R", "rama8000.R"), local = TRUE)
 source(file.path("R", "backbone.R"), local = TRUE)
 source(file.path("R", "conformation.R"), local = TRUE)
 source(file.path("R", "canonical.R"), local = TRUE)
+source(file.path("R", "atlas.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
 source(file.path("R", "inspection.R"), local = TRUE)
 source(file.path("R", "reports.R"), local = TRUE)
@@ -655,7 +656,7 @@ ui <- fluidPage(
                   uiOutput("atlasStatus"),
                   uiOutput("atlasResults"),
                   tags$p(class="ram-field-hint",
-                    "Results show an initial capped inventory. Canonical residue coverage, construct equivalence, and conformational-state identity must be verified before comparing states.")
+                    "Results load 50 experimental entities at a time. Canonical residue coverage, construct equivalence, and conformational-state identity must be verified before interpreting structural states.")
                 )
               )
             ),
@@ -1792,7 +1793,24 @@ server <- function(input, output, session) {
     atlas_status(list(state="searching",
       message=paste("Searching experimental PDB entities for",accession,"...")))
     session$sendCustomMessage("ram-atlas-discover",list(
-      request_id=as.character(id),accession=accession,rows=50L))
+      request_id=as.character(id),accession=accession,
+      rows=50L,start=0L))
+  },ignoreInit=TRUE)
+
+  observeEvent(input$atlasLoadMore, {
+    previous <- isolate(atlas_payload())
+    status <- isolate(atlas_status())
+    if(is.null(previous) || !isTRUE(previous$has_more) ||
+       identical(status$state,"searching")) return()
+    offset <- as.integer(previous$next_offset)
+    id <- isolate(atlas_request())+1L
+    atlas_request(id)
+    atlas_status(list(state="searching",
+      message=sprintf("Loading experimental entities %d–%d...",
+        offset+1L,min(previous$total_count,offset+50L))))
+    session$sendCustomMessage("ram-atlas-discover",list(
+      request_id=as.character(id),accession=previous$accession,
+      rows=50L,start=offset))
   },ignoreInit=TRUE)
 
   observeEvent(input$ramAtlasResults, {
@@ -1805,13 +1823,26 @@ server <- function(input, output, session) {
                   toupper(trimws(as.character(isolate(input$atlasAccession))))))
       return()
     if(identical(as.character(data$state),"error")) {
-      atlas_payload(NULL)
+      # Keep successfully retrieved pages when a later page fails.
       atlas_status(list(state="error",
-        message=if(is.null(data$message)) "Atlas search failed."
+        message=if(is.null(data$message)) "Atlas search failed; retry the page."
           else as.character(data$message)))
     } else {
-      atlas_payload(data)
-      atlas_status(list(state="done",message="Experimental inventory retrieved."))
+      merged <- tryCatch(
+        ram_atlas_merge_page(isolate(atlas_payload()),data),
+        error=function(e) {
+          atlas_status(list(state="error",message=conditionMessage(e)))
+          NULL
+        }
+      )
+      if(is.null(merged)) return()
+      atlas_payload(merged)
+      atlas_status(list(state=if(isTRUE(merged$stalled)) "error" else "done",
+        message=if(isTRUE(merged$stalled))
+          "RCSB returned an empty page before its reported total; restart the search."
+        else sprintf("Loaded %d of %d returned search hits across %d page%s.",
+          merged$returned_count,merged$total_count,merged$pages,
+          if(merged$pages==1L) "" else "s")))
     }
   },ignoreInit=TRUE)
 
@@ -1843,9 +1874,12 @@ server <- function(input, output, session) {
           length(results),length(pdbs),
           if(is.finite(total)) as.character(total) else "an unknown number of",
           if(is.finite(total) && is.finite(returned) && total>returned)
-            sprintf("; only the first %d were requested",returned) else ""),
+            sprintf("; %d of %d search hits retrieved so far",returned,total)
+            else "; all currently reported hits retrieved"),
         if(is.finite(unresolved) && unresolved>0L)
-          sprintf(" Metadata unavailable for %d returned entities.",unresolved) else ""),
+          sprintf(" Metadata unavailable for %d returned entities.",unresolved) else "",
+        if(isTRUE(payload$duplicate_count>0L))
+          sprintf(" %d duplicate entity IDs collapsed.",payload$duplicate_count) else ""),
       tags$div(class="ram-counterpart-results",
         lapply(results,function(item) {
           id <- get(item,"pdb_id")
@@ -1886,7 +1920,15 @@ server <- function(input, output, session) {
                 "data-pdb"=id,"data-chain"=chain,"data-entity"=entity,
                 "Compare with loaded structure")
             ))
-        }))
+        })),
+      if(isTRUE(payload$has_more))
+        actionButton("atlasLoadMore",
+          sprintf("Load next %d experimental entities",
+            min(50L,as.integer(payload$total_count-payload$next_offset))),
+          class="btn-default btn-sm"),
+      if(!isTRUE(payload$has_more) && !isTRUE(payload$stalled))
+        tags$p(class="ram-field-hint",
+          "The currently reported experimental search cohort has been retrieved.")
     )
   })
 

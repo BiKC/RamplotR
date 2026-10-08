@@ -23,10 +23,10 @@ conformational states.
 
 - Phase 0A canonical residue mapping is implemented on `main`. It provides
   conservative PDBe SIFTS/UniProt mapping and direct AlphaFold DB coordinates.
-- Phase 1 initial experimental inventory is being implemented on
-  `feature/atlas-experimental-inventory`. The first slice fetches experimental
-  polymer entities by UniProt accession, reports method/resolution and
-  reference sequence coverage, and opens a chosen candidate in Compare.
+- Phase 1 initial experimental inventory was merged in PR #47. It fetches
+  experimental polymer entities by UniProt accession, reports
+  method/resolution and reference sequence coverage, and opens a chosen
+  candidate in Compare.
 - **Not implemented yet:** complete paginated cohort retrieval, exact
   per-entity canonical SIFTS residue coverage, experimental structural-state
   clustering, fragment switch regions and prediction-vs-experiment coverage.

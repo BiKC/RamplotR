@@ -12,9 +12,17 @@ function syntheticUpdatedCif(pdbOffset,shifted) {
   const residues=Array.from({length:40},(_,i)=>i+1);
   const sequence=residues.map(i=>`X 1 ${i} A ${pdbOffset+i-1} .`).join("\n");
   const sifts=residues.map(i=>`1 X ${i} P00533 ${i+49} 1`).join("\n");
-  const atoms=residues.map(i=>{
-    const x=0.35*i+(shifted && i>21 ? 8 : 0);
-    return `ATOM CA X ${i} ${x.toFixed(4)} ${(3*Math.sin(i/2)).toFixed(4)} ${(3*Math.cos(i/2)).toFixed(4)} 1 .`;
+  const atoms=residues.flatMap(i=>{
+    const base=[1.5*i,0.5*Math.sin(i),0.5*Math.cos(i)];
+    const p=[base[0]+(shifted && i>21 ? 8 : 0),base[1],base[2]];
+    const N=[p[0]-0.2,p[1]+0.3,p[2]+0.1];
+    const C=[p[0]+0.2,p[1]-0.1,p[2]+0.25];
+    if(shifted && i>=15 && i<=19) {
+      N[1]+=0.45; N[2]-=0.1;
+      C[1]-=0.3; C[2]+=0.3;
+    }
+    return [["N",N],["CA",p],["C",C]].map(([name,xyz])=>
+      "ATOM "+name+" X "+i+" "+xyz.map(x=>x.toFixed(4)).join(" ")+" 1 .");
   }).join("\n");
   return `data_test
 #
@@ -188,6 +196,21 @@ ${atoms}
       return text.includes("2 verified experimental entities") &&
         text.includes("40 distinct observed UniProt positions") &&
         text.includes("Export verified residue mapping CSV");
+    },{timeout:25000});
+    await page.waitForSelector("#atlasSwitchThreshold",{timeout:15000});
+    await page.click("#atlasRunSwitch");
+    await page.waitForFunction(() => {
+      const panel=document.querySelector("#atlasSwitchSummary");
+      return panel && panel.textContent.includes(
+        "canonical positions have both valid") &&
+        panel.textContent.includes("candidate residue");
+    },{timeout:25000});
+    const switchText=await page.$eval("#atlasSwitchSummary",el=>el.textContent);
+    assert.match(switchText,/1CRN_1 versus 1UBQ_1/);
+    assert.ok(await page.$("#downloadAtlasSwitch"));
+    await page.waitForFunction(() => {
+      const plot=document.querySelector("#atlasSwitchPlot img");
+      return plot && plot.complete && plot.naturalWidth>0;
     },{timeout:25000});
     assert.ok(await page.$("#downloadAtlasCanonical"));
     assert.ok(await page.$("#downloadAtlasSupport"));

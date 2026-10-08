@@ -126,23 +126,35 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
   - This is **one known case**, not threshold validation. Chain A/B within
     a crystal are not independent biological replicates. Differences above
     30° already occur in same-crystal chain controls.
-- Active branch: `feature/atlas-multiprotein-benchmark`.
-  - Real SIFTS-coordinate benchmark covering ADK (4AKE/1AKE), maltose
-    binding protein (1OMP/1ANF, separate apo crystal 1JW4) and ribose
-    binding protein (1URP/2DRI).
-  - Open/closed contrasts, ADK/RBP same-crystal chain controls, MBP
-    separate-crystal open/apo control, and one exact self-control per protein.
-  - Strict accession, >=100 exact overlapping canonical positions and >=60%
-    two-sided coverage; inspect experimental residue-name concordance and
-    reject grossly incompatible constructs.
-  - Per-protein global C-alpha distance maps, circular paired phi/psi,
-    separate local denominators, missing-data and source SHA256 auditing.
-  - Live-data workflow plus downloadable per-residue CSV outputs. No
-    classification cutoffs or trained model.
-- After checking the actual real-data CI results, record source hashes,
-  discrepancies and limitations before merging. Three proteins (including
-  two periplasmic binding proteins of related fold) remain too few for any
-  broad statistical sensitivity/specificity claim.
+- PR #54 merged into `main` (`37e6f23506814a69e415b8c9a445ce104a47e20c`):
+  - Curated, provenance-checked **live experimental** benchmark across
+    three proteins: ADK (4AKE/1AKE), maltose-binding protein (1OMP/1ANF)
+    and ribose-binding protein (1URP/2DRI), using exact PDBe SIFTS mapping.
+  - Matched experimental controls: ADK and RBP within-crystal chain
+    comparisons, MBP separately crystallized apo 1OMP/1JW4, and three
+    numerical identity controls; synthetic mismatched UniProt/construct
+    examples must be rejected.
+  - Shared aligned UniProt C-alpha coordinates and complete peptide torsions,
+    with per-pair denominators, separate global/local measurements and
+    residue-name equality checks. The seven structures had 0 observed
+    residue-name mismatches at the compared mapped positions.
+  - Open/closed vs control C-alpha dRMSD: ADK 6.5077 Å vs 0.4022/0.2513 Å;
+    MBP 2.8060 vs 0.4119 Å; RBP 2.7443 vs 0.0773 Å.
+  - Local φ/ψ ≥30° candidate counts: ADK 37/212 vs 16/212 and 10/212;
+    MBP 23/368 vs 13/368; RBP 10/269 vs 0/269.
+  - Reproducible real PDBe source SHA256, atomic data, residue CSVs and
+    report archived by GitHub Actions. All three CI workflows passed:
+    scientific Ubuntu/Windows, structure validation and live multi-protein
+    case-study retrieval/analysis.
+  - Detailed results and limitations in
+    `docs/atlas-multiprotein-benchmark.md`. **No universal thresholds
+    or statistical sensitivity/specificity estimates** have been established.
+    Two of the three proteins are related periplasmic binding proteins.
+- No active implementation branch after PR #54. Next development should
+  focus on practical linkage of local candidate residues to both aligned
+  structures, arbitrary group-representative comparisons, and broader
+  independent-fold negative/positive controls. Deployed browser CORS has
+  still not been verified; GitHub's Node retrieval is not evidence of it.
 - Live PDBe API/CORS and updated mmCIF schema still need a deployment smoke
   test. CI mocks the network responses.
 - Do not equate verified PDB-entity counts with independent observations or
@@ -161,18 +173,20 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 
 ## Next implementation steps
 
-1. Validate the **deployed browser** PDBe/CORS and RCSB endpoints; the
-   real benchmark proves Node/GitHub access, not in-browser CORS.
-2. Build a curated **multi-protein** benchmark with structure-positive,
-   within-state and construct/isoform negative controls. Report local
-   sensitivity/background across proteins before using a scientific cutoff.
-3. Expose experimental comparisons between **user-selected** geometric
-   group representatives, with residue-level 3D/Ramachandran navigation.
-4. Inspect crystallographic conditions, conformer occupancies, resolution,
-   mutations, isoforms and construct coverage before calling states comparable.
-5. Measure prediction-versus-experimental conformation coverage only after
-   experimental structural states can be defended against these controls.
-6. Keep the manuscript separate until validation supports any novelty claims.
+1. Verify **deployed-browser** PDBe and RCSB CORS in RamplotR's actual
+   Shinylive hosting environment; Node/GitHub server retrieval is not enough.
+2. Let users select any pair of experimental Atlas geometry groups or their
+   representatives; show exact canonical/local residue identifiers and
+   coordinated 3D/Ramachandran inspection for candidate switch regions.
+3. Expand biological benchmarks to **independent folds** and independent
+   experimental same-state replicates, ideally including constructs and
+   intentionally mismatched isoforms. Report clear denominators and
+   background, not a universal threshold selected from three proteins.
+4. Implement cohort-wide mutation, construct and isoform equivalence checks
+   before classifying archive structures as comparable biological states.
+5. Compare prediction ensembles with validated experimental geometric
+   alternatives only when reference-state definitions are defensible.
+6. Keep the manuscript separate until the validation supports its claims.
 
 ## Branch hygiene
 

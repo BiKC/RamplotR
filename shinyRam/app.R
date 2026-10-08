@@ -3055,7 +3055,9 @@ server <- function(input, output, session) {
           metric(quality$aligned,
             if(!is.null(attr(result,"atlas_canonical"))) "exact UniProt pairs"
             else "aligned residues"),
-          metric(pct(quality$identity),"identity among paired residues"),
+          metric(pct(quality$identity),
+            if(!is.null(attr(result,"atlas_canonical")))
+              "identity among paired residues" else "sequence identity"),
           if(is.null(attr(result,"atlas_canonical")))
             metric(pct(quality$coverage_a),"primary coverage"),
           if(is.null(attr(result,"atlas_canonical")))

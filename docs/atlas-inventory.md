@@ -18,8 +18,8 @@ The search uses an exact UniProt cross-reference attribute in the RCSB PDB
 Search API and requests experimental results only. For each returned entity,
 the browser reads public entity and entry metadata from the RCSB Data API.
 The first response is capped at 50 polymer entities; the displayed total hit
-count distinguishes a partial inventory from a complete result. At most six
-metadata requests run concurrently. Failed metadata fetches are counted,
+count distinguishes a partial inventory from a complete result. At most six entity-enrichment tasks run concurrently (each task may fetch
+both entity and entry metadata). Failed metadata fetches are counted,
 rather than silently presented as complete records.
 
 The RCSB UniProt-reference-coverage field is entity-level metadata, **not**
@@ -44,3 +44,11 @@ as unavailable.
 The eventual Conformational Atlas will add canonical coverage checks,
 structural-state clustering, representative structures and local conformational
 switch regions. See [the roadmap](conformational-atlas-roadmap.md).
+
+## Regression tests
+
+- `node tests/atlas-discovery.test.cjs` tests normalized metadata and bounded
+  enrichment concurrency without network access.
+- `node tests/atlas-browser.cjs` exercises a live local Shiny application
+  against mocked RCSB search/metadata responses and captures desktop/mobile
+  screenshots. It runs in the browser-preview GitHub Actions workflow.

@@ -51,9 +51,13 @@ conformational states.
   Pairwise distances and multi-structure dendrograms are both supported.
   Scientific and browser CI passed, but biological thresholds and real
   archive/browser access still need independent validation.
+- Exact-mapped local backbone φ/ψ changes between geometric-group medoids
+  are being added on `feature/atlas-local-backbone-switches`. The first version
+  groups adjacent high-angular-change UniProt positions as exploratory
+  candidate segments, without biological state or statistical claims.
 - **Not implemented yet:** automatic cohort-wide construct/isoform validation,
-  scientifically benchmarked experimental state clustering, fragment switch
-  regions and prediction-vs-experiment coverage.
+  benchmarked experimental state clustering, a validated five-residue structural
+  alphabet, and prediction-vs-experiment coverage.
 - The manuscript remains separate until those scientific methods are
   implemented and validated.
 

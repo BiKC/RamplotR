@@ -1,7 +1,10 @@
 name: Interface browser preview
 
-# Run explicitly from GitHub Actions when ready for validation.
+# Validate a new non-draft PR, or when a draft is marked ready.
+# Ordinary pushes and PR updates do not trigger these jobs.
 on:
+  pull_request:
+    types: [opened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -9,6 +12,7 @@ permissions:
 
 jobs:
   visual-smoke:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:

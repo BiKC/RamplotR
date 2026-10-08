@@ -1518,7 +1518,7 @@ body > .container-fluid { max-width: none; padding: 0; }
 .ram-atlas-inventory .ram-counterpart-results { max-height:62vh; overflow:auto; padding:2px; }
 @media(max-width:580px) {
   .ram-atlas-controls { align-items:stretch; flex-direction:column; }
-  .ram-atlas-controls .form-group { width:100%; max-width:none; }
+  .ram-atlas-controls .form-group { width:100%; max-width:none; flex:0 0 auto; }
   .ram-atlas-controls > button { align-self:stretch; }
   .ram-atlas-inventory .ram-counterpart-results { max-height:none; }
 }

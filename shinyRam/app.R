@@ -1763,6 +1763,20 @@ server <- function(input, output, session) {
     )
   })
 
+  # Prefill from AlphaFold DB without issuing a network request.
+  observeEvent(loaded(), {
+    structure <- loaded()
+    if(!is.null(structure) && !is.null(structure$uniprot_accession))
+      updateTextInput(session,"atlasAccession",
+        value=structure$uniprot_accession)
+  },ignoreInit=TRUE)
+
+  # Avoid showing stale results after the requested accession changes.
+  observeEvent(input$atlasAccession, {
+    atlas_payload(NULL)
+    atlas_status(NULL)
+  },ignoreInit=TRUE)
+
   # Atlas inventory is independent of the loaded structure. It is an
   # experimental polymer-entity discovery view, not yet a state classification.
   observeEvent(input$atlasDiscover, {
@@ -1786,6 +1800,10 @@ server <- function(input, output, session) {
     if(!is.list(data) || is.null(data$request_id) ||
        !identical(as.character(data$request_id),
                   as.character(isolate(atlas_request())))) return()
+    if(is.null(data$accession) ||
+       !identical(toupper(trimws(as.character(data$accession))),
+                  toupper(trimws(as.character(isolate(input$atlasAccession))))))
+      return()
     if(identical(as.character(data$state),"error")) {
       atlas_payload(NULL)
       atlas_status(list(state="error",
@@ -1886,6 +1904,13 @@ server <- function(input, output, session) {
     chain_b <- if(is.null(candidate$chain)) "" else
       as.character(candidate$chain)
     chain_a <- if(length(primary$chains)) primary$chains[[1L]] else ""
+    if(!is.null(primary$uniprot_accession) &&
+       !is.null(isolate(atlas_payload())) &&
+       !identical(as.character(primary$uniprot_accession),
+                  as.character(isolate(atlas_payload())$accession)))
+      showNotification(
+        "Loaded AlphaFold model and Atlas query refer to different UniProt accessions. Check biological comparability.",
+        type="warning",duration=12)
     segments <- isolate(canonical_segments())
     searched <- isolate(atlas_payload())
     if(!is.null(searched) && nrow(segments)) {

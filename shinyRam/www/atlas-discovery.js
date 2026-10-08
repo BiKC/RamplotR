@@ -44,7 +44,7 @@
     const n = Number(value);
     return Number.isFinite(n) ? n : null;
   }
-  function normalizeEntity(hit, entity, entry) {
+  function normalizeEntity(hit, entity, entry, accession) {
     const id = parseEntityId(hit && hit.identifier);
     if (!id || !entity) return null;
     const container = entity.rcsb_polymer_entity_container_identifiers || {};
@@ -52,6 +52,15 @@
       ? [...new Set(container.auth_asym_ids.map(x => clean(x)).filter(Boolean))]
       : clean(entity.entity_poly && entity.entity_poly.pdbx_strand_id)
         .split(",").map(x => x.trim()).filter(Boolean);
+    const references = Array.isArray(container.reference_sequence_identifiers)
+      ? container.reference_sequence_identifiers : [];
+    const matching = references.filter(x =>
+      clean(x && x.database_name).toLowerCase() === "uniprot" &&
+      clean(x && x.database_accession).toUpperCase() ===
+        clean(accession).toUpperCase());
+    const coverage = matching.length === 1 ? matching[0] : null;
+    const refCoverage = asFinite(coverage && coverage.reference_sequence_coverage);
+    const entityCoverage = asFinite(coverage && coverage.entity_sequence_coverage);
     const resolutions = entry && entry.rcsb_entry_info &&
       Array.isArray(entry.rcsb_entry_info.resolution_combined)
       ? entry.rcsb_entry_info.resolution_combined.map(asFinite).filter(x => x !== null)
@@ -64,6 +73,9 @@
       chain: chains[0] || "",
       description: clean(entity.rcsb_polymer_entity &&
         entity.rcsb_polymer_entity.pdbx_description, "Protein entity"),
+      reference_sequence_coverage: refCoverage,
+      entity_sequence_coverage: entityCoverage,
+      matching_uniprot_reference: matching.length === 1,
       method: [...new Set(methods)].join(", ") || "Unknown method",
       resolution: resolutions.length ? Math.min(...resolutions) : null,
       release_date: clean(entry && entry.rcsb_accession_info &&
@@ -127,7 +139,7 @@
             .catch(() => null),
           cache.get(id.pdb_id)
         ]);
-        return normalizeEntity(hit, entity, entry);
+        return normalizeEntity(hit, entity, entry, accession);
       });
       const results = records.filter(Boolean);
       notify("ramAtlasResults", {

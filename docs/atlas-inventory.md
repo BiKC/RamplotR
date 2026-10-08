@@ -34,7 +34,12 @@ as unavailable.
   state.
 - Differences in constructs, sequence variants and bound partners require
   careful interpretation.
-- Results are not yet paginated through the entire archive.
+- Results can be paginated through the currently reported archive hits, but
+  do not represent a frozen archive snapshot. If the reported hit count
+  changes mid-search, restart rather than merging potentially incompatible
+  pages.
+- Page offsets count raw RCSB search hits. Metadata failures and duplicate
+  entity IDs are reported separately; neither silently shifts pagination.
 - State clustering and representative-state selection are not yet computed.
 - Canonical exact-residue coverage and isoform equivalence will be checked in
   a subsequent slice.
@@ -50,5 +55,8 @@ switch regions. See [the roadmap](conformational-atlas-roadmap.md).
 - `node tests/atlas-discovery.test.cjs` tests normalized metadata and bounded
   enrichment concurrency without network access.
 - `node tests/atlas-browser.cjs` exercises a live local Shiny application
-  against mocked RCSB search/metadata responses and captures desktop/mobile
-  screenshots. It runs in the browser-preview GitHub Actions workflow.
+  against mocked, multi-page RCSB search/metadata responses and captures
+  desktop/mobile screenshots. It runs in the browser-preview GitHub Actions
+  workflow.
+- `Rscript tests/atlas.R` checks page order, archive-total changes,
+  deduplication and failure recovery in the pure-R cohort merge helper.

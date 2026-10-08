@@ -27,9 +27,13 @@ conformational states.
   experimental polymer entities by UniProt accession, reports
   method/resolution and reference sequence coverage, and opens a chosen
   candidate in Compare.
-- **Not implemented yet:** complete paginated cohort retrieval, exact
-  per-entity canonical SIFTS residue coverage, experimental structural-state
-  clustering, fragment switch regions and prediction-vs-experiment coverage.
+- Experimental inventory pagination is implemented on
+  `feature/atlas-pagination-cohort` and is pending CI/merge. It preserves
+  page offsets, deduplicates polymer entities, records failed metadata IDs,
+  detects changes to the archive hit count, and loads the next page on demand.
+- **Not implemented yet:** exact per-entity canonical SIFTS residue coverage,
+  experimental structural-state clustering, fragment switch regions and
+  prediction-vs-experiment coverage.
 - The manuscript remains separate until those scientific methods are
   implemented and validated.
 

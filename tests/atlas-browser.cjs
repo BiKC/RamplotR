@@ -203,8 +203,23 @@ ${atoms}
       el=>el.textContent);
     assert.match(geometryTable,/1CRN_1/);
     assert.match(geometryTable,/1UBQ_1/);
-    assert.ok(await page.$("#atlasGeometryPlot canvas") ||
-              await page.$("#atlasGeometryPlot img"));
+    try {
+      await page.waitForFunction(() => {
+        const plot=document.querySelector("#atlasGeometryPlot");
+        const img=plot && plot.querySelector("img");
+        return !!(plot && (plot.querySelector("canvas") ||
+          (img && img.complete && img.naturalWidth>0)));
+      },{timeout:25000});
+    } catch(e) {
+      console.error("Atlas geometry plot diagnostics:",
+        JSON.stringify(await page.evaluate(() => ({
+          plot:document.querySelector("#atlasGeometryPlot")?.outerHTML?.slice(0,1500),
+          result:document.querySelector("#atlasGeometrySummary")?.textContent,
+          notices:[...document.querySelectorAll(".shiny-notification")]
+            .map(node=>node.textContent)
+        }))));
+      throw e;
+    }
 
     await page.screenshot({path:path.join(output,"atlas-inventory-desktop.png"),
       fullPage:true});

@@ -82,22 +82,21 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
   position-support counts and provides two CSV exports.
   Scientific Ubuntu/Windows, structure/wwPDB, and the full live-browser Atlas
   regression all passed after a browser test selector fix.
-- Active branch: `feature/atlas-geometry-state-candidates` from current
-  `main` after PR #50. Implements an initial **exploratory** experimental
-  geometry comparison, not biological state assignment:
-  - extract first-model C-alpha coordinates for exact SIFTS polymer positions
-    from the already retrieved PDBe updated mmCIF;
-  - retain label asym/seq mapping and ignore ambiguous atoms/positions;
-  - require >=30 common observed canonical positions and >=60% common-core
-    coverage for every selected structure;
-  - rigid-body-invariant C-alpha internal distance-map RMSD on one shared,
-    deterministically sampled core of <=300 positions;
-  - average-linkage geometric groups with a displayed user-selected distance
-    cutoff and representative medoids;
-  - pure-R and JS tests, plus real Shiny browser tests with synthetic changed
-    internal geometry.
-  - Next: scientifically benchmark cluster cutoffs and actual structures,
-    inspect construct equivalence and metadata before calling these states.
+- PR #51 merged into `main`
+  (`869b1af85e31b0b770e50b25e8c71ef37f288971`):
+  - extracted first-model C-alpha coordinates in PDBe updated mmCIF for
+    exact SIFTS polymer positions (no author-number interpolation);
+  - required >=30 common observed UniProt positions and >=60% core coverage;
+  - rigid-body-invariant C-alpha distance-map RMSD on a consistent sampled core;
+  - exploratory average-linkage geometric groups with an explicit adjustable
+    threshold and representative entity for each group;
+  - two-structure distance plot and >=3-structure dendrogram;
+  - Ubuntu/Windows scientific tests, independent wwPDB, structure benchmark
+    and live Shiny browser workflow all passed after fixing two plot regressions.
+- No active implementation PR after #51. Next: benchmark distance thresholds on
+  biological case studies, check construct/isoform equivalence and identify
+  local backbone switch regions tied to the experimental geometry groups.
+  Do not label geometric groups as biological functional states.
 - Live PDBe API/CORS and updated mmCIF schema still need a deployment smoke
   test. CI mocks the network responses.
 - Do not equate verified PDB-entity counts with independent observations or
@@ -116,21 +115,20 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 
 ## Next implementation steps
 
-1. Paginated experimental cohort inventory has merged in PR #48.
-2. Verify exact PDBe SIFTS residue correspondence for selected entities
-   (current active branch), then extend to cohort-level mapping.
-   Validate observable residue coverage and accession/isoform consistency
-   before treating structures as state evidence.
-   Prefer updated PDBe mmCIF/SIFTS residue-level annotations over guessing
-   interior mappings from range endpoints.
-3. Integrate a source-defined experimental conformational-state clustering
-   method and representative structures, with method/provenance recorded.
-4. Add fragment-level backbone switch regions and prediction-state clustering.
-5. Compare prediction-state coverage against experimentally observed states.
-6. Benchmark coarse backbone-state labels before treating them as scientific
-   conformation definitions.
-7. Update manuscript only after analysis, validation and case studies are
-   settled.
+1. **Validate live PDBe/RCSB retrieval** with representative real PDB entries
+   and the deployed app's browser/CORS environment. CI uses mock responses.
+2. **Benchmark geometry grouping** on known apo/holo/open/closed cases,
+   including identical structures, construct variants, missing residues,
+   alternative crystal forms and multi-domain hinge movements. The current
+   1.5 Å distance-map cutoff is exploratory, not biologically calibrated.
+3. **Improve construct and isoform checks** before accepting a candidate
+   cohort as structurally comparable. Do not silently pool isoforms.
+4. **Add local switch-region evidence**: residue-aligned backbone angles and
+   fragment-level conformational fingerprints for each geometric group.
+5. **Compare prediction ensembles to experimental geometric groups**, with
+   canonical coverage, explicit missing-data categories and confidence.
+6. Only then consider context associations with ligand/mutation/partner and
+   revise the publication once benchmark claims are supportable.
 
 ## Branch hygiene
 

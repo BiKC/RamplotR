@@ -58,39 +58,39 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 
 ## Active work
 
-- Baseline is current `main` after the canonical-coordinate implementation
-  (commit `c2615795ff202e5019d9abc03b130125e77a565b`).
-- Canonical mapping (Phase 0A) already exists in `main`:
-  `shinyRam/R/canonical.R`, `canonical-mapping.js`, inspector/summary
-  integration and tests. Do not reimplement it on the older
-  `feature/conformational-atlas-foundation` branch.
-- Active branch: `feature/atlas-experimental-inventory`.
-- Current slice: Phase 1 inventory discovery for a UniProt accession:
-  - experimental polymer-entity discovery from RCSB Search;
-  - bounded metadata retrieval, entity/reference coverage and limitations;
-  - an Atlas tab with comparison handoff to the existing Compare workflow;
-  - unit tests plus scientific CI/UI contract checks.
-- This is inventory discovery, not experimental conformational-state clustering.
-  It must not report a "state count" until a clustering analysis is implemented.
-- Long-term roadmap: `docs/conformational-atlas-roadmap.md`.
-- Manuscript remains separate on `arxiv-preprint` / PR #20.
-- Before continuing after a reconnect, inspect `main`, recent PRs,
-  and this worklog. Do not restore older branches over new work.
+- PR #46: canonical SIFTS/UniProt coordinates merged.
+- PR #47: first experimental Conformational Atlas inventory merged.
+  - UniProt-to-experimental-polymer-entity search;
+  - RCSB method, resolution and entity/reference coverage metadata;
+  - bounded, capped retrieval with explicit partial-result notices;
+  - comparison handoff and desktop/mobile regression coverage.
+- No active feature PR immediately after PR #47 merge. Next intended branch:
+  `feature/atlas-pagination-cohort`.
+- Roadmap: `docs/conformational-atlas-roadmap.md`.
+- Browser CI for PR #47 passed. Windows scientific tests passed; Ubuntu
+  scientific runner for the last CSS/test-only update had not completed setup
+  at merge time. An earlier Ubuntu scientific run on the functional changes
+  passed.
+- Manuscript PR #20 remains separate; it does not yet describe an Atlas state
+  discovery algorithm.
 
 ## Next implementation steps
 
-1. Finish and verify the experimental inventory branch; merge after the
-   scientific regression suite passes.
-2. Add exact SIFTS canonical coverage per returned entity/chain, preserving
-   unmapped/ambiguous residues and isoform differences.
-3. Add pagination and caching so proteins with hundreds of PDB entities are
-   analysed as complete, auditable cohorts rather than truncated search hits.
-4. Implement state discovery via established archive clusters when available,
-   with explicit structural/alignment validation and representative structures.
-5. Implement fragment-level switch regions, prediction-state clustering and
-   prediction-to-experimental state coverage.
-6. Benchmark coarse backbone-state bins before making biological claims.
-7. Keep the manuscript branch separate until analysis and validation stabilize.
+1. Make the experimental inventory paginated and auditable: each page has
+   deterministic offsets, bounded fetches, deduplicated entity IDs and
+   explicit partial/failure state.
+2. Validate canonical residue coverage against exact PDBe SIFTS data for
+   selected experimental structures before treating them as state evidence.
+   Prefer updated PDBe mmCIF/SIFTS residue-level annotations over guessing
+   interior mappings from range endpoints.
+3. Integrate a source-defined experimental conformational-state clustering
+   method and representative structures, with method/provenance recorded.
+4. Add fragment-level backbone switch regions and prediction-state clustering.
+5. Compare prediction-state coverage against experimentally observed states.
+6. Benchmark coarse backbone-state labels before treating them as scientific
+   conformation definitions.
+7. Update manuscript only after analysis, validation and case studies are
+   settled.
 
 ## Branch hygiene
 
@@ -118,5 +118,5 @@ Old feature/fix/chore branches are retained in GitHub but are **not active work*
 - `rebuild/compare-prediction-confidence-20261007`
 
 The only long-lived non-main branch intentionally kept for active content is
-`arxiv-preprint` / PR #20. The active implementation branch is the one named in **Active work**
-above; all older feature branches are historical unless explicitly reopened.
+`arxiv-preprint` / PR #20. Start any new work from current `main`, update **Active work** with the actual
+branch, and do not reuse historical feature branches.

@@ -76,10 +76,14 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
   with insertion-safe joins, conflict reporting and on-demand verification.
   Scientific Ubuntu/Windows, structure, independent wwPDB and live-browser CI
   all passed.
-- No active implementation PR immediately after #49. Next branch should
-  extend exact mappings into a canonical-mapped cohort with explicit
-  completeness/coverage and support for grouped experimental state discovery.
-  Do not group by inferred author numbering.
+- Active branch: `feature/atlas-canonical-cohort`. Combines only explicitly
+  verified SIFTS entities on canonical UniProt positions, shows mapped/observed
+  support and ambiguous residues, and offers residue/position-support CSVs.
+  It intentionally does not infer secondary structure or state clusters.
+- After merging this branch, next milestone is canonicalized experimental
+  structure coordinates and global state discovery, with coverage thresholds
+  and construct/isoform checks. Never group structures by inferred author
+  numbering.
 - Browser tests mock PDBe responses; confirm live PDBe CORS and updated-mmCIF
   endpoint on deployment before advertising archive-wide state analysis.
 - Manual live RCSB API smoke test remains desirable; CI uses mocked RCSB

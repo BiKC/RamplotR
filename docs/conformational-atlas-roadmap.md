@@ -51,10 +51,13 @@ conformational states.
   Pairwise distances and multi-structure dendrograms are both supported.
   Scientific and browser CI passed, but biological thresholds and real
   archive/browser access still need independent validation.
-- Exact-mapped local backbone φ/ψ changes between geometric-group medoids
-  are being added on `feature/atlas-local-backbone-switches`. The first version
-  groups adjacent high-angular-change UniProt positions as exploratory
-  candidate segments, without biological state or statistical claims.
+- Exact-mapped local φ/ψ comparisons between geometry-group medoids merged
+  in PR #52. Calculations require observed N/CA/C atoms, native peptide
+  continuity and shared UniProt positions; wrapped angular differences and
+  contiguous above-threshold regions are exploratory navigation evidence.
+  End-to-end browser and scientific CI passed on the final revision.
+  The current workflow uses the first two group medoids, not all group members,
+  and its threshold is not calibrated against biological reference cases.
 - **Not implemented yet:** automatic cohort-wide construct/isoform validation,
   benchmarked experimental state clustering, a validated five-residue structural
   alphabet, and prediction-vs-experiment coverage.

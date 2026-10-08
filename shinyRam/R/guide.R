@@ -153,9 +153,9 @@ ram_guide_ui <- function() {
         step(4, "Compare geometric groups",
           "When at least two structures have sufficient common canonical Cα coverage, use Compare structural geometries. The method uses first-model distance maps and an exploratory grouping cutoff."),
         step(5, "Investigate local differences",
-          "If multiple geometric groups are found, use Find local backbone changes to compare representatives. The sequence plot reports wrapped φ/ψ changes and candidate regions."),
-        step(6, "Inspect an experimental counterpart directly",
-          "A candidate entry can also be handed off to Compare for synchronized two-structure inspection.")
+          "Choose two geometric-group representatives, then select Find local backbone changes. Click a canonical residue to see paired φ/ψ and exact PDB residue identifiers."),
+        step(6, "Inspect both representative structures in 2D/3D",
+          "Click Inspect both structures in 2D/3D. The representatives open in Compare, where RamplotR highlights the pair only when both exact author residue identifiers match. A mismatch is reported rather than guessed.")
       ),
       tags$p("Atlas groups are exploratory geometric similarities, not confirmed functional states. SIFTS verification does not establish construct equivalence; the default 1.5 Å and 30° cutoffs have not been validated as universal state boundaries."),
       jump("guideGoAtlas", "Open Atlas")

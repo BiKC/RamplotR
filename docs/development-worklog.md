@@ -64,12 +64,19 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
   - RCSB method, resolution and entity/reference coverage metadata;
   - bounded, capped retrieval with explicit partial-result notices;
   - comparison handoff and desktop/mobile regression coverage.
-- Active implementation branch: `feature/atlas-pagination-cohort`.
-  It adds paged RCSB experimental search, stable sort/offset tracking, metadata
-  failure IDs, deduplication, archive-total change detection, a Load Next control
-  and dedicated R/Node/browser regression coverage.
-- Pending verification: open PR and wait for scientific/browser CI. After merge,
-  move to exact SIFTS canonical coverage on selected experimental entities.
+- PR #48: experimental Atlas cohort pagination merged into `main`
+  (`d70ba566fa2330e0d238413d803e880109a7c20d`).
+  - Paged RCSB search, deterministic sort/offset tracking, deduplicated entity
+    IDs, archive-total consistency checks and metadata failure identifiers.
+  - Browser, scientific (Ubuntu/Windows), independent wwPDB and structure
+    validation workflows all passed. The first browser attempt had a transient
+    prediction-upload timeout; rerun passed the full suite including Atlas.
+- No active implementation branch after PR #48. Next phase: exact SIFTS
+  residue-level canonical mapping for selected experimental entities. In PDBe
+  updated mmCIF, `_pdbx_sifts_xref_db` supplies direct per-residue UniProt
+  cross-references. Resolve label/auth chain and insertion code carefully.
+- Manual live RCSB API smoke test remains desirable; CI uses mocked RCSB
+  search/metadata responses to make network-independent UI regressions.
 - Roadmap: `docs/conformational-atlas-roadmap.md`.
 - Browser CI for PR #47 passed. Windows scientific tests passed; Ubuntu
   scientific runner for the last CSS/test-only update had not completed setup

@@ -179,6 +179,25 @@ if(!all(vapply(conf$proteins,function(protein)
   sum(results$protein==protein$id &
       results$comparison=="documented_open_closed")==1L,logical(1L))))
   stop("Every protein must have one documented contrast.")
+# Synthetic mismatch controls test *rejection behaviour*, not biology. A
+# cross-UniProt comparison must not be silently performed just because local
+# residue numbers happen to overlap.
+foreign <- try(pair("negative_cross_accession","4AKE_1","1OMP_1",
+                    "A","A","synthetic_wrong_protein"),silent=TRUE)
+if(!inherits(foreign,"try-error"))
+  stop("Cross-UniProt benchmark comparison incorrectly accepted.")
+# Deliberately substitute 8% of the experimental residue names in memory;
+# check that sequence/construct incompatibility is rejected before exports.
+saved <- cache[["2DRI_1"]]
+mutated <- saved
+idx <- seq_len(min(25L,nrow(mutated$sequence_audit)))
+mutated$sequence_audit$residue_name[idx] <- "ZZZ"
+cache[["2DRI_1"]] <- mutated
+mismatched <- try(pair("synthetic_wrong_construct","1URP_1","2DRI_1",
+                       "A","A","synthetic_construct_mismatch"),silent=TRUE)
+cache[["2DRI_1"]] <- saved
+if(!inherits(mismatched,"try-error"))
+  stop("Construct/sequence mismatch control incorrectly accepted.")
 utils::write.csv(results,file.path(dest,"multiprotein-summary.csv"),
                  row.names=FALSE)
 # Contrast report is descriptive. One comparison per protein is not enough to

@@ -71,10 +71,14 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
   - Browser, scientific (Ubuntu/Windows), independent wwPDB and structure
     validation workflows all passed. The first browser attempt had a transient
     prediction-upload timeout; rerun passed the full suite including Atlas.
-- No active implementation branch after PR #48. Next phase: exact SIFTS
-  residue-level canonical mapping for selected experimental entities. In PDBe
-  updated mmCIF, `_pdbx_sifts_xref_db` supplies direct per-residue UniProt
-  cross-references. Resolve label/auth chain and insertion code carefully.
+- Active branch: `feature/atlas-exact-sifts-residues` (Phase 1 mapping).
+  - Targeted PDBe updated mmCIF parsing of `_pdbx_sifts_xref_db` and
+    `_pdbx_poly_seq_scheme` with exact asym/seq joins;
+  - author/PDB chain and insertion code retained, explicit conflict detection;
+  - on-demand Verify SIFTS mapping in experimental Atlas, no bulk download;
+  - independent R/Node regression coverage and browser smoke tests.
+  - Next phase after CI/merge: canonical-mapped cohort and experimental state
+    discovery. Never infer residue correspondence by offset alone.
 - Manual live RCSB API smoke test remains desirable; CI uses mocked RCSB
   search/metadata responses to make network-independent UI regressions.
 - Roadmap: `docs/conformational-atlas-roadmap.md`.
@@ -87,11 +91,11 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 
 ## Next implementation steps
 
-1. Make the experimental inventory paginated and auditable: each page has
-   deterministic offsets, bounded fetches, deduplicated entity IDs and
-   explicit partial/failure state.
-2. Validate canonical residue coverage against exact PDBe SIFTS data for
-   selected experimental structures before treating them as state evidence.
+1. Paginated experimental cohort inventory has merged in PR #48.
+2. Verify exact PDBe SIFTS residue correspondence for selected entities
+   (current active branch), then extend to cohort-level mapping.
+   Validate observable residue coverage and accession/isoform consistency
+   before treating structures as state evidence.
    Prefer updated PDBe mmCIF/SIFTS residue-level annotations over guessing
    interior mappings from range endpoints.
 3. Integrate a source-defined experimental conformational-state clustering

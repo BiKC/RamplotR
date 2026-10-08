@@ -90,8 +90,13 @@ pair <- function(case_id,a,b,chain_a,chain_b,kind) {
                             c("x","y","z"),drop=FALSE])
   A <- as.matrix(stats::dist(pos_a))
   B <- as.matrix(stats::dist(pos_b))
-  drmsd <- sqrt(mean((A-B)^2)) # uses same residue pair set across compared models
-  local_global <- sqrt(rowMeans((A-B)^2))
+  # Match the established Atlas dRMSD definition: each distinct pair
+  # contributes once, without the always-zero self distances on the diagonal.
+  # The first adenylate kinase benchmark used stats::dist directly.
+  difference <- A-B
+  upper <- upper.tri(difference)
+  drmsd <- sqrt(mean(difference[upper]^2))
+  local_global <- sqrt(rowSums(difference^2)/(nrow(difference)-1L))
   torsions_a <- ram_atlas_entity_torsions(aa,chain_a)
   torsions_b <- ram_atlas_entity_torsions(bb,chain_b)
   changes <- ram_atlas_torsion_delta(torsions_a,torsions_b,

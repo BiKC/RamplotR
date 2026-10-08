@@ -150,25 +150,35 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
     `docs/atlas-multiprotein-benchmark.md`. **No universal thresholds
     or statistical sensitivity/specificity estimates** have been established.
     Two of the three proteins are related periplasmic binding proteins.
-- Active branch: `feature/in-app-workflow-guide-group-layout`.
-  This is a usability/documentation milestone after PR #54, without altering
-  the scientific algorithms.
-  - Fix the screenshot-reported Group Comparison form overlap with a
-    responsive settings grid, unconstrained field widths and wrapped labels.
-  - Present the Group workflow as reference/criteria, condition uploads and
-    analysis; explain why the loaded structure belongs to Group A.
-  - Hide export controls until a successful group comparison exists.
-  - Add an in-app **Guide** tab and entry links from input, Compare and Atlas.
-    Task-based tutorials cover single-residue inspection, predicted confidence
-    and ensembles, paired structure comparison, group comparison, Atlas,
-    reports and scientific interpretation limitations.
-  - Remove stale Atlas copy saying clustering/local regions are future work.
-  - Browser test `tests/guide-browser.cjs` checks guide navigation,
-    desktop/laptop/mobile form overlap and screenshot previews.
-  - No scientific categories or default thresholds changed.
-- PR #54 remains the last merged scientific milestone. Following this UI work:
-  link local Atlas change candidates to paired 3D/Ramachandran navigation;
-  benchmark with independent folds; check deployed browser API/CORS.
+- PR #55 merged into `main`
+  (`71de4a4f3300d39254777edf48231ab3101afc38`).
+  - User-visible **Guide** tab with seven task-oriented sections: single
+    structure/residue inspection, predicted confidence/ensembles, paired
+    Compare, grouped comparisons, experimental Atlas, exports and scientific
+    interpretation. Entry links from input, Compare and Atlas; tab-navigation
+    action links for the workflows.
+  - Group Comparison is organized as reference/chain match, two condition
+    upload sets, then analysis. Fixed labels/field widths at responsive
+    desktop/laptop/mobile sizes. Hide export actions before analysis exists.
+  - Also corrected the paired comparison-source button clipping at narrow
+    laptop content widths. Initial "New here?" input link disappears once
+    a structure is loaded, preserving the compact analysis toolbar.
+  - Removed misleading stale Atlas text claiming geometric grouping and
+    local candidate detection are not yet implemented.
+  - Real headless-browser regression checks no clipping/overlap at 1440,
+    900 and 390 px and verifies guide navigation. Screenshots in browser
+    artifact from run 37779032286.
+  - Full Interface browser preview, scientific Ubuntu/Windows, and structure
+    validation workflows passed on final head. Independent wwPDB checks
+    1CRN, 1UBQ, 1D3Z and 6VXX passed; 2DQ4 remained in GitHub runner
+    R setup at merge time, without a reported code/test failure.
+  - No scientific metric, residue classification, or cutoff was changed.
+- No active feature PR after #55. Next: link local Atlas backbone candidates
+  to selected 3D/Ramachandran residues, verify deployed browser PDBe CORS,
+  and continue independent-fold controls for state classification claims.
+- IMPORTANT: this repository merge does not update the static Shinylive
+  deployment automatically. Regenerate the export and publish its built files
+  before expecting the Guide tab at bikc.be/RamplotR.
 - Live PDBe API/CORS and updated mmCIF schema still need a deployment smoke
   test. CI mocks the network responses.
 - Do not equate verified PDB-entity counts with independent observations or

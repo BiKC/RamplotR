@@ -639,6 +639,27 @@ ui <- fluidPage(
               )
             ),
             tabPanel(
+              title = "Atlas", value = "atlas",
+              tags$div(class="ram-subtab-content",
+                tags$div(class="ram-result-head",
+                  tags$div(tags$h2("Conformational Atlas"),
+                    tags$p("Discover experimental structures for a UniProt protein. State clustering and local switch regions will follow."))),
+                tags$section(class="ram-panel",
+                  tags$p(class="ram-field-hint",
+                    "Searches public RCSB PDB by UniProt cross-reference, restricted to experimental entries. Results are candidate polymer entities, not distinct conformational states."),
+                  tags$div(class="ram-atlas-controls",
+                    textInput("atlasAccession","UniProt accession",
+                      placeholder="e.g. P00533"),
+                    actionButton("atlasDiscover","Find experimental structures",
+                      class="btn-primary")),
+                  uiOutput("atlasStatus"),
+                  uiOutput("atlasResults"),
+                  tags$p(class="ram-field-hint",
+                    "Results show an initial capped inventory. Canonical residue coverage, construct equivalence, and conformational-state identity must be verified before comparing states.")
+                )
+              )
+            ),
+            tabPanel(
               title = "Summary", value = "summary",
               tags$div(
                 class = "ram-subtab-content",
@@ -680,6 +701,7 @@ ui <- fluidPage(
   tags$script(src = "plotly-loader.js"),
   tags$script(src = "custom.js"),
   tags$script(src = "canonical-mapping.js"),
+  tags$script(src = "atlas-discovery.js"),
   tags$script(src = "experimental-search.js"),
   tags$script(src = "compare.js"),
   tags$script(src = "prediction.js"),
@@ -698,6 +720,9 @@ server <- function(input, output, session) {
   experimental_search_results <- reactiveVal(NULL)
   experimental_search_status <- reactiveVal(NULL)
   experimental_search_request <- reactiveVal(0L)
+  atlas_request <- reactiveVal(0L)
+  atlas_payload <- reactiveVal(NULL)
+  atlas_status <- reactiveVal(NULL)
   canonical_segments <- reactiveVal(ram_canonical_empty_segments())
   canonical_mapping <- reactiveVal(ram_canonical_empty_map())
   canonical_status <- reactiveVal(NULL)
@@ -1737,6 +1762,133 @@ server <- function(input, output, session) {
       )
     )
   })
+
+  # Atlas inventory is independent of the loaded structure. It is an
+  # experimental polymer-entity discovery view, not yet a state classification.
+  observeEvent(input$atlasDiscover, {
+    accession <- tryCatch(ram_uniprot_accession(input$atlasAccession),
+      error=function(e) {
+        atlas_status(list(state="error",message=conditionMessage(e)))
+        NULL
+      })
+    if(is.null(accession)) return()
+    id <- isolate(atlas_request())+1L
+    atlas_request(id)
+    atlas_payload(NULL)
+    atlas_status(list(state="searching",
+      message=paste("Searching experimental PDB entities for",accession,"...")))
+    session$sendCustomMessage("ram-atlas-discover",list(
+      request_id=as.character(id),accession=accession,rows=50L))
+  },ignoreInit=TRUE)
+
+  observeEvent(input$ramAtlasResults, {
+    data <- input$ramAtlasResults
+    if(!is.list(data) || is.null(data$request_id) ||
+       !identical(as.character(data$request_id),
+                  as.character(isolate(atlas_request())))) return()
+    if(identical(as.character(data$state),"error")) {
+      atlas_payload(NULL)
+      atlas_status(list(state="error",
+        message=if(is.null(data$message)) "Atlas search failed."
+          else as.character(data$message)))
+    } else {
+      atlas_payload(data)
+      atlas_status(list(state="done",message="Experimental inventory retrieved."))
+    }
+  },ignoreInit=TRUE)
+
+  output$atlasStatus <- renderUI({
+    item <- atlas_status()
+    if(is.null(item)) return(NULL)
+    tags$p(class=if(identical(item$state,"error"))
+      "ram-confidence-warning" else "ram-field-hint",item$message)
+  })
+
+  output$atlasResults <- renderUI({
+    payload <- atlas_payload()
+    if(is.null(payload)) return(NULL)
+    results <- payload$results
+    if(!length(results))
+      return(tags$p("No experimental polymer entities were returned for this accession."))
+    get <- function(item,key,default="") {
+      value <- item[[key]]
+      if(is.null(value) || !length(value) || is.na(value[[1L]])) default
+      else as.character(value[[1L]])
+    }
+    pdbs <- unique(vapply(results,get,character(1L),key="pdb_id"))
+    total <- suppressWarnings(as.integer(payload$total_count))
+    returned <- suppressWarnings(as.integer(payload$returned_count))
+    unresolved <- suppressWarnings(as.integer(payload$incomplete_metadata))
+    tags$div(class="ram-atlas-inventory",
+      tags$p(class="ram-field-hint",
+        sprintf("%d enriched polymer entities in %d PDB entries. RCSB reports %s matching entities%s.",
+          length(results),length(pdbs),
+          if(is.finite(total)) as.character(total) else "an unknown number of",
+          if(is.finite(total) && is.finite(returned) && total>returned)
+            sprintf("; only the first %d were requested",returned) else ""),
+        if(is.finite(unresolved) && unresolved>0L)
+          sprintf(" Metadata unavailable for %d returned entities.",unresolved) else ""),
+      tags$div(class="ram-counterpart-results",
+        lapply(results,function(item) {
+          id <- get(item,"pdb_id")
+          entity <- get(item,"entity_id")
+          chain <- get(item,"chain")
+          resolution <- suppressWarnings(as.numeric(get(item,"resolution",NA_character_)))
+          tags$article(class="ram-counterpart-card",
+            tags$div(class="ram-counterpart-card-main",
+              tags$div(class="ram-counterpart-id",
+                tags$strong(id),
+                tags$span(paste("Entity",entity)),
+                tags$span(if(nzchar(chain)) paste("Chain",chain) else "Chain unknown")),
+              tags$div(class="ram-counterpart-copy",
+                tags$strong(get(item,"description","Protein entity")),
+                tags$p(get(item,"title")),
+                tags$div(class="ram-counterpart-meta",
+                  tags$span(get(item,"method","Unknown method")),
+                  tags$span(if(is.finite(resolution))
+                    sprintf("%.2f Å",resolution) else "Resolution n/a"),
+                  tags$span(get(item,"release_date"))))),
+            tags$div(class="ram-counterpart-actions",
+              tags$a("RCSB entry",
+                href=paste0("https://www.rcsb.org/structure/",id),
+                target="_blank",rel="noopener noreferrer",
+                class="btn btn-default btn-sm"),
+              tags$button(type="button",class="btn btn-primary btn-sm ram-atlas-compare",
+                "data-pdb"=id,"data-chain"=chain,"data-entity"=entity,
+                "Compare with loaded structure")
+            ))
+        }))
+    )
+  })
+
+  observeEvent(input$ramAtlasComparePick, {
+    candidate <- input$ramAtlasComparePick
+    primary <- isolate(loaded())
+    if(is.null(primary)) {
+      showNotification("Load a primary structure first, then choose an Atlas counterpart.",
+        type="warning",duration=10)
+      return()
+    }
+    if(!is.list(candidate) || is.null(candidate$pdb_id)) return()
+    id <- toupper(trimws(as.character(candidate$pdb_id)))
+    if(!grepl("^[A-Z0-9]{4}$",id)) return()
+    chain_b <- if(is.null(candidate$chain)) "" else
+      as.character(candidate$chain)
+    chain_a <- if(length(primary$chains)) primary$chains[[1L]] else ""
+    segments <- isolate(canonical_segments())
+    searched <- isolate(atlas_payload())
+    if(!is.null(searched) && nrow(segments)) {
+      matches <- segments$chain[segments$uniprot_accession ==
+        as.character(searched$accession)]
+      matches <- intersect(matches,primary$chains)
+      if(length(matches)) chain_a <- matches[[1L]]
+    }
+    success <- load_comparison_structure(pdb_id=id,
+      preferred_chain_a=chain_a,preferred_chain_b=chain_b)
+    if(isTRUE(success))
+      updateTabsetPanel(session,"analysisTabs",selected="compare")
+  },ignoreInit=TRUE)
+
   output$experimentalCounterpartPanel <- renderUI({
     structure <- req(loaded())
     prediction <- structure$prediction

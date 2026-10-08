@@ -83,6 +83,11 @@ conformational states.
 - The manuscript remains separate until those scientific methods are
   implemented and validated.
 
+
+## October 8 feature branch note
+
+Selectable Atlas group representatives and a residue-level evidence panel are under development. Exact local PDB identifiers are preserved; linked 3D inspection is only a partial handoff to existing Compare, not automatic synced focus. Manual CI verification is pending.
+
 ## Scientific principles
 
 1. Keep evidence types separate. Rama8000 validation, native RamplotR density,

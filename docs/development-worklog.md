@@ -76,14 +76,19 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
   with insertion-safe joins, conflict reporting and on-demand verification.
   Scientific Ubuntu/Windows, structure, independent wwPDB and live-browser CI
   all passed.
-- Active branch: `feature/atlas-canonical-cohort`. Combines only explicitly
-  verified SIFTS entities on canonical UniProt positions, shows mapped/observed
-  support and ambiguous residues, and offers residue/position-support CSVs.
-  It intentionally does not infer secondary structure or state clusters.
-- After merging this branch, next milestone is canonicalized experimental
-  structure coordinates and global state discovery, with coverage thresholds
-  and construct/isoform checks. Never group structures by inferred author
-  numbering.
+- PR #50 merged into `main` (`67935cba2fdcf954fbc4afc133cdeefa54e98c90`).
+  Aggregates verified SIFTS mappings by UniProt position, retains conflicts
+  in exact residue exports, excludes ambiguous coordinates from observed
+  position-support counts and provides two CSV exports.
+  Scientific Ubuntu/Windows, structure/wwPDB, and the full live-browser Atlas
+  regression all passed after a browser test selector fix.
+- No active implementation branch after #50. Next scientific milestone:
+  obtain comparable experimental protein-chain coordinates, verify sufficient
+  common UniProt residue coverage and construct/isoform equivalence, then
+  identify experimentally observed structural states and representative
+  structures with explicit distance/clustering provenance.
+- Do not equate verified PDB-entity counts with independent observations or
+  distinct conformations. No experimental state clustering exists yet.
 - Browser tests mock PDBe responses; confirm live PDBe CORS and updated-mmCIF
   endpoint on deployment before advertising archive-wide state analysis.
 - Manual live RCSB API smoke test remains desirable; CI uses mocked RCSB

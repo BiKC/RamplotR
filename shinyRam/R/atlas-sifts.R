@@ -49,6 +49,8 @@ ram_atlas_exact_sifts_map <- function(payload, pdb_id, entity_id, accession) {
       chain=chain,resi=resi,insertion_code=ins,
       uniprot_accession=target,uniprot_resi=unp,
       entity_id=entity,struct_asym_id=asym,
+      label_seq_id=if(is.null(row$label_seq_id)) NA_integer_
+        else suppressWarnings(as.integer(row$label_seq_id)),
       identity=NA_real_,coverage=NA_real_,
       canonical_source="PDBe updated mmCIF exact SIFTS",
       observed=isTRUE(row$observed),

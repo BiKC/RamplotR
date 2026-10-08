@@ -150,7 +150,7 @@
           insertion_code: present(s.pdb_ins_code) ? String(s.pdb_ins_code) : "",
           uniprot_accession: requested.uniprot, uniprot_resi: unp,
           entity_id: Number(requested.entity), struct_asym_id: row.asym_id,
-          observed
+          label_seq_id: seq, observed
         });
       }
     }
@@ -167,6 +167,81 @@
       matched_sifts_rows: matched, unlinked_sifts_rows: unlinked,
       unobserved_rows: unobserved, rows: [...unique.values()]
     };
+  }
+
+  // Read C-alpha coordinates only. Never send entire mmCIF atom tables to
+  // Shiny. Require exact (label_asym_id,label_seq_id) references from SIFTS;
+  // PDB author numbers are not used for coordinate indexing.
+  function extractMappedCA(cif, exact) {
+    if (typeof cif !== "string") throw new Error("Expected mmCIF text.");
+    if (cif.length > 45 * 1024 * 1024)
+      throw new Error("Coordinate table exceeds the 45 MB browser limit.");
+    const wanted = new Set(exact.rows.filter(r=>r.observed).map(r=>
+      r.struct_asym_id + "|" + r.label_seq_id));
+    if (!wanted.size) return [];
+    const lines=cif.split(/\r?\n/);
+    const output=new Map();
+    for(let i=0;i<lines.length;i++) {
+      if(lines[i].trim()!=="loop_") continue;
+      const headers=[];
+      while(i+1<lines.length && lines[i+1].trim().startsWith("_")) {
+        const name=lines[++i].trim().toLowerCase();
+        headers.push(name);
+      }
+      if(!headers.length || !headers[0].startsWith("_atom_site.")) continue;
+      const fields=["group_pdb","label_atom_id","label_asym_id",
+        "label_seq_id","cartn_x","cartn_y","cartn_z"];
+      const indices=fields.map(x=>headers.indexOf("_atom_site."+x));
+      if(indices.some(x=>x<0))
+        throw new Error("Updated mmCIF lacks atom_site C-alpha coordinate fields.");
+      const model=headers.indexOf("_atom_site.pdbx_pdb_model_num");
+      const alt=headers.indexOf("_atom_site.label_alt_id");
+      const buffer=[];
+      for(;i+1<lines.length;) {
+        const next=lines[i+1].trim();
+        if(next==="#" || next==="loop_" || next.startsWith("data_") ||
+           next.startsWith("save_") || next.startsWith("_")) break;
+        i++;
+        if(!next) continue;
+        if(lines[i].startsWith(";"))
+          throw new Error("Unsupported multiline atom-site record.");
+        // Most CIF atom rows occupy one physical line. Retain wrapped rows.
+        buffer.push(...tokenize(lines[i]));
+        while(buffer.length>=headers.length) {
+          const row=buffer.splice(0,headers.length);
+          if(row[indices[0]]!=="ATOM" || row[indices[1]]!=="CA") continue;
+          if(model>=0 && row[model]!=="1") continue;
+          const seq=integer(row[indices[3]]);
+          if(seq===null) continue;
+          const asym=row[indices[2]], key=asym+"|"+seq;
+          if(!wanted.has(key)) continue;
+          const alternative=alt<0 ? "." : row[alt];
+          if(![".","?","A"].includes(alternative)) continue;
+          const xyz=indices.slice(4).map(index=>Number(row[index]));
+          if(!xyz.every(n=>Number.isFinite(n)&&Math.abs(n)<100000))
+            continue;
+          const existing=output.get(key);
+          if(existing && existing.ambiguous) continue;
+          // Prefer the primary unlabelled conformer to alternate A.
+          const preferred=alternative==="." || alternative==="?";
+          if(!existing || (preferred && !existing.preferred))
+            output.set(key,{struct_asym_id:asym,label_seq_id:seq,
+              x:xyz[0],y:xyz[1],z:xyz[2],preferred});
+          else if(existing.preferred===preferred &&
+                  xyz.some((n,j)=>Math.abs(n-[existing.x,existing.y,existing.z][j])>0.001))
+            output.set(key,{ambiguous:true});
+          if(output.size>5000)
+            throw new Error("More than 5000 mapped C-alpha positions.");
+        }
+      }
+      if(buffer.length)
+        throw new Error("Incomplete atom_site coordinate record.");
+      break;
+    }
+    return [...output.values()].filter(x=>!x.ambiguous).map(x=>({
+      struct_asym_id:x.struct_asym_id,label_seq_id:x.label_seq_id,
+      x:x.x,y:x.y,z:x.z
+    }));
   }
 
   async function fetchExact(payload) {
@@ -186,6 +261,12 @@
         const result = exactRows(cif, id.pdb, id.entity, id.uniprot);
         if (result.rows.length > 50000)
           throw new Error("SIFTS mapping response is too large.");
+        // A coordinate-reader problem does not invalidate exact SIFTS mapping.
+        try { result.ca_points = extractMappedCA(cif,result); }
+        catch (err) {
+          result.ca_points = [];
+          result.ca_warning = err && err.message ? err.message : String(err);
+        }
         if (root.Shiny && root.Shiny.setInputValue)
           root.Shiny.setInputValue("ramAtlasSiftsExact", {
             request_id: requestId, state: "ok", endpoint: url, ...result
@@ -220,7 +301,7 @@
       entity_id: button.dataset.entity
     }, {priority: "event"});
   });
-  const api = {tokenize, parseLoops, exactRows, validate};
+  const api = {tokenize, parseLoops, exactRows, extractMappedCA, validate};
   root.RamplotRExactSifts = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

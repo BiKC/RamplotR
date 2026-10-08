@@ -82,11 +82,24 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
   position-support counts and provides two CSV exports.
   Scientific Ubuntu/Windows, structure/wwPDB, and the full live-browser Atlas
   regression all passed after a browser test selector fix.
-- No active implementation branch after #50. Next scientific milestone:
-  obtain comparable experimental protein-chain coordinates, verify sufficient
-  common UniProt residue coverage and construct/isoform equivalence, then
-  identify experimentally observed structural states and representative
-  structures with explicit distance/clustering provenance.
+- Active branch: `feature/atlas-geometry-state-candidates` from current
+  `main` after PR #50. Implements an initial **exploratory** experimental
+  geometry comparison, not biological state assignment:
+  - extract first-model C-alpha coordinates for exact SIFTS polymer positions
+    from the already retrieved PDBe updated mmCIF;
+  - retain label asym/seq mapping and ignore ambiguous atoms/positions;
+  - require >=30 common observed canonical positions and >=60% common-core
+    coverage for every selected structure;
+  - rigid-body-invariant C-alpha internal distance-map RMSD on one shared,
+    deterministically sampled core of <=300 positions;
+  - average-linkage geometric groups with a displayed user-selected distance
+    cutoff and representative medoids;
+  - pure-R and JS tests, plus real Shiny browser tests with synthetic changed
+    internal geometry.
+  - Next: scientifically benchmark cluster cutoffs and actual structures,
+    inspect construct equivalence and metadata before calling these states.
+- Live PDBe API/CORS and updated mmCIF schema still need a deployment smoke
+  test. CI mocks the network responses.
 - Do not equate verified PDB-entity counts with independent observations or
   distinct conformations. No experimental state clustering exists yet.
 - Browser tests mock PDBe responses; confirm live PDBe CORS and updated-mmCIF

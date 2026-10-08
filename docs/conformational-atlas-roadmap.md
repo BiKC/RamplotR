@@ -44,9 +44,14 @@ conformational states.
   summaries and downloaded as residue/position-support CSVs on `main`
   (PR #50). Only explicitly verified entities count; ambiguous mappings do not
   contribute to observed position support.
-- **Not implemented yet:** automatic cohort-wide canonical coverage validation,
-  experimental structural-state clustering, fragment switch regions and
-  prediction-vs-experiment coverage.
+- The initial `feature/atlas-geometry-state-candidates` branch begins
+  experimental **geometric** grouping on exactly mapped first-model C-alpha
+  coordinates. Distances use one shared UniProt-position core and are invariant
+  to whole-structure rotation/translation. Groups and cutoff are exploratory;
+  no ligand-linked or functional-state claim is implied.
+- **Not implemented yet:** automatic cohort-wide construct/isoform validation,
+  scientifically benchmarked experimental state clustering, fragment switch
+  regions and prediction-vs-experiment coverage.
 - The manuscript remains separate until those scientific methods are
   implemented and validated.
 

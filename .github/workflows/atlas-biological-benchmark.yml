@@ -1,13 +1,7 @@
 name: Experimental Atlas biological benchmark
 
+# Run explicitly from GitHub Actions when ready for validation.
 on:
-  pull_request:
-    paths:
-      - "scripts/atlas-adk-*"
-      - ".github/workflows/atlas-biological-benchmark.yml"
-      - "shinyRam/R/atlas-geometry.R"
-      - "shinyRam/R/atlas-switch.R"
-      - "shinyRam/www/atlas-sifts-exact.js"
   workflow_dispatch:
 
 permissions:

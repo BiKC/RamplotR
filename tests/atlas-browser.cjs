@@ -197,7 +197,20 @@ ${atoms}
         text.includes("40 distinct observed UniProt positions") &&
         text.includes("Export verified residue mapping CSV");
     },{timeout:25000});
-    await page.waitForSelector("#atlasSwitchThreshold",{timeout:15000});
+    try {
+      await page.waitForSelector("#atlasSwitchThreshold",{timeout:15000});
+    } catch(error) {
+      console.error("Atlas switch panel diagnostics:",JSON.stringify(
+        await page.evaluate(()=>({
+          geometry:document.querySelector("#atlasGeometrySummary")?.textContent,
+          switchPanel:document.querySelector("#atlasSwitchPanel")?.outerHTML?.slice(0,2000),
+          errors:[...document.querySelectorAll(".shiny-output-error")]
+            .map(node=>node.textContent?.slice(0,400)),
+          messages:[...document.querySelectorAll(".shiny-notification")]
+            .map(node=>node.textContent)
+        }))));
+      throw error;
+    }
     await page.click("#atlasRunSwitch");
     await page.waitForFunction(() => {
       const panel=document.querySelector("#atlasSwitchSummary");

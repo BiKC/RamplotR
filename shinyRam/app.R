@@ -862,30 +862,24 @@ server <- function(input, output, session) {
 
   prediction_downloads <- character()
   session$onSessionEnded(function() unlink(prediction_downloads))
-  observeEvent(input$submit, {
-    source_type <- input$inputSource
-    if (!source_type %in% c("pdb", "upload", "afdb")) return()
-    is_upload <- identical(source_type, "upload")
-    is_afdb <- identical(source_type, "afdb")
+  # Shared loader: user submissions and explicit Atlas representative-pair
+  # inspection both use the same primary PDB parsing and NGL preparation.
+  load_primary_structure <- function(source_type,source_label,
+    declared_source="experimental",sidecar="",summary_file="") {
+    if (length(source_type)!=1L || is.na(source_type) ||
+        !source_type %in% c("pdb","upload","afdb")) return(invisible(FALSE))
+    is_upload <- identical(source_type,"upload")
+    is_afdb <- identical(source_type,"afdb")
     if (is_upload && (is.null(input$structfile) ||
                       is.null(input$structfile$datapath))) {
-      showNotification("Choose a PDB or mmCIF file first.", type = "error")
-      return()
+      showNotification("Choose a PDB or mmCIF file first.",type="error")
+      return(invisible(FALSE))
     }
-    source_label <- if (is_upload) input$structfile$datapath else if (is_afdb)
-      toupper(trimws(input$afdbAccession)) else toupper(trimws(input$PDB))
-    declared_source <- if (is_afdb) "alphafold_db" else if (is_upload)
-      input$predictionSource else "experimental"
-    if (is.null(declared_source) || !nzchar(declared_source))
-      declared_source <- "experimental"
-    sidecar <- if (is_upload && !is.null(input$predictionJson))
-      input$predictionJson$datapath else ""
-    summary_file <- if (is_upload && !is.null(input$predictionSummaryJson))
-      input$predictionSummaryJson$datapath else ""
-    key <- paste(source_type, source_label, declared_source,
-                 sidecar, summary_file, sep = ":")
+    key <- paste(source_type,source_label,declared_source,sidecar,
+                 summary_file,sep=":")
     previous <- isolate(loaded())
-    if (!is.null(previous) && identical(previous$key, key)) return()
+    if (!is.null(previous) && identical(previous$key,key))
+      return(invisible(TRUE))
     withProgress(message = "Analysing structure", value = 0, {
       incProgress(0.15, detail = "Loading coordinates")
       afdb_files <- NULL
@@ -1011,7 +1005,25 @@ server <- function(input, output, session) {
                     ram_uniprot_accession(source_label) else NULL))
       incProgress(0.25, detail = "Preparing interactive views")
     })
-  }, ignoreInit = TRUE)
+    invisible(TRUE)
+  }
+  observeEvent(input$submit, {
+    source_type <- input$inputSource
+    is_upload <- identical(source_type,"upload")
+    is_afdb <- identical(source_type,"afdb")
+    source_label <- if (is_upload) input$structfile$datapath else if (is_afdb)
+      toupper(trimws(input$afdbAccession)) else toupper(trimws(input$PDB))
+    declared_source <- if (is_afdb) "alphafold_db" else if (is_upload)
+      input$predictionSource else "experimental"
+    if (is.null(declared_source) || !nzchar(declared_source))
+      declared_source <- "experimental"
+    sidecar <- if (is_upload && !is.null(input$predictionJson))
+      input$predictionJson$datapath else ""
+    summary_file <- if (is_upload && !is.null(input$predictionSummaryJson))
+      input$predictionSummaryJson$datapath else ""
+    load_primary_structure(source_type,source_label,declared_source,
+      sidecar,summary_file)
+  }, ignoreInit=TRUE)
 
   # Canonical UniProt coordinates are an additive annotation. PDB author
   # numbering remains the local coordinate system used by selection and NGL.

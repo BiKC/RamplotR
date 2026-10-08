@@ -90,10 +90,30 @@ const assert = require("node:assert/strict");
     }, { timeout: 15000 });
     await new Promise(resolve => setTimeout(resolve, 1500));
     await page.click("#submit");
-    await page.waitForFunction(() =>
-      document.getElementById("plotly").classList.contains("js-plotly-plot"),
-      { timeout: 90000 }
-    );
+    try {
+      await page.waitForFunction(() =>
+        document.getElementById("plotly").classList.contains("js-plotly-plot"),
+        { timeout: 90000 }
+      );
+    } catch (error) {
+      const diagnostics = await page.evaluate(() => ({
+        plotClass: document.getElementById("plotly")?.className,
+        plotMarkup: document.getElementById("plotly")?.innerHTML.slice(0,400),
+        source: document.querySelector('input[name="inputSource"]:checked')?.value,
+        fileName: document.getElementById("structfile")?.files?.[0]?.name,
+        fileUpload: window.Shiny?.shinyapp?.$inputValues?.["structfile:shiny.file"],
+        inputSource: window.Shiny?.shinyapp?.$inputValues?.inputSource,
+        currentStructure: document.getElementById("ram-current-structure")?.textContent,
+        notifications: [...document.querySelectorAll(".shiny-notification")]
+          .map(el=>el.textContent),
+        sidebar: document.getElementById("ram-settings")?.textContent.slice(0,100)
+      }));
+      console.error("Initial plot load diagnostics:",JSON.stringify(diagnostics));
+      console.error("Page errors:",errors);
+      await page.screenshot({path:"benchmarks/output/ui-preview/plot-upload-failure.png",
+        fullPage:true});
+      throw error;
+    }
     // The loaded-state CSS is applied in Plotly.react's completion
     // callback. Wait for its scheduled responsive relayout before measuring.
     try {

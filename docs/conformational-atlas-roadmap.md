@@ -64,6 +64,19 @@ conformational states.
   is unsuitable as a validated functional-state classifier on its own.
   See `docs/atlas-adenylate-kinase-benchmark.md` for provenance and outputs.
   Real live archive CI passed; this validates one case, not transferability.
+- A three-protein **real-data** benchmark merged in PR #54:
+  open/closed ADK (4AKE/1AKE), maltose-binding protein (1OMP/1ANF),
+  and ribose-binding protein (1URP/2DRI). In each, the documented
+  conformational contrast has larger global C-alpha distance-map RMSD
+  than its available same-state control (same-crystal chains for ADK/RBP,
+  independently crystallized apo MBP for 1OMP/1JW4).
+  All compared observed exact-SIFTS residue chemistries agreed.
+  However, 30° backbone-angle candidates occur in same-state controls,
+  with strongly variable fractions by protein. No cutoff has been
+  scientifically calibrated; the sample includes two related periplasmic
+  binding-protein folds and non-independent within-crystal controls.
+  The live PDBe/Node benchmark passed CI. Full measurements and SHA256
+  provenance: `docs/atlas-multiprotein-benchmark.md`.
 - **Not implemented yet:** automatic cohort-wide construct/isoform validation,
   benchmarked experimental state clustering, a validated five-residue structural
   alphabet, and prediction-vs-experiment coverage.

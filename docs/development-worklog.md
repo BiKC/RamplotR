@@ -203,6 +203,16 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 - The Compare handoff does not load the first representative into the primary viewer, does not automatically select the aligned canonical position, and requires checking comparability. Full coordinated 3D focus remains unfinished.
 - CI policy revised: seven validation/benchmark workflows run for a newly opened non-draft PR or on `ready_for_review`, not on pushes or subsequent PR commits (`synchronize` excluded). Draft PRs skip jobs until marked ready. Manual `workflow_dispatch` remains as fallback. The README screenshot curation workflow is intentionally manual-only because it writes generated artifacts back to the repository. Use PR #56 readiness to trigger final CI and review results before merge.
 
+## October 8 continuation: PR #57
+
+- PR #56 merged into `main` as `0e04769b953a14022ad97b7d371cbe002218a16f`. All seven checks passed.
+- Active branch: `feature/atlas-synced-pair-inspection` created from that merge.
+- The primary structure loader now serves regular analysis and explicit Atlas pair navigation. The Atlas action loads **both** experimental geometric representatives instead of keeping an unrelated primary structure.
+- A selected UniProt residue is highlighted in the existing linked Compare Ramachandran/NGL viewer only if the exact PDB author chain, residue number and insertion code match **both** sides of the aligned pair. No silent guessing on mismatches or duplicate matches.
+- Extended R tests for mismatches, insertion codes and ambiguous alignments, and Atlas browser tests for the residue inspector.
+- The next PR-ready CI execution must validate this new code before merge. Pushes do not launch GitHub Actions automatically.
+- Long-term: independently validate biological-state grouping, improve construct equivalence, and test live browser archive retrieval on Shinylive.
+
 ## Next implementation steps
 
 1. Verify **deployed-browser** PDBe and RCSB CORS in RamplotR's actual

@@ -3195,6 +3195,7 @@ server <- function(input, output, session) {
     if(show_delta) fields <- c(fields,"delta_plddt")
     fields <- c(fields,"class_changed","rama8000_region_a","rama8000_region_b",
       "rama8000_changed","alignment")
+    if("uniprot_resi" %in% names(result)) fields <- c("uniprot_resi",fields)
     shown <- result[,fields,drop=FALSE]
     shown$pos_a <- ifelse(is.na(shown$residue_a),"—",
       paste0(shown$residue_a,shown$insertion_a))
@@ -3213,6 +3214,10 @@ server <- function(input, output, session) {
       "angular_displacement","shift_band")
     labels <- c("Chain A","Pos A","AA A","Chain B","Pos B","AA B",
       "Δφ (°)","Δψ (°)","Backbone shift (°)","Shift band")
+    if("uniprot_resi" %in% names(shown)) {
+      display <- c("uniprot_resi",display)
+      labels <- c("UniProt position",labels)
+    }
     if(all(c("basin_a","basin_b","basin_changed") %in% names(shown))) {
       shown$basin_changed <- ifelse(shown$basin_changed,"Yes","No")
       display <- c(display,"basin_a","basin_b","basin_changed")
@@ -3236,7 +3241,8 @@ server <- function(input, output, session) {
       "Rama8000 changed","Alignment")
     shown <- shown[,display,drop=FALSE]
     DT::datatable(shown,rownames=FALSE,colnames=labels,selection="single",
-      options=list(pageLength=15,scrollX=show_conf_a||show_conf_b||show_delta,
+      options=list(pageLength=15,scrollX=show_conf_a||show_conf_b||show_delta ||
+                      "uniprot_resi" %in% names(shown),
                    autoWidth=FALSE,dom="ftip"),
       class="compact stripe hover")
   }, server=FALSE)
@@ -3765,6 +3771,10 @@ server <- function(input, output, session) {
     }
 
     tags$div(class="ram-compare-selection",
+      if("uniprot_resi" %in% names(row))
+        tags$p(class="ram-field-hint",
+          sprintf("Verified UniProt position %d · exact PDBe SIFTS mapping",
+            row$uniprot_resi[[1L]])),
       tags$div(class="ram-compare-selection-pair",
         tags$span(class="ram-compare-primary",
           tags$small("Primary"), tags$strong(label("a")),

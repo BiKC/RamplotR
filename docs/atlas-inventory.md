@@ -40,6 +40,9 @@ as unavailable.
   pages.
 - Page offsets count raw RCSB search hits. Metadata failures and duplicate
   entity IDs are reported separately; neither silently shifts pagination.
+- When entity metadata is unavailable, a disclosure lists the affected
+  PDB/entity identifiers so researchers can distinguish a failed enrichment
+  from an absent experimental structure.
 - State clustering and representative-state selection are not yet computed.
 - Canonical exact-residue coverage and isoform equivalence will be checked in
   a subsequent slice.

@@ -37,7 +37,39 @@ shows an experimental cohort summary and two CSV exports:
   with an observed, unambiguous mapping.
 
 These counts are **not** the number of independent experimental measurements,
-protein conformations, or sequence coverage. Ambiguous local residue mappings
+protein conformations, or sequence coverage.
+
+## Experimental geometry groups (exploratory)
+
+When two or more verified experimental entities each have at least 30
+unambiguous, observed C-alpha positions, the Atlas offers
+**Compare structural geometries**. It uses the first coordinate model in
+the downloaded PDBe updated mmCIF. Each coordinate must match an exact
+SIFTS polymer `label_asym_id/label_seq_id` reference. Alternate atom
+conformers, missing atoms, ambiguous mappings and secondary protein copies
+are not counted as extra observations.
+
+The comparison requires at least 30 shared observed UniProt residues and
+at least 60% common-core coverage of each selected chain. The common
+position set is identical for all compared entities. For performance,
+large common cores are sampled evenly to at most 300 positions; the number
+of positions used is always displayed.
+
+RamplotR calculates the root mean squared difference between intrachain
+C-alpha distance maps (distance-map RMSD, Å). This captures internal
+geometry changes without needing a rigid-body superposition. Average-linkage
+hierarchical clustering and the visible 1.5 Å default cutoff provide
+**exploratory geometric groups**, with one representative experimental entity
+per group selected as a distance medoid.
+
+These groups must not be presented as functional states, experimental
+populations, independent structural observations, ligand-caused transitions,
+or calibrated conformational classes. Different constructs and conformations
+can affect distances, and a global distance map does not identify which
+local backbone residues change. Those checks are separate roadmap steps.
+
+The geometry analysis uses data from explicitly verified structures only.
+It does not download every experimental entry from the RCSB inventory. Ambiguous local residue mappings
 remain in the residue export but never count as canonical position support. Ambiguous and unresolved positions are not silently
 assigned a canonical coordinate.
 

@@ -1,13 +1,7 @@
 name: Structure validation and benchmark
 
+# Run explicitly from GitHub Actions when ready for validation.
 on:
-  push:
-    branches: ["upgrade/validation-benchmarks"]
-  pull_request:
-    paths:
-      - "shinyRam/R/**"
-      - "benchmarks/**"
-      - ".github/workflows/structure-validation.yml"
   workflow_dispatch:
 
 permissions:

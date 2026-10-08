@@ -29,6 +29,7 @@ source(file.path("R", "rama8000.R"), local = TRUE)
 source(file.path("R", "backbone.R"), local = TRUE)
 source(file.path("R", "conformation.R"), local = TRUE)
 source(file.path("R", "canonical.R"), local = TRUE)
+source(file.path("R", "atlas-sifts.R"), local = TRUE)
 source(file.path("R", "atlas.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
 source(file.path("R", "inspection.R"), local = TRUE)
@@ -702,6 +703,7 @@ ui <- fluidPage(
   tags$script(src = "plotly-loader.js"),
   tags$script(src = "custom.js"),
   tags$script(src = "canonical-mapping.js"),
+  tags$script(src = "atlas-sifts-exact.js"),
   tags$script(src = "atlas-discovery.js"),
   tags$script(src = "experimental-search.js"),
   tags$script(src = "compare.js"),
@@ -724,6 +726,9 @@ server <- function(input, output, session) {
   atlas_request <- reactiveVal(0L)
   atlas_payload <- reactiveVal(NULL)
   atlas_status <- reactiveVal(NULL)
+  atlas_exact_request <- reactiveVal(0L)
+  atlas_exact_selected <- reactiveVal(NULL)
+  atlas_exact_results <- reactiveVal(list())
   canonical_segments <- reactiveVal(ram_canonical_empty_segments())
   canonical_mapping <- reactiveVal(ram_canonical_empty_map())
   canonical_status <- reactiveVal(NULL)
@@ -1776,6 +1781,9 @@ server <- function(input, output, session) {
   observeEvent(input$atlasAccession, {
     atlas_payload(NULL)
     atlas_status(NULL)
+    atlas_exact_selected(NULL)
+    atlas_exact_results(list())
+    atlas_exact_request(isolate(atlas_exact_request())+1L)
   },ignoreInit=TRUE)
 
   # Atlas inventory is independent of the loaded structure. It is an
@@ -1790,6 +1798,9 @@ server <- function(input, output, session) {
     id <- isolate(atlas_request())+1L
     atlas_request(id)
     atlas_payload(NULL)
+    atlas_exact_selected(NULL)
+    atlas_exact_results(list())
+    atlas_exact_request(isolate(atlas_exact_request())+1L)
     atlas_status(list(state="searching",
       message=paste("Searching experimental PDB entities for",accession,"...")))
     session$sendCustomMessage("ram-atlas-discover",list(
@@ -1846,6 +1857,66 @@ server <- function(input, output, session) {
     }
   },ignoreInit=TRUE)
 
+  # Verify exact SIFTS only on user request, never for all archived PDBs.
+  observeEvent(input$ramAtlasVerifyPick, {
+    selected <- input$ramAtlasVerifyPick
+    cohort <- isolate(atlas_payload())
+    if(is.null(cohort) || !is.list(selected)) return()
+    pdb <- toupper(trimws(as.character(selected$pdb_id)))
+    entity <- as.character(selected$entity_id)
+    if(length(pdb)!=1L || !grepl("^[A-Z0-9]{4}$",pdb) ||
+       length(entity)!=1L || !grepl("^[1-9][0-9]*$",entity)) return()
+    ids <- vapply(cohort$results,ram_atlas_record_key,character(1L))
+    key <- paste0(pdb,"_",entity)
+    if(!key %in% ids) return()
+    seq <- isolate(atlas_exact_request())+1L
+    atlas_exact_request(seq)
+    atlas_exact_selected(list(key=key,request_id=as.character(seq),
+                              accession=cohort$accession))
+    results <- isolate(atlas_exact_results())
+    results[[key]] <- list(state="searching")
+    atlas_exact_results(results)
+    session$sendCustomMessage("ram-atlas-sifts-exact",list(
+      request_id=as.character(seq),pdb_id=pdb,entity_id=entity,
+      accession=cohort$accession))
+  },ignoreInit=TRUE)
+
+  observeEvent(input$ramAtlasSiftsExact, {
+    value <- input$ramAtlasSiftsExact
+    chosen <- isolate(atlas_exact_selected())
+    cohort <- isolate(atlas_payload())
+    if(!is.list(value) || is.null(chosen) || is.null(cohort) ||
+       !identical(as.character(value$request_id),chosen$request_id) ||
+       !identical(as.character(value$accession),chosen$accession) ||
+       !identical(paste0(as.character(value$pdb_id),"_",
+                         as.character(value$entity_id)),chosen$key)) return()
+    outcomes <- isolate(atlas_exact_results())
+    if(!identical(as.character(value$state),"ok")) {
+      outcomes[[chosen$key]] <- list(state="error",
+        message=if(is.null(value$message))
+          "Exact SIFTS mapping could not be retrieved."
+          else as.character(value$message))
+    } else {
+      mapped <- tryCatch(
+        ram_atlas_exact_sifts_map(value, value$pdb_id,
+          value$entity_id,chosen$accession),
+        error=function(e) {
+          outcomes[[chosen$key]] <<- list(state="error",
+            message=conditionMessage(e))
+          NULL
+        })
+      if(!is.null(mapped)) {
+        summary <- ram_atlas_sifts_summary(mapped)
+        outcomes[[chosen$key]] <- c(list(state="mapped",
+          source=as.character(value$source),endpoint=as.character(value$endpoint),
+          matched_sifts_rows=as.integer(value$matched_sifts_rows),
+          unlinked_sifts_rows=as.integer(value$unlinked_sifts_rows)),
+          summary,list(mapping=mapped))
+      }
+    }
+    atlas_exact_results(outcomes)
+  },ignoreInit=TRUE)
+
   output$atlasStatus <- renderUI({
     item <- atlas_status()
     if(is.null(item)) return(NULL)
@@ -1857,6 +1928,7 @@ server <- function(input, output, session) {
     payload <- atlas_payload()
     if(is.null(payload)) return(NULL)
     results <- payload$results
+    exact <- atlas_exact_results()
     get <- function(item,key,default="") {
       value <- item[[key]]
       if(is.null(value) || !length(value) || is.na(value[[1L]])) default
@@ -1891,6 +1963,7 @@ server <- function(input, output, session) {
         lapply(results,function(item) {
           id <- get(item,"pdb_id")
           entity <- get(item,"entity_id")
+          verify <- exact[[paste0(id,"_",entity)]]
           chain <- get(item,"chain")
           resolution <- suppressWarnings(as.numeric(get(item,"resolution",NA_character_)))
           reference_coverage <- suppressWarnings(as.numeric(
@@ -1917,12 +1990,28 @@ server <- function(input, output, session) {
                   if(is.finite(entity_coverage))
                     tags$span(sprintf("%.1f%% entity sequence aligned",
                       100*entity_coverage)),
-                  tags$span(get(item,"release_date"))))),
+                  tags$span(get(item,"release_date"))),
+              if(!is.null(verify))
+                tags$p(class="ram-field-hint",
+                  if(identical(verify$state,"searching"))
+                    "Retrieving exact SIFTS residue mapping..."
+                  else if(identical(verify$state,"error"))
+                    paste("SIFTS unavailable:",verify$message)
+                  else sprintf(paste0(
+                    "Verified exact SIFTS: %d distinct PDB residues; ",
+                    "%d observed; %d conflicting positions; %d unmatched ",
+                    "SIFTS rows. Not a complete structure-state assessment."),
+                    verify$unique_residues,verify$observed_residues,
+                    verify$conflicting_residues,verify$unlinked_sifts_rows)))),
             tags$div(class="ram-counterpart-actions",
               tags$a("RCSB entry",
                 href=paste0("https://www.rcsb.org/structure/",id),
                 target="_blank",rel="noopener noreferrer",
                 class="btn btn-default btn-sm"),
+              tags$button(type="button",
+                class="btn btn-default btn-sm ram-atlas-verify",
+                "data-pdb"=id,"data-entity"=entity,
+                "Verify SIFTS mapping"),
               tags$button(type="button",class="btn btn-primary btn-sm ram-atlas-compare",
                 "data-pdb"=id,"data-chain"=chain,"data-entity"=entity,
                 "Compare with loaded structure")

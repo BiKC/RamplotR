@@ -41,7 +41,9 @@ jobs:
           node --check shinyRam/www/custom.js
           node --check shinyRam/www/canonical-mapping.js
           node --check shinyRam/www/atlas-discovery.js
+          node --check shinyRam/www/atlas-sifts-exact.js
           node tests/atlas-discovery.test.cjs
+          node tests/atlas-sifts-exact.test.cjs
           node --check shinyRam/www/experimental-search.js
           node --check shinyRam/www/compare.js
           node --check shinyRam/www/prediction.js
@@ -77,6 +79,7 @@ jobs:
           Rscript tests/rama8000.R
           Rscript tests/canonical.R
           Rscript tests/atlas.R
+          Rscript tests/atlas-sifts.R
         shell: bash
       - name: Verify peptide continuity and torsion calculations
         run: Rscript tests/peptide.R

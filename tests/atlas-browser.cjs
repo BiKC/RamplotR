@@ -257,6 +257,21 @@ ${atoms}
       const plot=document.querySelector("#atlasSwitchPlot img");
       return plot && plot.complete && plot.naturalWidth>0;
     },{timeout:25000});
+    // The Atlas table must lead to a residue inspector before any model
+    // navigation occurs. The synthetic mappings deliberately differ from
+    // real PDB author numbering, so the test does not claim paired 3D focus.
+    await page.waitForSelector("#atlasSwitchResidues tbody tr",{timeout:25000});
+    await page.click("#atlasSwitchResidues tbody tr:first-child");
+    await page.waitForFunction(() => {
+      const inspector=document.querySelector("#atlasSwitchResidueInspector");
+      return inspector && inspector.textContent.includes("UniProt residue") &&
+        inspector.textContent.includes("Chain A, residue");
+    },{timeout:15000});
+    const inspectorText=await page.$eval("#atlasSwitchResidueInspector",
+      el=>el.textContent);
+    assert.match(inspectorText,/Inspect both structures in 2D\/3D/);
+    assert.match(inspectorText,/Chain A, residue/);
+    assert.match(inspectorText,/first-model experimental torsions/);
     await page.screenshot({path:path.join(output,"atlas-inventory-desktop.png"),
       fullPage:true});
     await page.setViewport({width:390,height:844});

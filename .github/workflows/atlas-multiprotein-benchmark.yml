@@ -1,0 +1,44 @@
+name: Multi-protein experimental Atlas benchmark
+
+on:
+  pull_request:
+    paths:
+      - "scripts/atlas-multiprotein-*"
+      - "benchmarks/atlas-multiprotein-cases.json"
+      - ".github/workflows/atlas-multiprotein-benchmark.yml"
+      - "shinyRam/R/atlas-geometry.R"
+      - "shinyRam/R/atlas-switch.R"
+      - "shinyRam/www/atlas-sifts-exact.js"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  multiprotein-case-study:
+    name: Live ADK, maltose-binding and ribose-binding protein cases
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - name: Check R and Node code before network access
+        run: |
+          node --check scripts/atlas-multiprotein-fetch.cjs
+          Rscript -e 'parse(file="scripts/atlas-multiprotein-benchmark.R")'
+      - name: Install JSON reader
+        run: Rscript -e 'install.packages("jsonlite")'
+      - name: Fetch seven current experimental PDBe structures
+        run: node scripts/atlas-multiprotein-fetch.cjs benchmarks/output/atlas-multiprotein
+      - name: Evaluate canonical overlap, torsion and controls
+        run: Rscript scripts/atlas-multiprotein-benchmark.R benchmarks/output/atlas-multiprotein
+      - name: Save benchmark provenance and per-position readouts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-multiprotein-experimental-benchmark
+          path: benchmarks/output/atlas-multiprotein
+          if-no-files-found: warn
+          retention-days: 30

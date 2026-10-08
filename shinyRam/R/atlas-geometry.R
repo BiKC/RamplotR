@@ -163,3 +163,23 @@ ram_atlas_geometry_groups <- function(verified,accession,selected,
     representatives=representatives,cutoff=cutoff,
     distance_method="C-alpha intrachain distance-map RMSD (Å), common canonical UniProt positions; average-linkage hierarchical clustering")
 }
+
+# Graphics device independent; 2-entry cohorts are a single distance and do
+# not need (and should not rely upon) dendrogram conversion.
+ram_atlas_geometry_plot <- function(result) {
+  if(!is.list(result) || is.null(result$distance_matrix) ||
+     is.null(result$selected) || is.null(result$cutoff))
+    stop("Invalid Atlas geometry result.",call.=FALSE)
+  if(length(result$selected)==2L) {
+    distance <- result$distance_matrix[1L,2L]
+    graphics::barplot(distance,names.arg=paste(result$selected,
+      collapse=" vs "),ylab="C-alpha distance-map RMSD (Å)",
+      main="Pairwise experimental geometry",
+      ylim=c(0,max(distance,result$cutoff)*1.2))
+  } else {
+    graphics::plot(result$hclust,main="Experimental geometry similarity",
+      xlab="",sub="",ylab="C-alpha distance-map RMSD (Å)")
+  }
+  graphics::abline(h=result$cutoff,lty=2,col="gray50")
+  invisible(result)
+}

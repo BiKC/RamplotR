@@ -36,6 +36,14 @@ ram_atlas_merge_page <- function(previous=NULL,page) {
   records <- if(is.null(page$results)) list() else page$results
   if(!is.list(records) || length(records)>returned)
     stop("Atlas page has inconsistent enriched entity records.",call.=FALSE)
+  failed_ids <- if(is.null(page$failed_entity_ids))
+    character() else as.character(unlist(page$failed_entity_ids))
+  if(anyNA(failed_ids) ||
+     any(!grepl("^[A-Za-z0-9]{4}_[1-9][0-9]*$",failed_ids)) ||
+     length(failed_ids)>failed)
+    stop("Atlas page contains inconsistent failed entity identifiers.",
+         call.=FALSE)
+  failed_ids <- unique(toupper(failed_ids))
 
   if(start==0L) {
     previous <- NULL
@@ -70,6 +78,8 @@ ram_atlas_merge_page <- function(previous=NULL,page) {
        else previous$incomplete_metadata)+failed,
     duplicate_count=(if(is.null(previous)) 0L
       else previous$duplicate_count)+sum(!keep),
+    failed_entity_ids=unique(c(if(is.null(previous)) character()
+      else previous$failed_entity_ids,failed_ids)),
     pages=(if(is.null(previous)) 0L else previous$pages)+1L,
     has_more=offset<total && !stalled,
     stalled=stalled,

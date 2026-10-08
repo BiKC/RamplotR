@@ -194,3 +194,35 @@ ram_atlas_group_switches <- function(verified,geometry,threshold=30,
     comparable=sum(diff$comparable),total_positions=nrow(diff),
     method="Paired exact UniProt residue phi/psi, circular wrapped angle differences; peptide bond 1.0–1.9 Å; first model, two geometric group representatives")
 }
+
+# A conformational Atlas position may only select an existing pairwise
+# alignment row when BOTH PDB author identifiers match exactly. Sequence-only
+# matches, gaps and ambiguous insertion-code mappings are not silently used.
+ram_atlas_comparison_pair_index <- function(comparison,atlas_residue) {
+  fields <- c("chain_a","resi_a","insertion_a",
+    "chain_b","resi_b","insertion_b")
+  columns <- c("chain_a","residue_a","insertion_a",
+    "chain_b","residue_b","insertion_b")
+  if(!is.data.frame(comparison) || !nrow(comparison) ||
+     !is.data.frame(atlas_residue) || nrow(atlas_residue)!=1L ||
+     !all(fields %in% names(atlas_residue)) ||
+     !all(columns %in% names(comparison)))
+    return(NA_integer_)
+  expected <- atlas_residue[1L,fields,drop=FALSE]
+  if(anyNA(expected) || any(!nzchar(as.character(unlist(expected[c(
+      "chain_a","chain_b")],use.names=FALSE)))) ||
+      any(!is.finite(as.numeric(unlist(expected[c(
+        "resi_a","resi_b")],use.names=FALSE)))))
+    return(NA_integer_)
+  matched <- rep(TRUE,nrow(comparison))
+  for(i in seq_along(fields)) {
+    lhs <- comparison[[columns[[i]]]]
+    rhs <- expected[[fields[[i]]]][[1L]]
+    equal <- !is.na(lhs) & as.character(lhs)==as.character(rhs)
+    equal[is.na(equal)] <- FALSE
+    matched <- matched & equal
+  }
+  indices <- which(matched)
+  if(length(indices)!=1L) return(NA_integer_)
+  indices[[1L]]
+}

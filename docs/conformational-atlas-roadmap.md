@@ -44,11 +44,13 @@ conformational states.
   summaries and downloaded as residue/position-support CSVs on `main`
   (PR #50). Only explicitly verified entities count; ambiguous mappings do not
   contribute to observed position support.
-- The initial `feature/atlas-geometry-state-candidates` branch begins
-  experimental **geometric** grouping on exactly mapped first-model C-alpha
-  coordinates. Distances use one shared UniProt-position core and are invariant
-  to whole-structure rotation/translation. Groups and cutoff are exploratory;
-  no ligand-linked or functional-state claim is implied.
+- Initial experimental **geometric** grouping merged in PR #51. Exact
+  SIFTS-linked first-model C-alpha coordinates are compared on a common
+  UniProt-position core using internal distance-map RMSD; the resulting
+  average-linkage groups are exploratory, not functional state assignments.
+  Pairwise distances and multi-structure dendrograms are both supported.
+  Scientific and browser CI passed, but biological thresholds and real
+  archive/browser access still need independent validation.
 - **Not implemented yet:** automatic cohort-wide construct/isoform validation,
   scientifically benchmarked experimental state clustering, fragment switch
   regions and prediction-vs-experiment coverage.

@@ -106,34 +106,30 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
   validation and full Shiny browser suite all passed on the final PR #52
   commit. CI now runs the Atlas browser regression before the older prediction
   upload test; the latter also passed on the final run.
-- Active branch: `feature/atlas-adk-biological-benchmark`.
-  - Real experimental 4AKE open and 1AKE closed adenylate kinase case study,
-    UniProt P69441, via the **same browser SIFTS/mapping parser** in Node.
-  - Reproducible PDBe updated-mmCIF retrieval with SHA256 provenance and
-    model-1 N/CA/C backbone coordinates only.
-  - Use explicit observed UniProt position overlap; no author-number
-    interpolation. Compare open/closed plus within-4AKE and within-1AKE
-    chain copies and a zero-distance self control.
-  - Report global distance-map RMSD separately from local wrapped φ/ψ
-    changes, above-threshold regions and domain-level descriptive context.
-  - Live-archive GitHub Actions workflow uploads reports, data and hashes.
-  - Work is **benchmarking, not cutoff calibration**. Intra-crystal copies are
-    not independent observations, and one pair cannot establish a general
-    validated state classifier.
-- After benchmark CI passes, review the actual metrics, limitations and
-  whether the live updated-mmCIF schema matches the parser. No scientific
-  claims until the real-data job is green.
-- Earlier roadmap after PR #52:
-  1. real biological case study and numeric calibration with E. coli
-     adenylate kinase open 4AKE vs closed 1AKE (literature-supported pair);
-  2. construct/isoform compatibility and full-cohort comparison;
-  3. arbitrary pair of experimental group medoids and local switch-region
-     inspection in linked 3D;
-  4. prediction-to-experimental state coverage;
-  5. a separately benchmarked fragment-level structural alphabet.
-- Current switch regions remain exploratory, based on two representatives
-  and a user-selectable navigation threshold, not a statistical or functional
-  state classification.
+- PR #53 merged into `main` (`3fe89c94b2e93acb080a7e0ab4d8e3a6352e1585`).
+  Real PDBe updated-mmCIF benchmark using E. coli adenylate kinase:
+  4AKE (open apo), 1AKE (closed inhibitor-bound), UniProt P69441.
+  - 214 exact canonical residues for each structure and chain, using live
+    SIFTS mapping and first-model N/CA/C atomic coordinates.
+  - 4AKE-A vs 1AKE-A global C-alpha distance-map RMSD **6.5077 Å**;
+    within-4AKE A/B **0.4022 Å**, within-1AKE A/B **0.2513 Å**;
+    self-control exactly **0 Å**. All compared on 214 shared positions.
+  - Full φ/ψ pairs at 212 residues. >=30° local changes: open/closed 37;
+    open same-crystal chain controls 16; closed controls 10; self 0.
+  - Global distance-map change per canonical position mean:
+    LID 8.600 Å, NMP 7.591 Å, CORE 4.540 Å. These are descriptive
+    geometry measurements, not local φ/ψ change or calibrated state scores.
+  - Live PDBe retrieval and benchmark GitHub CI green; Ubuntu/Windows
+    scientific regression CI green.
+  - Case study and exact SHA256 source provenance in
+    `docs/atlas-adenylate-kinase-benchmark.md`.
+  - This is **one known case**, not threshold validation. Chain A/B within
+    a crystal are not independent biological replicates. Differences above
+    30° already occur in same-crystal chain controls.
+- No active implementation PR after #53. Next: independent protein cases,
+  structure-level metadata/construct-isoform controls, and user-selected
+  local comparisons with clear denominators; only then assess general
+  state-detection sensitivity and background/false positives.
 - Live PDBe API/CORS and updated mmCIF schema still need a deployment smoke
   test. CI mocks the network responses.
 - Do not equate verified PDB-entity counts with independent observations or
@@ -152,19 +148,18 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 
 ## Next implementation steps
 
-1. Validate live PDBe/RCSB endpoints and CORS in the deployed browser;
-   browser CI currently mocks external responses.
-2. Benchmark experimental geometry and local backbone differences with curated
-   real structure pairs, starting with E. coli adenylate kinase 4AKE (open)
-   versus 1AKE (closed). Include same-state replicates and construct controls
-   before calibrating any distance or angular thresholds.
-3. Extend local φ/ψ comparison to user-selected pairs of geometric groups,
-   then all supporting structures with uncertainty/coverage reporting.
-4. Make switch-region selection navigate to both corresponding 3D structures,
-   Ramachandran plots and precise canonical/local residue identifiers.
-5. Add prediction state clustering and experimental state coverage only after
-   the experimental reference-state method is validated.
-6. Keep the manuscript separate until biological benchmark claims are sound.
+1. Validate the **deployed browser** PDBe/CORS and RCSB endpoints; the
+   real benchmark proves Node/GitHub access, not in-browser CORS.
+2. Build a curated **multi-protein** benchmark with structure-positive,
+   within-state and construct/isoform negative controls. Report local
+   sensitivity/background across proteins before using a scientific cutoff.
+3. Expose experimental comparisons between **user-selected** geometric
+   group representatives, with residue-level 3D/Ramachandran navigation.
+4. Inspect crystallographic conditions, conformer occupancies, resolution,
+   mutations, isoforms and construct coverage before calling states comparable.
+5. Measure prediction-versus-experimental conformation coverage only after
+   experimental structural states can be defended against these controls.
+6. Keep the manuscript separate until validation supports any novelty claims.
 
 ## Branch hygiene
 

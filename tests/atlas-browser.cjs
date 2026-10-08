@@ -6,6 +6,49 @@ const fs = require("node:fs");
 const path = require("node:path");
 const puppeteer = require("puppeteer-core");
 
+// Realistic synthetic common cores exercise browser mmCIF C-alpha extraction
+// and the Shiny distance-map grouping without depending on live PDBe APIs.
+function syntheticUpdatedCif(pdbOffset,shifted) {
+  const residues=Array.from({length:40},(_,i)=>i+1);
+  const sequence=residues.map(i=>`X 1 ${i} A ${pdbOffset+i-1} .`).join("\\n");
+  const sifts=residues.map(i=>`1 X ${i} P00533 ${i+49} 1`).join("\\n");
+  const atoms=residues.map(i=>{
+    const x=0.35*i+(shifted && i>21 ? 8 : 0);
+    return `ATOM CA X ${i} ${x.toFixed(4)} ${(3*Math.sin(i/2)).toFixed(4)} ${(3*Math.cos(i/2)).toFixed(4)} 1 .`;
+  }).join("\\n");
+  return `data_test
+#
+loop_
+_pdbx_poly_seq_scheme.asym_id
+_pdbx_poly_seq_scheme.entity_id
+_pdbx_poly_seq_scheme.seq_id
+_pdbx_poly_seq_scheme.pdb_strand_id
+_pdbx_poly_seq_scheme.pdb_seq_num
+_pdbx_poly_seq_scheme.pdb_ins_code
+${sequence}
+#
+loop_
+_pdbx_sifts_xref_db.entity_id
+_pdbx_sifts_xref_db.asym_id
+_pdbx_sifts_xref_db.seq_id
+_pdbx_sifts_xref_db.unp_acc
+_pdbx_sifts_xref_db.unp_num
+_pdbx_sifts_xref_db.observed
+${sifts}
+#
+loop_
+_atom_site.group_PDB
+_atom_site.label_atom_id
+_atom_site.label_asym_id
+_atom_site.label_seq_id
+_atom_site.Cartn_x
+_atom_site.Cartn_y
+_atom_site.Cartn_z
+_atom_site.pdbx_PDB_model_num
+_atom_site.label_alt_id
+${atoms}
+#`;
+}
 (async function () {
   const chrome = [
     process.env.CHROME_BIN, "/usr/bin/google-chrome",
@@ -46,54 +89,12 @@ const puppeteer = require("puppeteer-core");
           result_set:[{identifier:offset===0 ? "1CRN_1" : "1UBQ_1"}]
         })});
       } else if (url === "https://www.ebi.ac.uk/pdbe/static/entry/1crn_updated.cif") {
-        const mockCif = `data_1crn
-#
-loop_
-_pdbx_poly_seq_scheme.asym_id
-_pdbx_poly_seq_scheme.entity_id
-_pdbx_poly_seq_scheme.seq_id
-_pdbx_poly_seq_scheme.pdb_strand_id
-_pdbx_poly_seq_scheme.pdb_seq_num
-_pdbx_poly_seq_scheme.pdb_ins_code
-X 1 1 A 101 .
-X 1 2 A 101 A
-#
-loop_
-_pdbx_sifts_xref_db.entity_id
-_pdbx_sifts_xref_db.asym_id
-_pdbx_sifts_xref_db.seq_id
-_pdbx_sifts_xref_db.unp_acc
-_pdbx_sifts_xref_db.unp_num
-_pdbx_sifts_xref_db.observed
-1 X 1 P00533 50 1
-1 X 2 P00533 52 1
-#`;
+        const mockCif = syntheticUpdatedCif(101,false);
         request.respond({status:200,
           headers:{...cors,"content-type":"text/plain"},
           body:mockCif});
       } else if (url === "https://www.ebi.ac.uk/pdbe/static/entry/1ubq_updated.cif") {
-        const mockCif = `data_1ubq
-#
-loop_
-_pdbx_poly_seq_scheme.asym_id
-_pdbx_poly_seq_scheme.entity_id
-_pdbx_poly_seq_scheme.seq_id
-_pdbx_poly_seq_scheme.pdb_strand_id
-_pdbx_poly_seq_scheme.pdb_seq_num
-_pdbx_poly_seq_scheme.pdb_ins_code
-X 1 1 A 201 .
-X 1 2 A 202 .
-#
-loop_
-_pdbx_sifts_xref_db.entity_id
-_pdbx_sifts_xref_db.asym_id
-_pdbx_sifts_xref_db.seq_id
-_pdbx_sifts_xref_db.unp_acc
-_pdbx_sifts_xref_db.unp_num
-_pdbx_sifts_xref_db.observed
-1 X 1 P00533 51 1
-1 X 2 P00533 52 1
-#`;
+        const mockCif = syntheticUpdatedCif(201,true);
         request.respond({status:200,
           headers:{...cors,"content-type":"text/plain"},body:mockCif});
       } else if (url === "https://data.rcsb.org/rest/v1/core/polymer_entity/1CRN/1") {
@@ -165,8 +166,8 @@ _pdbx_sifts_xref_db.observed
     await page.waitForFunction(() => {
       const results=document.querySelector("#atlasResults");
       return results && results.textContent.includes("Verified exact SIFTS:") &&
-        results.textContent.includes("2 distinct PDB residues") &&
-        results.textContent.includes("2 observed");
+        results.textContent.includes("40 distinct PDB residues") &&
+        results.textContent.includes("40 observed");
     },{timeout:25000});
     await page.click("#atlasLoadMore");
     await page.waitForFunction(() => {
@@ -185,11 +186,26 @@ _pdbx_sifts_xref_db.observed
     await page.waitForFunction(() => {
       const text=document.querySelector("#atlasResults")?.textContent || "";
       return text.includes("2 verified experimental entities") &&
-        text.includes("3 distinct observed UniProt positions") &&
+        text.includes("40 distinct observed UniProt positions") &&
         text.includes("Export verified residue mapping CSV");
     },{timeout:25000});
     assert.ok(await page.$("#downloadAtlasCanonical"));
     assert.ok(await page.$("#downloadAtlasSupport"));
+    await page.waitForSelector("#atlasGeometryEntities",{timeout:15000});
+    await page.click("#atlasRunGeometry");
+    await page.waitForFunction(() => {
+      const panel=document.querySelector("#atlasGeometrySummary");
+      return panel && panel.textContent.includes(
+        "2 exploratory geometric group(s)") &&
+        panel.textContent.includes("40 common observed UniProt");
+    },{timeout:25000});
+    const geometryTable=await page.$eval("#atlasGeometryTable",
+      el=>el.textContent);
+    assert.match(geometryTable,/1CRN_1/);
+    assert.match(geometryTable,/1UBQ_1/);
+    assert.ok(await page.$("#atlasGeometryPlot canvas") ||
+              await page.$("#atlasGeometryPlot img"));
+
     await page.screenshot({path:path.join(output,"atlas-inventory-desktop.png"),
       fullPage:true});
     await page.setViewport({width:390,height:844});

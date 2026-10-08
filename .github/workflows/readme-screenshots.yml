@@ -1,12 +1,8 @@
 name: Refresh README screenshots
 
 # Commit curated browser-test images only for documentation updates.
+# Run explicitly from GitHub Actions when ready for validation.
 on:
-  push:
-    branches:
-      - docs/project-readme
-    paths:
-      - README.md
   workflow_dispatch:
     inputs:
       run_id:

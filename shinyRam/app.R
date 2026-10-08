@@ -660,6 +660,7 @@ ui <- fluidPage(
                   uiOutput("atlasStatus"),
                   uiOutput("atlasResults"),
                   uiOutput("atlasGeometryPanel"),
+                  uiOutput("atlasSwitchPanel"),
                   tags$p(class="ram-field-hint",
                     "Results load 50 experimental entities at a time. Canonical residue coverage, construct equivalence, and conformational-state identity must be verified before interpreting structural states.")
                 )
@@ -2101,8 +2102,7 @@ server <- function(input, output, session) {
         class="btn-primary btn-sm"),
       uiOutput("atlasGeometrySummary"),
       plotOutput("atlasGeometryPlot",height="260px"),
-      tableOutput("atlasGeometryTable"),
-      uiOutput("atlasSwitchPanel"))
+      tableOutput("atlasGeometryTable"))
   })
 
   observeEvent(input$atlasRunGeometry, {

@@ -1,14 +1,7 @@
 name: Multi-protein experimental Atlas benchmark
 
+# Run explicitly from GitHub Actions when ready for validation.
 on:
-  pull_request:
-    paths:
-      - "scripts/atlas-multiprotein-*"
-      - "benchmarks/atlas-multiprotein-cases.json"
-      - ".github/workflows/atlas-multiprotein-benchmark.yml"
-      - "shinyRam/R/atlas-geometry.R"
-      - "shinyRam/R/atlas-switch.R"
-      - "shinyRam/www/atlas-sifts-exact.js"
   workflow_dispatch:
 
 permissions:

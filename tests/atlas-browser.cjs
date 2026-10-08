@@ -179,7 +179,7 @@ _pdbx_sifts_xref_db.observed
     const afterPaging=await page.$eval("#atlasResults",el=>el.textContent);
     assert.match(afterPaging,/2 enriched polymer entities in 2 PDB entries/);
     assert.match(afterPaging,/55.0% UniProt sequence coverage/);
-    const verifier=await page.$(".ram-atlas-verify");
+    const verifier=await page.$$(".ram-atlas-verify");
     assert.equal(verifier.length,2,"Expected one verifier per experimental entity.");
     await verifier[1].click();
     await page.waitForFunction(() => {

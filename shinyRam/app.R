@@ -546,6 +546,7 @@ ui <- fluidPage(
                   )
                 ),
                 uiOutput("compareChainControls"),
+                uiOutput("atlasCanonicalNotice"),
                 tags$div(class = "ram-compare-status", uiOutput("compareSummary")),
                 uiOutput("compareChangeTrack"),
                 tags$div(class = "ram-compare-toolbar",
@@ -778,6 +779,7 @@ server <- function(input, output, session) {
   atlas_switch_result <- reactiveVal(NULL)
   atlas_selected_position <- reactiveVal(NULL)
   atlas_pair_handoff <- reactiveVal(NULL)
+  atlas_alignment_context <- reactiveVal(NULL)
   canonical_segments <- reactiveVal(ram_canonical_empty_segments())
   canonical_mapping <- reactiveVal(ram_canonical_empty_map())
   canonical_status <- reactiveVal(NULL)
@@ -1009,6 +1011,7 @@ server <- function(input, output, session) {
     invisible(TRUE)
   }
   observeEvent(input$submit, {
+    atlas_alignment_context(NULL)
     source_type <- input$inputSource
     is_upload <- identical(source_type,"upload")
     is_afdb <- identical(source_type,"afdb")
@@ -1204,6 +1207,7 @@ server <- function(input, output, session) {
   }
 
   observeEvent(input$compareSubmit, {
+    atlas_alignment_context(NULL)
     is_upload <- identical(input$compareInputSource, "upload")
     if (is_upload && (is.null(input$compareFile) ||
                       is.null(input$compareFile$datapath))) {
@@ -2391,7 +2395,35 @@ server <- function(input, output, session) {
       return()
     pdb_a <- substr(ids[[1L]],1L,4L)
     pdb_b <- substr(ids[[2L]],1L,4L)
+    geometry <- isolate(atlas_geometry_result())
+    verified <- isolate(atlas_exact_results())
+    available <- tryCatch(
+      ram_atlas_geometry_entities(verified,geometry$accession),
+      error=function(e) list())
+    if(any(!ids %in% names(available))) {
+      showNotification("Exact verified Atlas representatives are unavailable.",
+        type="error",duration=12)
+      return()
+    }
+    if(!identical(as.character(row$chain_a[[1L]]),
+                  as.character(available[[ids[[1L]]]]$chain)) ||
+       !identical(as.character(row$chain_b[[1L]]),
+                  as.character(available[[ids[[2L]]]]$chain))) {
+      showNotification("The Atlas residue no longer matches the verified representative chains.",
+        type="error",duration=12)
+      return()
+    }
+    context <- list(pdb_a=pdb_a,pdb_b=pdb_b,
+      entity_a=ids[[1L]],entity_b=ids[[2L]],
+      accession=geometry$accession,
+      chain_a=as.character(row$chain_a[[1L]]),
+      chain_b=as.character(row$chain_b[[1L]]),
+      asym_a=available[[ids[[1L]]]]$struct_asym_id,
+      asym_b=available[[ids[[2L]]]]$struct_asym_id,
+      map_a=verified[[ids[[1L]]]]$mapping,
+      map_b=verified[[ids[[2L]]]]$mapping)
     atlas_pair_handoff(NULL)
+    atlas_alignment_context(NULL)
     # An unrelated primary protein cannot serve as the Atlas representative.
     first_ok <- isTRUE(load_primary_structure("pdb",pdb_a))
     if(!first_ok) {
@@ -2409,6 +2441,7 @@ server <- function(input, output, session) {
     }
     updateRadioButtons(session,"inputSource",selected="pdb")
     updateTextInput(session,"PDB",value=pdb_a)
+    atlas_alignment_context(context)
     atlas_pair_handoff(list(
       pdb_a=pdb_a,pdb_b=pdb_b,entity_a=ids[[1L]],entity_b=ids[[2L]],
       position=as.integer(pos),residue=row))

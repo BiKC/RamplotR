@@ -22,6 +22,15 @@ count distinguishes a partial inventory from a complete result. At most six enti
 both entity and entry metadata). Failed metadata fetches are counted,
 rather than silently presented as complete records.
 
+Click **Verify SIFTS mapping** on one experimental entity to download the
+PDBe **updated mmCIF** and validate its residue-level UniProt correspondence.
+This is an explicit action because mmCIF files can be large. RamplotR joins
+the SIFTS `asym_id/seq_id` pair to the polymer sequence scheme, then preserves
+PDB chain ID, residue number, insertion code and UniProt accession/position.
+Results report exact mapped positions, observed residues, conflicts and unmatched
+cross-reference rows. Ambiguous and unresolved positions are not silently
+assigned a canonical coordinate.
+
 The RCSB UniProt-reference-coverage field is entity-level metadata, **not**
 the verified per-residue canonical mapping. It does not prove two structures
 represent the same protein state. Coverage unavailable from the API is shown
@@ -44,8 +53,12 @@ as unavailable.
   PDB/entity identifiers so researchers can distinguish a failed enrichment
   from an absent experimental structure.
 - State clustering and representative-state selection are not yet computed.
-- Canonical exact-residue coverage and isoform equivalence will be checked in
-  a subsequent slice.
+- Exact residue mapping is now available on demand for selected entities.
+  Full cohort-scale mapping, isoform equivalence and consistent coverage
+  filtering before state clustering remain future work.
+- PDBe updated mmCIF uses `_pdbx_sifts_xref_db` and
+  `_pdbx_poly_seq_scheme`; the browser must be able to reach PDBe.
+  Retrieval failures leave the inventory intact.
 - Selecting a structure for comparison is a user-controlled network action.
   Arbitrary uploaded structures are not transmitted to the search service.
 

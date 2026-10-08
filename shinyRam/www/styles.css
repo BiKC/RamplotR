@@ -483,14 +483,28 @@ body > .container-fluid { max-width: none; padding: 0; }
 
 /* Comparison is optional; keep the primary workflow compact. */
 .ram-compare-source {
-  display:grid; grid-template-columns:minmax(190px,235px) minmax(180px,1fr) auto auto;
+  display:grid; grid-template-columns:minmax(190px,235px) minmax(180px,1fr) auto;
   align-items:end; gap:10px 14px;
   border:1px solid #e1eae8; border-radius:10px;
   background:#f8fbfa; padding:15px; margin:14px 0;
 }
 .ram-compare-source .form-group { margin:0; max-width:none; }
+.ram-compare-source > div, .ram-compare-source > .form-group { min-width:0; }
+.ram-compare-source .shiny-input-container,
+.ram-compare-source .form-control { max-width:100%; min-width:0; }
+@container (max-width: 720px) {
+  .ram-compare-source { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .ram-compare-source #compareSubmit { grid-column:1/-1; justify-self:start; }
+  .ram-compare-source #ram-compare-upload { grid-column:1/-1; }
+}
+@container (max-width: 430px) {
+  .ram-compare-source { grid-template-columns:minmax(0,1fr); }
+  .ram-compare-source #compareSubmit { grid-column:auto; width:100%; }
+  .ram-compare-source #ram-compare-upload { grid-column:auto; }
+}
 .ram-compare-source .shiny-input-radiogroup .shiny-options-group { display:flex; gap:5px; flex-wrap:wrap; }
 .ram-compare-source-panel {
+  container-type:inline-size;
   margin:12px 0; border:1px solid #d7e7e3; border-radius:10px;
   background:#fbfdfc; overflow:hidden;
 }

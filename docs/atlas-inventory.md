@@ -28,7 +28,17 @@ This is an explicit action because mmCIF files can be large. RamplotR joins
 the SIFTS `asym_id/seq_id` pair to the polymer sequence scheme, then preserves
 PDB chain ID, residue number, insertion code and UniProt accession/position.
 Results report exact mapped positions, observed residues, conflicts and unmatched
-cross-reference rows. Ambiguous and unresolved positions are not silently
+cross-reference rows. Once at least one entity has been verified, the Atlas
+shows an experimental cohort summary and two CSV exports:
+
+- exact residue rows with PDB entry, entity, author/PDB chain/number/insertion,
+  UniProt accession/number, observed state, provenance and ambiguity status;
+- per-UniProt-position support, counting distinct **verified PDB entities**
+  with an observed, unambiguous mapping.
+
+These counts are **not** the number of independent experimental measurements,
+protein conformations, or sequence coverage. Ambiguous local residue mappings
+remain in the residue export but never count as canonical position support. Ambiguous and unresolved positions are not silently
 assigned a canonical coordinate.
 
 The RCSB UniProt-reference-coverage field is entity-level metadata, **not**

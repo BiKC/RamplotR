@@ -197,34 +197,6 @@ ${atoms}
         text.includes("40 distinct observed UniProt positions") &&
         text.includes("Export verified residue mapping CSV");
     },{timeout:25000});
-    try {
-      await page.waitForSelector("#atlasSwitchThreshold",{timeout:15000});
-    } catch(error) {
-      console.error("Atlas switch panel diagnostics:",JSON.stringify(
-        await page.evaluate(()=>({
-          geometry:document.querySelector("#atlasGeometrySummary")?.textContent,
-          switchPanel:document.querySelector("#atlasSwitchPanel")?.outerHTML?.slice(0,2000),
-          errors:[...document.querySelectorAll(".shiny-output-error")]
-            .map(node=>node.textContent?.slice(0,400)),
-          messages:[...document.querySelectorAll(".shiny-notification")]
-            .map(node=>node.textContent)
-        }))));
-      throw error;
-    }
-    await page.click("#atlasRunSwitch");
-    await page.waitForFunction(() => {
-      const panel=document.querySelector("#atlasSwitchSummary");
-      return panel && panel.textContent.includes(
-        "canonical positions have both valid") &&
-        panel.textContent.includes("candidate residue");
-    },{timeout:25000});
-    const switchText=await page.$eval("#atlasSwitchSummary",el=>el.textContent);
-    assert.match(switchText,/1CRN_1 versus 1UBQ_1/);
-    assert.ok(await page.$("#downloadAtlasSwitch"));
-    await page.waitForFunction(() => {
-      const plot=document.querySelector("#atlasSwitchPlot img");
-      return plot && plot.complete && plot.naturalWidth>0;
-    },{timeout:25000});
     assert.ok(await page.$("#downloadAtlasCanonical"));
     assert.ok(await page.$("#downloadAtlasSupport"));
     await page.waitForSelector("#atlasGeometryEntities",{timeout:15000});
@@ -257,6 +229,34 @@ ${atoms}
       throw e;
     }
 
+    try {
+      await page.waitForSelector("#atlasSwitchThreshold",{timeout:15000});
+    } catch(error) {
+      console.error("Atlas switch panel diagnostics:",JSON.stringify(
+        await page.evaluate(()=>({
+          geometry:document.querySelector("#atlasGeometrySummary")?.textContent,
+          switchPanel:document.querySelector("#atlasSwitchPanel")?.outerHTML?.slice(0,2000),
+          errors:[...document.querySelectorAll(".shiny-output-error")]
+            .map(node=>node.textContent?.slice(0,400)),
+          messages:[...document.querySelectorAll(".shiny-notification")]
+            .map(node=>node.textContent)
+        }))));
+      throw error;
+    }
+    await page.click("#atlasRunSwitch");
+    await page.waitForFunction(() => {
+      const panel=document.querySelector("#atlasSwitchSummary");
+      return panel && panel.textContent.includes(
+        "canonical positions have both valid") &&
+        panel.textContent.includes("candidate residue");
+    },{timeout:25000});
+    const switchText=await page.$eval("#atlasSwitchSummary",el=>el.textContent);
+    assert.match(switchText,/1CRN_1 versus 1UBQ_1/);
+    assert.ok(await page.$("#downloadAtlasSwitch"));
+    await page.waitForFunction(() => {
+      const plot=document.querySelector("#atlasSwitchPlot img");
+      return plot && plot.complete && plot.naturalWidth>0;
+    },{timeout:25000});
     await page.screenshot({path:path.join(output,"atlas-inventory-desktop.png"),
       fullPage:true});
     await page.setViewport({width:390,height:844});

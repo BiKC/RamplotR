@@ -6,6 +6,7 @@ on:
       - "shinyRam/app.R"
       - "shinyRam/www/**"
       - "tests/ui-browser.cjs"
+      - "tests/atlas-browser.cjs"
       - "tests/prediction-browser.cjs"
       - "tests/structure-verification-browser.cjs"
       - "tests/reports.R"
@@ -71,6 +72,8 @@ jobs:
           done
           cat benchmarks/output/ui-preview/shiny.log
           exit 1
+      - name: Verify experimental Atlas inventory in real browser
+        run: node tests/atlas-browser.cjs
       - name: Exercise real browser and capture screenshots
         run: node tests/ui-browser.cjs
       - name: Verify AlphaFold and ESMFold uploads in the live browser

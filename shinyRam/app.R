@@ -1834,6 +1834,10 @@ server <- function(input, output, session) {
           entity <- get(item,"entity_id")
           chain <- get(item,"chain")
           resolution <- suppressWarnings(as.numeric(get(item,"resolution",NA_character_)))
+          reference_coverage <- suppressWarnings(as.numeric(
+            get(item,"reference_sequence_coverage",NA_character_)))
+          entity_coverage <- suppressWarnings(as.numeric(
+            get(item,"entity_sequence_coverage",NA_character_)))
           tags$article(class="ram-counterpart-card",
             tags$div(class="ram-counterpart-card-main",
               tags$div(class="ram-counterpart-id",
@@ -1847,6 +1851,13 @@ server <- function(input, output, session) {
                   tags$span(get(item,"method","Unknown method")),
                   tags$span(if(is.finite(resolution))
                     sprintf("%.2f Å",resolution) else "Resolution n/a"),
+                  tags$span(if(is.finite(reference_coverage))
+                    sprintf("%.1f%% UniProt sequence coverage",
+                      100*reference_coverage)
+                    else "UniProt coverage unreported"),
+                  if(is.finite(entity_coverage))
+                    tags$span(sprintf("%.1f%% entity sequence aligned",
+                      100*entity_coverage)),
                   tags$span(get(item,"release_date"))))),
             tags$div(class="ram-counterpart-actions",
               tags$a("RCSB entry",

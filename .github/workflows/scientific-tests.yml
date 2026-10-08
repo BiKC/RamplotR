@@ -44,6 +44,7 @@ jobs:
           node --check shinyRam/www/atlas-sifts-exact.js
           node tests/atlas-discovery.test.cjs
           node tests/atlas-sifts-exact.test.cjs
+          node tests/atlas-multiprotein-config.test.cjs
           node --check shinyRam/www/experimental-search.js
           node --check shinyRam/www/compare.js
           node --check shinyRam/www/prediction.js

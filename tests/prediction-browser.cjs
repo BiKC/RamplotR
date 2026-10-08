@@ -106,15 +106,25 @@ const puppeteer = require("puppeteer-core");
     await chooseSource("esmfold");
     await page.waitForFunction(()=>document.getElementById("ram-confidence-sidecars")
       .classList.contains("is-hidden"));
-    const upload=await page.$("#structfile");
-    await upload.uploadFile(fixture);
-    await page.waitForFunction(() => {
-      const input=document.getElementById("structfile");
-      return input && input.files && input.files.length===1;
-    },{timeout:10000});
-    // With provenance stable, Shiny can finish the upload without the file
-    // input being replaced by a reactive re-render.
-    await new Promise(done=>setTimeout(done,1800));
+    // Wait for the Shiny input binding itself, not an arbitrary sleep after
+    // the browser file input receives the File. Reactive UI rebuilds may
+    // replace an input between file selection and transfer completion.
+    let delivered=false;
+    for(let attempt=0;attempt<3 && !delivered;attempt++) {
+      const upload=await page.waitForSelector("#structfile",{timeout:15000});
+      await upload.uploadFile(fixture);
+      try {
+        await page.waitForFunction(() => {
+          const selected=document.querySelector("#structfile")?.files;
+          const received=window.Shiny?.shinyapp?.$inputValues?.["structfile:shiny.file"];
+          return selected?.length===1 && received != null;
+        },{timeout:15000});
+        delivered=true;
+      } catch(error) {
+        if(attempt===2) throw new Error(
+          "Structure fixture was selected but Shiny did not receive it after three attempts.");
+      }
+    }
     await page.click("#submit");
     try {
       await page.waitForFunction(() => {

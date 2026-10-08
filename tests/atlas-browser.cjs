@@ -10,12 +10,12 @@ const puppeteer = require("puppeteer-core");
 // and the Shiny distance-map grouping without depending on live PDBe APIs.
 function syntheticUpdatedCif(pdbOffset,shifted) {
   const residues=Array.from({length:40},(_,i)=>i+1);
-  const sequence=residues.map(i=>`X 1 ${i} A ${pdbOffset+i-1} .`).join("\\n");
-  const sifts=residues.map(i=>`1 X ${i} P00533 ${i+49} 1`).join("\\n");
+  const sequence=residues.map(i=>`X 1 ${i} A ${pdbOffset+i-1} .`).join("\n");
+  const sifts=residues.map(i=>`1 X ${i} P00533 ${i+49} 1`).join("\n");
   const atoms=residues.map(i=>{
     const x=0.35*i+(shifted && i>21 ? 8 : 0);
     return `ATOM CA X ${i} ${x.toFixed(4)} ${(3*Math.sin(i/2)).toFixed(4)} ${(3*Math.cos(i/2)).toFixed(4)} 1 .`;
-  }).join("\\n");
+  }).join("\n");
   return `data_test
 #
 loop_

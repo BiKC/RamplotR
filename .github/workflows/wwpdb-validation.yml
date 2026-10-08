@@ -1,25 +1,7 @@
 name: Independent wwPDB validation
 
+# Run explicitly from GitHub Actions when ready for validation.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "shinyRam/R/**"
-      - "benchmarks/wwpdb_helpers.R"
-      - "benchmarks/compare_wwpdb.R"
-      - "tests/wwpdb.R"
-      - "tests/wwpdb-baseline.R"
-      - "validation/**"
-      - ".github/workflows/wwpdb-validation.yml"
-  pull_request:
-    paths:
-      - "shinyRam/R/**"
-      - "benchmarks/wwpdb_helpers.R"
-      - "benchmarks/compare_wwpdb.R"
-      - "tests/wwpdb.R"
-      - "tests/wwpdb-baseline.R"
-      - "validation/**"
-      - ".github/workflows/wwpdb-validation.yml"
   workflow_dispatch:
 
 permissions:

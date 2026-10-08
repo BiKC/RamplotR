@@ -2034,7 +2034,7 @@ server <- function(input, output, session) {
                         length(verify$ca_points))
                       else if(nzchar(verify$ca_warning))
                         paste(" Geometry unavailable:",verify$ca_warning)
-                      else " No C-alpha coordinates available.")))),
+                      else " No C-alpha coordinates available."))),
             tags$div(class="ram-counterpart-actions",
               tags$a("RCSB entry",
                 href=paste0("https://www.rcsb.org/structure/",id),

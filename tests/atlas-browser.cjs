@@ -38,10 +38,12 @@ const puppeteer = require("puppeteer-core");
           request.respond({status:204,headers:cors,body:""});
           return;
         }
-        requests.push(JSON.parse(request.postData() || "{}"));
+        const submitted=JSON.parse(request.postData() || "{}");
+        requests.push(submitted);
+        const offset=submitted.request_options.paginate.start;
         request.respond({status:200,headers:cors,body:JSON.stringify({
           total_count:73,
-          result_set:[{identifier:"1CRN_1"}]
+          result_set:[{identifier:offset===0 ? "1CRN_1" : "1UBQ_1"}]
         })});
       } else if (url === "https://data.rcsb.org/rest/v1/core/polymer_entity/1CRN/1") {
         request.respond({status:200,headers:cors,body:JSON.stringify({
@@ -53,6 +55,24 @@ const puppeteer = require("puppeteer-core");
             }]
           },
           rcsb_polymer_entity:{pdbx_description:"Synthetic atlas test protein"}
+        })});
+      } else if (url === "https://data.rcsb.org/rest/v1/core/polymer_entity/1UBQ/1") {
+        request.respond({status:200,headers:cors,body:JSON.stringify({
+          rcsb_polymer_entity_container_identifiers:{
+            auth_asym_ids:["A"],
+            reference_sequence_identifiers:[{
+              database_name:"UniProt",database_accession:"P00533",
+              reference_sequence_coverage:0.55,entity_sequence_coverage:0.98
+            }]
+          },
+          rcsb_polymer_entity:{pdbx_description:"Second atlas entity"}
+        })});
+      } else if (url === "https://data.rcsb.org/rest/v1/core/entry/1UBQ") {
+        request.respond({status:200,headers:cors,body:JSON.stringify({
+          struct:{title:"Second mock entry"},
+          exptl:[{method:"SOLUTION NMR"}],
+          rcsb_entry_info:{resolution_combined:[]},
+          rcsb_accession_info:{initial_release_date:"2001-01-01"}
         })});
       } else if (url === "https://data.rcsb.org/rest/v1/core/entry/1CRN") {
         request.respond({status:200,headers:cors,body:JSON.stringify({
@@ -79,12 +99,26 @@ const puppeteer = require("puppeteer-core");
     },{timeout:25000});
     const visible=await page.$eval("#atlasResults", el=>el.textContent);
     assert.match(visible,/73 matching entities/);
-    assert.match(visible,/first 1 were requested/);
+    assert.match(visible,/1 of 73 search hits retrieved/);
     assert.match(visible,/1.50 Å/);
     assert.ok(requests.length===1,"Atlas should issue one explicit search.");
     assert.equal(requests[0].query.parameters.value,"P00533");
     assert.equal(requests[0].query.parameters.operator,"exact_match");
     assert.deepEqual(requests[0].request_options.results_content_type,["experimental"]);
+    assert.deepEqual(requests[0].request_options.paginate,{start:0,rows:50});
+    assert.deepEqual(requests[0].request_options.sort,
+      [{sort_by:"rcsb_id",direction:"asc"}]);
+    await page.click("#atlasLoadMore");
+    await page.waitForFunction(() => {
+      const results=document.querySelector("#atlasResults");
+      return results && results.textContent.includes("Second atlas entity") &&
+        results.textContent.includes("2 of 73 search hits retrieved");
+    },{timeout:25000});
+    assert.equal(requests.length,2,"Load more should issue exactly one new page request.");
+    assert.deepEqual(requests[1].request_options.paginate,{start:1,rows:50});
+    const afterPaging=await page.$eval("#atlasResults",el=>el.textContent);
+    assert.match(afterPaging,/2 enriched polymer entities in 2 PDB entries/);
+    assert.match(afterPaging,/55.0% UniProt sequence coverage/);
     await page.screenshot({path:path.join(output,"atlas-inventory-desktop.png"),
       fullPage:true});
     await page.setViewport({width:390,height:844});

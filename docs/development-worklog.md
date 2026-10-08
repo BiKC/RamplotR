@@ -71,14 +71,17 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
   - Browser, scientific (Ubuntu/Windows), independent wwPDB and structure
     validation workflows all passed. The first browser attempt had a transient
     prediction-upload timeout; rerun passed the full suite including Atlas.
-- Active branch: `feature/atlas-exact-sifts-residues` (Phase 1 mapping).
-  - Targeted PDBe updated mmCIF parsing of `_pdbx_sifts_xref_db` and
-    `_pdbx_poly_seq_scheme` with exact asym/seq joins;
-  - author/PDB chain and insertion code retained, explicit conflict detection;
-  - on-demand Verify SIFTS mapping in experimental Atlas, no bulk download;
-  - independent R/Node regression coverage and browser smoke tests.
-  - Next phase after CI/merge: canonical-mapped cohort and experimental state
-    discovery. Never infer residue correspondence by offset alone.
+- PR #49 merged into `main` (`daa014eba9f92eab8cd79cb32466cc5970e2af1c`):
+  exact PDBe updated-mmCIF SIFTS mapping for selected experimental entities,
+  with insertion-safe joins, conflict reporting and on-demand verification.
+  Scientific Ubuntu/Windows, structure, independent wwPDB and live-browser CI
+  all passed.
+- No active implementation PR immediately after #49. Next branch should
+  extend exact mappings into a canonical-mapped cohort with explicit
+  completeness/coverage and support for grouped experimental state discovery.
+  Do not group by inferred author numbering.
+- Browser tests mock PDBe responses; confirm live PDBe CORS and updated-mmCIF
+  endpoint on deployment before advertising archive-wide state analysis.
 - Manual live RCSB API smoke test remains desirable; CI uses mocked RCSB
   search/metadata responses to make network-independent UI regressions.
 - Roadmap: `docs/conformational-atlas-roadmap.md`.

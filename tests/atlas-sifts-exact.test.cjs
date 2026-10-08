@@ -53,4 +53,31 @@ assert.equal(sifts.exactRows(duplicate,"1abc","1","P12345").rows.length,3);
 assert.ok(!result.rows.some(x=>x.resi===102));
 assert.deepEqual(sifts.tokenize('  \'A title\'  "other title" # comment'),
   ["A title","other title"]);
+// Coordinates are joined by label_asym_id + label_seq_id, never author
+// residue numbers. Extra models/altlocs and non-protein atoms are excluded.
+const withAtoms = mmcif + `
+loop_
+_atom_site.group_PDB
+_atom_site.label_atom_id
+_atom_site.label_asym_id
+_atom_site.label_seq_id
+_atom_site.Cartn_x
+_atom_site.Cartn_y
+_atom_site.Cartn_z
+_atom_site.pdbx_PDB_model_num
+_atom_site.label_alt_id
+ATOM CA X 1 1.0 2.0 3.0 1 .
+ATOM CA X 2 4.0 5.0 6.0 1 A
+ATOM CA X 3 7.0 8.0 9.0 1 .
+ATOM CA X 1 99.0 99.0 99.0 2 .
+ATOM N X 2 10.0 10.0 10.0 1 .
+HETATM CA Y 1 20.0 20.0 20.0 1 .
+#`;
+const ca = sifts.extractMappedCA(withAtoms,result);
+assert.equal(ca.length,2,"Unobserved SIFTS residues must not be sent as C-alpha points.");
+assert.deepEqual(ca.map(x=>x.label_seq_id),[1,2]);
+assert.deepEqual([ca[0].x,ca[0].y,ca[0].z],[1,2,3]);
+assert.equal(result.rows[1].label_seq_id,2);
+assert.throws(()=>sifts.extractMappedCA(withAtoms.replace(
+  "_atom_site.Cartn_z","_atom_site.unknown"),result),/lacks/);
 console.log("Exact SIFTS mmCIF parser tests passed.");

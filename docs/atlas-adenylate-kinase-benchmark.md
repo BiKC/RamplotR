@@ -59,6 +59,43 @@ The live benchmark is intentionally separate from the regular offline unit
 tests. PDBe outages or schema changes should fail the live benchmark clearly
 without blocking unrelated offline scientific regression tests.
 
+## First live-data results (2026-10-08)
+
+GitHub Actions run [37765740664](https://github.com/BiKC/RamplotR/actions/runs/37765740664)
+retrieved the PDBe **updated mmCIF** files and completed both structure
+comparisons. The [benchmark artifact](https://github.com/BiKC/RamplotR/actions/runs/37765740664/artifacts/11544028276)
+contains the exact source manifest, atom/mapping records, tracks and reports.
+
+| Compared model-1 chains | Common UniProt positions | Cα distance-map RMSD (Å) | Complete φ/ψ pairs | Above 30° | Candidate segments |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 4AKE A vs 1AKE A (open/closed) | 214 | 6.5077 | 212 | 37 | 22 |
+| 4AKE A vs 4AKE B (same crystal) | 214 | 0.4022 | 212 | 16 | 9 |
+| 1AKE A vs 1AKE B (same crystal) | 214 | 0.2513 | 212 | 10 | 8 |
+| 4AKE A vs itself | 214 | 0.0000 | 212 | 0 | 0 |
+
+Mean per-residue contributions to the *global Cα distance-map change*
+between 4AKE A and 1AKE A (Å): CORE 4.540, LID 8.600, NMP 7.591.
+This is distinct from the local circular φ/ψ metric.
+
+Both structures mapped to 214 observed UniProt positions across two chains,
+with 428 Cα and 1,284 complete N/Cα/C atom records per entry.
+
+Input source SHA256 digests from that run:
+
+- `4ake_updated.cif`:
+  `3b1cad099974d4d78d218b5699480a453701533612e696d92d51b7621efdcebd`
+- `1ake_updated.cif`:
+  `7ba43f1063e8f43efd138d79cff888ee427b5dc42b17ca5a35a46496c8d120e0`
+
+The global open/closed difference clearly exceeds the two within-crystal
+controls, as expected for this documented domain-motion pair. However,
+the chain-copy controls still have 16 and 10 residues above the 30°
+navigation threshold. A fixed angular cutoff therefore cannot be
+interpreted as a validated positive/negative functional-state classifier.
+
+The current benchmark check protects against a **loss of contrast on this
+specific pair**; it is not a trained, transferable classification threshold.
+
 ## Interpretation limits
 
 Open/closed adenylate kinase is a documented large-domain-motion example.

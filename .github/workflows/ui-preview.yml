@@ -1,19 +1,7 @@
 name: Interface browser preview
 
+# Run explicitly from GitHub Actions when ready for validation.
 on:
-  pull_request:
-    paths:
-      - "shinyRam/app.R"
-      - "shinyRam/www/**"
-      - "tests/ui-browser.cjs"
-      - "tests/guide-browser.cjs"
-      - "tests/atlas-browser.cjs"
-      - "tests/prediction-browser.cjs"
-      - "tests/structure-verification-browser.cjs"
-      - "tests/reports.R"
-      - "tests/model-integration.R"
-      - "shinyRam/R/**"
-      - ".github/workflows/ui-preview.yml"
   workflow_dispatch:
 
 permissions:

@@ -32,10 +32,7 @@ conformational states.
   detects changes to the archive hit count and loads further pages on demand.
   RCSB is not a frozen archive snapshot: a changed hit count forces restart,
   and live API compatibility should be checked separately from mocked CI tests.
-- Next implementation slice: direct per-residue SIFTS annotations from PDBe's
-  updated mmCIF `_pdbx_sifts_xref_db` category, with explicit asym/auth chain
-  mapping, insertion-code handling, partial coverage and conflicting targets.
-  Do not infer any interior residue mapping solely from range endpoints.
+
 - On-demand exact per-residue SIFTS verification merged in PR #49, using
   PDBe updated mmCIF and polymer sequence-number cross-references. Insertions,
   unmapped rows and conflicts are explicit. Live PDBe retrieval still merits
@@ -58,6 +55,15 @@ conformational states.
   End-to-end browser and scientific CI passed on the final revision.
   The current workflow uses the first two group medoids, not all group members,
   and its threshold is not calibrated against biological reference cases.
+- A first real-data experimental biological benchmark merged in PR #53:
+  *E. coli* adenylate kinase 4AKE (open) versus 1AKE (closed) with within-crystal
+  chain-copy controls, all matched at 214 canonical UniProt P69441 positions.
+  Open/closed C-alpha distance-map RMSD was 6.5077 Å versus 0.4022 Å and
+  0.2513 Å for A/B chain controls within 4AKE and 1AKE respectively.
+  Local changes above 30° were 37 versus 16 and 10, so the angular cutoff
+  is unsuitable as a validated functional-state classifier on its own.
+  See `docs/atlas-adenylate-kinase-benchmark.md` for provenance and outputs.
+  Real live archive CI passed; this validates one case, not transferability.
 - **Not implemented yet:** automatic cohort-wide construct/isoform validation,
   benchmarked experimental state clustering, a validated five-residue structural
   alphabet, and prediction-vs-experiment coverage.

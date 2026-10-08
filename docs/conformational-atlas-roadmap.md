@@ -36,9 +36,10 @@ conformational states.
   updated mmCIF `_pdbx_sifts_xref_db` category, with explicit asym/auth chain
   mapping, insertion-code handling, partial coverage and conflicting targets.
   Do not infer any interior residue mapping solely from range endpoints.
-- Exact per-residue SIFTS verification for selected experimental entities is
-  being implemented on `feature/atlas-exact-sifts-residues` via PDBe updated
-  mmCIF and explicit polymer sequence-number cross-references.
+- On-demand exact per-residue SIFTS verification merged in PR #49, using
+  PDBe updated mmCIF and polymer sequence-number cross-references. Insertions,
+  unmapped rows and conflicts are explicit. Live PDBe retrieval still merits
+  deployment verification separately from mocked CI.
 - **Not implemented yet:** automatic cohort-wide canonical coverage validation,
   experimental structural-state clustering, fragment switch regions and
   prediction-vs-experiment coverage.

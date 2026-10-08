@@ -1878,6 +1878,12 @@ server <- function(input, output, session) {
           sprintf(" Metadata unavailable for %d returned entities.",unresolved) else "",
         if(isTRUE(payload$duplicate_count>0L))
           sprintf(" %d duplicate entity IDs collapsed.",payload$duplicate_count) else ""),
+      if(length(payload$failed_entity_ids))
+        tags$details(class="ram-details",
+          tags$summary(sprintf("Show %d entity IDs with unavailable metadata",
+            length(payload$failed_entity_ids))),
+          tags$p(class="ram-field-hint",
+            paste(payload$failed_entity_ids,collapse=", "))),
       if(!length(results))
         tags$p(class="ram-counterpart-empty",
           "No enriched entity metadata were returned on the pages checked so far."),

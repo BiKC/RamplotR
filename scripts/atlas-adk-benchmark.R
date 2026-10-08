@@ -9,8 +9,11 @@ source(file.path("shinyRam","R","atlas-geometry.R"))
 source(file.path("shinyRam","R","atlas-switch.R"))
 if(!requireNamespace("jsonlite",quietly=TRUE))
   stop("Install jsonlite before running the live archive benchmark.")
-output <- if(length(commandArgs(TRUE))) commandArgs(TRUE)[[1L]]
-  else "benchmarks/output/atlas-adk"
+output <- if(length(commandArgs(TRUE))) {
+  commandArgs(TRUE)[[1L]]
+} else {
+  "benchmarks/output/atlas-adk"
+}
 accession <- "P69441"
 load_entry <- function(id) {
   filename <- file.path(output,paste0(id,"_1.json"))

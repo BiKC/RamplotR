@@ -66,4 +66,16 @@ clean <- ram_atlas_geometry_entities(conflicted,"P12345")
 assert(nrow(clean[["1ABC_1"]]$coordinates)==39L &&
        !1L %in% clean[["1ABC_1"]]$coordinates$uniprot_resi,
        "Conflicting exact-SIFTS mapping must remove that coordinate.")
+# Exercise the exact plotting function the Shiny view calls. Two entities
+# need a direct distance chart, whereas three or more use a dendrogram.
+pdf_path <- tempfile(fileext=".pdf")
+grDevices::pdf(pdf_path)
+two <- ram_atlas_geometry_groups(verified,"P12345",
+  c("1ABC_1","3ABC_1"),cutoff=1.5)
+ram_atlas_geometry_plot(two)
+ram_atlas_geometry_plot(groups)
+grDevices::dev.off()
+assert(file.exists(pdf_path) && file.info(pdf_path)$size>100L,
+       "Geometry charts must render for pairs and multi-entity cohorts.")
+unlink(pdf_path)
 message("Experimental Atlas distance-map grouping tests passed.")

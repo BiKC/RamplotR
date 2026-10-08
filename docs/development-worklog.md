@@ -213,6 +213,16 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 - The next PR-ready CI execution must validate this new code before merge. Pushes do not launch GitHub Actions automatically.
 - Long-term: independently validate biological-state grouping, improve construct equivalence, and test live browser archive retrieval on Shinylive.
 
+## October 8 continuation: canonical Atlas comparison (PR #58)
+
+- PR #57 merged to main at `3c9da838cdd2b3df3e4d79ffd222905a4326e858` after all seven PR-check workflows passed.
+- Active branch: `feature/atlas-canonical-comparison` from this main baseline.
+- Adds conservative first-model UniProt-coordinate pairing for an Atlas-generated comparison. Only shared, observed, one-to-one exact SIFTS positions are matched. Local identifiers use actual author chain/number/insertion with selected struct_asym; ambiguous/nonexistent mappings are excluded.
+- The existing 2D/3D compare and residue inspector consume those canonical matches. A coverage notice shows how many residues were verified and compares; other residues are excluded, **not** inferred to be deleted. Users can explicitly revert to ordinary sequence alignment.
+- Existing pairwise comparison remains unchanged for ordinary comparisons and other structural models. Substitution labels remain visible when residue chemistries differ, without claims of construct equivalence.
+- Added synthetic tests for differing PDB numbering, insertion codes, ambiguous records, missing segments, accession mismatches, and canonical pair input validity.
+- CI policy: once PR #58 is marked Ready for review, seven workflows run. Do not merge on incomplete/failed checks. Live Shinylive CORS and independent biological-state validation remain future tasks.
+
 ## Next implementation steps
 
 1. Verify **deployed-browser** PDBe and RCSB CORS in RamplotR's actual

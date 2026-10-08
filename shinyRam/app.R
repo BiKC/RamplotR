@@ -1857,8 +1857,6 @@ server <- function(input, output, session) {
     payload <- atlas_payload()
     if(is.null(payload)) return(NULL)
     results <- payload$results
-    if(!length(results))
-      return(tags$p("No experimental polymer entities were returned for this accession."))
     get <- function(item,key,default="") {
       value <- item[[key]]
       if(is.null(value) || !length(value) || is.na(value[[1L]])) default
@@ -1880,6 +1878,9 @@ server <- function(input, output, session) {
           sprintf(" Metadata unavailable for %d returned entities.",unresolved) else "",
         if(isTRUE(payload$duplicate_count>0L))
           sprintf(" %d duplicate entity IDs collapsed.",payload$duplicate_count) else ""),
+      if(!length(results))
+        tags$p(class="ram-counterpart-empty",
+          "No enriched entity metadata were returned on the pages checked so far."),
       tags$div(class="ram-counterpart-results",
         lapply(results,function(item) {
           id <- get(item,"pdb_id")

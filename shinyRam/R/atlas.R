@@ -68,7 +68,8 @@ ram_atlas_merge_page <- function(previous=NULL,page) {
     enriched_count=length(unique_records),
     incomplete_metadata=(if(is.null(previous)) 0L
        else previous$incomplete_metadata)+failed,
-    duplicate_count=sum(!keep),
+    duplicate_count=(if(is.null(previous)) 0L
+      else previous$duplicate_count)+sum(!keep),
     pages=(if(is.null(previous)) 0L else previous$pages)+1L,
     has_more=offset<total && !stalled,
     stalled=stalled,

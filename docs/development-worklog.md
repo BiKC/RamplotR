@@ -106,7 +106,24 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
   validation and full Shiny browser suite all passed on the final PR #52
   commit. CI now runs the Atlas browser regression before the older prediction
   upload test; the latter also passed on the final run.
-- No active implementation branch after PR #52. Next milestones:
+- Active branch: `feature/atlas-adk-biological-benchmark`.
+  - Real experimental 4AKE open and 1AKE closed adenylate kinase case study,
+    UniProt P69441, via the **same browser SIFTS/mapping parser** in Node.
+  - Reproducible PDBe updated-mmCIF retrieval with SHA256 provenance and
+    model-1 N/CA/C backbone coordinates only.
+  - Use explicit observed UniProt position overlap; no author-number
+    interpolation. Compare open/closed plus within-4AKE and within-1AKE
+    chain copies and a zero-distance self control.
+  - Report global distance-map RMSD separately from local wrapped φ/ψ
+    changes, above-threshold regions and domain-level descriptive context.
+  - Live-archive GitHub Actions workflow uploads reports, data and hashes.
+  - Work is **benchmarking, not cutoff calibration**. Intra-crystal copies are
+    not independent observations, and one pair cannot establish a general
+    validated state classifier.
+- After benchmark CI passes, review the actual metrics, limitations and
+  whether the live updated-mmCIF schema matches the parser. No scientific
+  claims until the real-data job is green.
+- Earlier roadmap after PR #52:
   1. real biological case study and numeric calibration with E. coli
      adenylate kinase open 4AKE vs closed 1AKE (literature-supported pair);
   2. construct/isoform compatibility and full-cohort comparison;

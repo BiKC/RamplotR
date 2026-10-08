@@ -1,0 +1,43 @@
+name: Experimental Atlas biological benchmark
+
+on:
+  pull_request:
+    paths:
+      - "scripts/atlas-adk-*"
+      - ".github/workflows/atlas-biological-benchmark.yml"
+      - "shinyRam/R/atlas-geometry.R"
+      - "shinyRam/R/atlas-switch.R"
+      - "shinyRam/www/atlas-sifts-exact.js"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  adk-case-study:
+    name: Live 4AKE/1AKE SIFTS + crystal-chain controls
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - name: Parse benchmark R source before live downloads
+        run: Rscript -e 'parse(file="scripts/atlas-adk-benchmark.R")'
+      - name: Install benchmark JSON reader
+        run: Rscript -e 'install.packages("jsonlite")'
+      - name: Retrieve current PDBe updated mmCIF using exact SIFTS parser
+        run: |
+          mkdir -p benchmarks/output/atlas-adk
+          node scripts/atlas-adk-fetch.cjs benchmarks/output/atlas-adk
+      - name: Benchmark experimental geometry and backbone torsion differences
+        run: Rscript scripts/atlas-adk-benchmark.R benchmarks/output/atlas-adk
+      - name: Upload full data provenance and benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-adenylate-kinase-benchmark
+          path: benchmarks/output/atlas-adk/
+          retention-days: 30
+          if-no-files-found: warn

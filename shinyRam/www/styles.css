@@ -1499,6 +1499,9 @@ body > .container-fluid { max-width: none; padding: 0; }
 .ram-group-run-row > span { color:#68818a; font-size:11px; line-height:1.5; }
 .ram-group-downloads { margin-top:12px; }
 .ram-source-guide { margin:0 0 12px; font-size:12px; }
+/* The input panel becomes a one-row toolbar after analysis. The Guide tab
+   remains visible, so this onboarding link must not add a second toolbar row. */
+.ram-has-data .ram-source-guide { display:none; }
 @container (max-width: 710px) {
   .ram-group-compare-controls { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .ram-group-field:first-child { grid-column:1 / -1; }

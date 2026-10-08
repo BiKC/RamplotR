@@ -19,11 +19,13 @@ RamplotR is an open-source R Shiny application that brings backbone geometry, a 
 | **Work with predicted models** | Import AlphaFold DB models or upload AlphaFold 2/3, ColabFold and ESMFold structures. Examine pLDDT/PAE, analyse AF2/ColabFold, AF3 or ESMFold model/seed ensembles with residue-level backbone-state and confidence agreement, and search experimental PDB counterparts for direct comparison. |
 | **Examine structural geometry** | Explore peptide ω, side-chain χ1 and descriptive Cβ measurements. Optionally attach the matching deposited structure's official wwPDB validation report for independent rotamer, clash and geometry annotations. |
 | **Inspect experimental evidence** | Overlay a local CCP4/MRC cryo-EM map in the 3D viewer as a qualitative aid, without uploading the map to a separate service. |
-| **Discover experimental structures** | Use the new **Atlas** tab to find experimental PDB polymer entities by UniProt accession, inspect experimental method, resolution and reported sequence coverage, then open a candidate in Compare. The Atlas currently provides an initial capped inventory; automatic conformational-state clustering is on the roadmap. |
+| **Discover experimental structures** | Use **Atlas** to find experimental PDB polymer entities by UniProt accession, verify exact SIFTS residue mappings, compare common Cα geometry across selected experimental entries, and inspect candidate local backbone changes. The geometric groups are exploratory and have not been validated as biological states. |
 | **Compare models** | Sequence-align two structures with the Conformational Change Explorer using the same Ramachandran density background as the main plot; inspect wrapped φ/ψ shifts and broad backbone-state transitions, swap primary/comparison roles instantly, or compare biologically defined structure sets (for example apo/holo or WT/mutant) using residue-level circular φ/ψ means, dispersion and between-group backbone shifts. |
 | **Publish or automate** | Export SVG and high-resolution PNG figures, filtered CSV tables and standalone HTML reports. Run the offline R command-line tool on individual files or a directory of structures. |
 
 Advanced analysis stays in collapsible panels or dedicated comparison/summary views, keeping the everyday 2D/3D inspection screen uncluttered.
+
+For an in-app walkthrough, open the **Guide** tab or choose **New here? Explore the workflow guide** above the structure input. It covers individual residues, prediction confidence, pairwise and group comparisons, experimental Atlas discovery and exports, with explicit scientific interpretation cautions.
 
 ## Screenshots
 

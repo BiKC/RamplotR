@@ -14,7 +14,8 @@ required <- c(
   "bg1", "bg2", "bg3", "bg4", "plotly", "NGL",
   "comparePlot", "compareSwap", "NGLCompare",
   "regionselect", "regions", "summary",
-  "atlasAccession", "atlasDiscover", "atlasStatus", "atlasResults"
+  "atlasAccession", "atlasDiscover", "atlasStatus", "atlasResults",
+  "openGuide", "groupGuide", "atlasGuide", "groupComparisonExports"
 )
 missing <- required[!vapply(required, function(id) {
   grepl(paste0('"', id, '"'), ui, fixed = TRUE)
@@ -34,6 +35,10 @@ stopifnot(
   grepl('class = "ram-workspace"', ui, fixed = TRUE),
   grepl('class = "ram-charts"', ui, fixed = TRUE),
   grepl("tabsetPanel(", ui, fixed = TRUE),
+  grepl('source(file.path("R", "guide.R")', ui, fixed = TRUE),
+  grepl('value = "guide"', ui, fixed = TRUE),
+  grepl('.ram-guide-steps', css, fixed = TRUE),
+  grepl('.ram-group-compare-controls', css, fixed = TRUE),
   grepl("@media (max-width: 580px)", css, fixed = TRUE),
   grepl(".ram-plot-empty[hidden]", css, fixed = TRUE),
   grepl("Plotly.react(", js, fixed = TRUE),

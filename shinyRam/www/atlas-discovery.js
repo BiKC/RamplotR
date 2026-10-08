@@ -148,6 +148,9 @@
         return normalizeEntity(hit, entity, entry, accession);
       });
       const results = records.filter(Boolean);
+      const failedEntityIds = hits.filter((hit,i) => !records[i])
+        .map(hit => clean(hit && hit.identifier))
+        .filter(identifier => /^[A-Za-z0-9]{4}_[1-9][0-9]*$/.test(identifier));
       notify("ramAtlasResults", {
         request_id: requestId,
         accession,
@@ -157,6 +160,7 @@
         returned_count: hits.length,
         next_offset: offset + hits.length,
         incomplete_metadata: hits.length - results.length,
+        failed_entity_ids: failedEntityIds,
         results
       });
     } catch (err) {

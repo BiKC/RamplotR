@@ -126,10 +126,23 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
   - This is **one known case**, not threshold validation. Chain A/B within
     a crystal are not independent biological replicates. Differences above
     30° already occur in same-crystal chain controls.
-- No active implementation PR after #53. Next: independent protein cases,
-  structure-level metadata/construct-isoform controls, and user-selected
-  local comparisons with clear denominators; only then assess general
-  state-detection sensitivity and background/false positives.
+- Active branch: `feature/atlas-multiprotein-benchmark`.
+  - Real SIFTS-coordinate benchmark covering ADK (4AKE/1AKE), maltose
+    binding protein (1OMP/1ANF, separate apo crystal 1JW4) and ribose
+    binding protein (1URP/2DRI).
+  - Open/closed contrasts, ADK/RBP same-crystal chain controls, MBP
+    separate-crystal open/apo control, and one exact self-control per protein.
+  - Strict accession, >=100 exact overlapping canonical positions and >=60%
+    two-sided coverage; inspect experimental residue-name concordance and
+    reject grossly incompatible constructs.
+  - Per-protein global C-alpha distance maps, circular paired phi/psi,
+    separate local denominators, missing-data and source SHA256 auditing.
+  - Live-data workflow plus downloadable per-residue CSV outputs. No
+    classification cutoffs or trained model.
+- After checking the actual real-data CI results, record source hashes,
+  discrepancies and limitations before merging. Three proteins (including
+  two periplasmic binding proteins of related fold) remain too few for any
+  broad statistical sensitivity/specificity claim.
 - Live PDBe API/CORS and updated mmCIF schema still need a deployment smoke
   test. CI mocks the network responses.
 - Do not equate verified PDB-entity counts with independent observations or

@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "notes": "Curated literature-based contrast cases. PDB chain-copy controls and single-entry identities are not independent biological replicates. All conformational labels are literature context, not model predictions.",
+  "proteins": [
+    {
+      "id": "adenylate_kinase",
+      "name": "Escherichia coli adenylate kinase",
+      "uniprot": "P69441",
+      "source": "https://www.rcsb.org/structure/4AKE",
+      "entries": [
+        {
+          "pdb": "4AKE",
+          "entity": 1,
+          "label": "open",
+          "condition": "apo"
+        },
+        {
+          "pdb": "1AKE",
+          "entity": 1,
+          "label": "closed",
+          "condition": "Ap5A inhibitor-bound"
+        }
+      ],
+      "comparisons": [
+        {
+          "left": "4AKE",
+          "right": "1AKE",
+          "class": "documented_open_closed"
+        },
+        {
+          "left": "4AKE",
+          "right": "4AKE",
+          "left_chain_rank": 1,
+          "right_chain_rank": 2,
+          "class": "within_crystal"
+        },
+        {
+          "left": "1AKE",
+          "right": "1AKE",
+          "left_chain_rank": 1,
+          "right_chain_rank": 2,
+          "class": "within_crystal"
+        }
+      ]
+    },
+    {
+      "id": "maltose_binding_protein",
+      "name": "Escherichia coli maltose-binding protein",
+      "uniprot": "P0AEX9",
+      "source": "https://pmc.ncbi.nlm.nih.gov/articles/PMC240646/",
+      "entries": [
+        {
+          "pdb": "1OMP",
+          "entity": 1,
+          "label": "open",
+          "condition": "apo"
+        },
+        {
+          "pdb": "1ANF",
+          "entity": 1,
+          "label": "closed",
+          "condition": "maltose-bound"
+        },
+        {
+          "pdb": "1JW4",
+          "entity": 1,
+          "label": "open",
+          "condition": "apo separate crystal"
+        }
+      ],
+      "comparisons": [
+        {
+          "left": "1OMP",
+          "right": "1ANF",
+          "class": "documented_open_closed"
+        },
+        {
+          "left": "1OMP",
+          "right": "1JW4",
+          "class": "separate_crystal_open_control"
+        }
+      ]
+    },
+    {
+      "id": "ribose_binding_protein",
+      "name": "Escherichia coli ribose-binding protein",
+      "uniprot": "P02925",
+      "source": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8150535/",
+      "entries": [
+        {
+          "pdb": "1URP",
+          "entity": 1,
+          "label": "open",
+          "condition": "apo"
+        },
+        {
+          "pdb": "2DRI",
+          "entity": 1,
+          "label": "closed",
+          "condition": "ribose-bound"
+        }
+      ],
+      "comparisons": [
+        {
+          "left": "1URP",
+          "right": "2DRI",
+          "class": "documented_open_closed"
+        },
+        {
+          "left": "1URP",
+          "right": "1URP",
+          "left_chain_rank": 1,
+          "right_chain_rank": 2,
+          "class": "within_crystal"
+        }
+      ]
+    }
+  ]
+}

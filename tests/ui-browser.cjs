@@ -79,7 +79,11 @@ const assert = require("node:assert/strict");
     });
     await page.waitForFunction(() =>
       !document.getElementById("ram-upload-wrap").classList.contains("is-hidden"));
-    const input = await page.$("#structfile");
+    // Changing inputSource triggers a Shiny re-render of the upload form.
+    // Do not attach a file until that re-render has settled, otherwise the
+    // file input may be replaced before the browser-to-Shiny transfer begins.
+    await new Promise(resolve => setTimeout(resolve, 1800));
+    const input = await page.waitForSelector("#structfile",{timeout:15000});
     await input.uploadFile(contextFixture);
     // Shiny's upload widget does not expose a stable progress-complete
     // attribute across versions. Confirm the file was selected, then give the
@@ -88,7 +92,16 @@ const assert = require("node:assert/strict");
       const field = document.querySelector("#structfile");
       return field && field.files && field.files.length === 1;
     }, { timeout: 15000 });
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise(resolve => setTimeout(resolve, 1800));
+    // A defensive reattach is preferable to a 90-second false timeout if
+    // an unrelated reactive update replaced this input mid-upload.
+    const hasFile=await page.$eval("#structfile",el=>
+      el.files && el.files.length===1);
+    if(!hasFile) {
+      const retry=await page.$("#structfile");
+      await retry.uploadFile(contextFixture);
+      await new Promise(resolve => setTimeout(resolve, 1800));
+    }
     await page.click("#submit");
     try {
       await page.waitForFunction(() =>

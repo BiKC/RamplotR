@@ -114,4 +114,23 @@ invalid <- try(ram_atlas_group_switches(verified,geometry,30,
   representative_ids=c("1ABC_1","1ABC_1")),silent=TRUE)
 assert(inherits(invalid,"try-error"),
   "The same group representative must not be selected twice.")
+# Atlas-linked Compare focus must use both exact PDB author positions,
+# not the UniProt number or the first sequence-alignment candidate.
+aligned <- data.frame(chain_a=c("A","A","A"),residue_a=c(102L,103L,103L),
+  insertion_a=c("","","A"),chain_b=c("B","B","B"),
+  residue_b=c(202L,203L,203L),insertion_b=c("","",""),
+  row_id=1:3)
+target <- data.frame(chain_a="A",resi_a=103L,insertion_a="A",
+  chain_b="B",resi_b=203L,insertion_b="")
+assert(identical(ram_atlas_comparison_pair_index(aligned,target),3L),
+  "Atlas focus must match the exact insertion-bearing author pair.")
+not_both <- transform(target,resi_b=204L)
+assert(is.na(ram_atlas_comparison_pair_index(aligned,not_both)),
+  "Wrong second residue must not be selected by coincidence.")
+no_mapping <- transform(target,insertion_a=NA_character_)
+assert(is.na(ram_atlas_comparison_pair_index(aligned,no_mapping)),
+  "Missing insertion-code mapping must reject automatic focus.")
+duplicate <- rbind(aligned,aligned[3L,,drop=FALSE])
+assert(is.na(ram_atlas_comparison_pair_index(duplicate,target)),
+  "Ambiguous alignment pairs must not be auto-selected.")
 message("Experimental Atlas backbone switch-region tests passed.")

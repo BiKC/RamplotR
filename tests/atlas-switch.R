@@ -164,6 +164,13 @@ ambiguous <- ram_atlas_canonical_pairing(first_torsions,second_torsions,
 assert(ambiguous$matched==39L &&
        !10L %in% ambiguous$pairing$uniprot_resi,
   "Conflicting canonical SIFTS residue must be excluded entirely.")
+label_conflict <- second_map
+label_conflict$label_seq_id[[11L]] <- label_conflict$label_seq_id[[10L]]
+label_ambiguous <- ram_atlas_canonical_pairing(first_torsions,second_torsions,
+  a$mapping,label_conflict,"P12345","A","X","B","X")
+assert(label_ambiguous$matched==38L &&
+       !any(c(10L,11L) %in% label_ambiguous$pairing$uniprot_resi),
+  "Duplicate label_seq_id must exclude both conflicting canonical residues.")
 
 # Insertion codes are part of the local author identifier.
 insertion_map <- a$mapping

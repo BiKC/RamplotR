@@ -45,6 +45,32 @@ const puppeteer = require("puppeteer-core");
           total_count:73,
           result_set:[{identifier:offset===0 ? "1CRN_1" : "1UBQ_1"}]
         })});
+      } else if (url === "https://www.ebi.ac.uk/pdbe/static/entry/1crn_updated.cif") {
+        const mockCif = `data_1crn
+#
+loop_
+_pdbx_poly_seq_scheme.asym_id
+_pdbx_poly_seq_scheme.entity_id
+_pdbx_poly_seq_scheme.seq_id
+_pdbx_poly_seq_scheme.pdb_strand_id
+_pdbx_poly_seq_scheme.pdb_seq_num
+_pdbx_poly_seq_scheme.pdb_ins_code
+X 1 1 A 101 .
+X 1 2 A 101 A
+#
+loop_
+_pdbx_sifts_xref_db.entity_id
+_pdbx_sifts_xref_db.asym_id
+_pdbx_sifts_xref_db.seq_id
+_pdbx_sifts_xref_db.unp_acc
+_pdbx_sifts_xref_db.unp_num
+_pdbx_sifts_xref_db.observed
+1 X 1 P00533 50 1
+1 X 2 P00533 52 1
+#`;
+        request.respond({status:200,
+          headers:{...cors,"content-type":"text/plain"},
+          body:mockCif});
       } else if (url === "https://data.rcsb.org/rest/v1/core/polymer_entity/1CRN/1") {
         request.respond({status:200,headers:cors,body:JSON.stringify({
           rcsb_polymer_entity_container_identifiers:{
@@ -108,6 +134,15 @@ const puppeteer = require("puppeteer-core");
     assert.deepEqual(requests[0].request_options.paginate,{start:0,rows:50});
     assert.deepEqual(requests[0].request_options.sort,
       [{sort_by:"rcsb_id",direction:"asc"}]);
+    // A selected experimental entity can verify exact SIFTS positions
+    // without guessing interior numbering or losing insertion codes.
+    await page.click(".ram-atlas-verify");
+    await page.waitForFunction(() => {
+      const results=document.querySelector("#atlasResults");
+      return results && results.textContent.includes("Verified exact SIFTS:") &&
+        results.textContent.includes("2 distinct PDB residues") &&
+        results.textContent.includes("2 observed");
+    },{timeout:25000});
     await page.click("#atlasLoadMore");
     await page.waitForFunction(() => {
       const results=document.querySelector("#atlasResults");

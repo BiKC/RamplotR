@@ -87,9 +87,9 @@ sparse_cmp <- ram_group_conformation_compare(
   reference,sparse_a,prepared_b$models,"apo","holo")
 sparse_r1 <- sparse_cmp[sparse_cmp$resi==1L,,drop=FALSE]
 assert(isTRUE(all.equal(sparse_r1$a_coverage,0.5)) &&
-       identical(as.character(sparse_r1$evidence_profile),"Sparse coverage") &&
+       identical(as.character(sparse_r1$evidence_profile),"Unreplicated structural difference") &&
        !isTRUE(sparse_r1$high_support_shift),
-       "Sparse group coverage must be explicit and must not be promoted as high support.")
+       "A residue with only one paired observation cannot count as replicated support.")
 
 # Separate phi and psi counts must never inflate complete-pair support.
 complement_a1 <- make_chain("A",c(-60,-60,-60),c(-40,-40,-40))

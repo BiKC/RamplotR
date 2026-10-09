@@ -3514,6 +3514,7 @@ server <- function(input, output, session) {
     value <- group_comparison_results()
     if (is.null(value)) return(NULL)
     if(identical(value$source,"atlas")) {
+      if(!identical(input$groupInputMode,"atlas")) return(NULL)
       geometry <- atlas_geometry_result()
       picked <- atlas_group_transfer()
       if(is.null(geometry) || !is.null(geometry$error) ||
@@ -3523,6 +3524,7 @@ server <- function(input, output, session) {
         return(NULL)
       return(value$result)
     }
+    if(identical(input$groupInputMode,"atlas")) return(NULL)
     structure <- req(loaded())
     if (!identical(value$key,structure$key) ||
         !identical(value$mode,input$validationMode) ||

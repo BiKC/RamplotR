@@ -2170,16 +2170,20 @@ server <- function(input, output, session) {
           "Exact SIFTS mapping could not be retrieved."
           else as.character(value$message))
     } else {
-      mapped <- tryCatch(
-        ram_atlas_exact_sifts_map(value, value$pdb_id,
+      # Map validation AND summary creation belong to one per-entity
+      # error boundary. PDBe can legitimately return zero exact matches.
+      # That must not throw out of this observer or stall a verification batch.
+      checked <- tryCatch(
+        ram_atlas_verified_sifts(value,value$pdb_id,
           value$entity_id,chosen$accession),
         error=function(e) {
           outcomes[[chosen$key]] <<- list(state="error",
             message=conditionMessage(e))
           NULL
         })
-      if(!is.null(mapped)) {
-        summary <- ram_atlas_sifts_summary(mapped)
+      if(!is.null(checked)) {
+        mapped <- checked$mapping
+        summary <- checked$summary
         outcomes[[chosen$key]] <- c(list(state="mapped",
           source=as.character(value$source),endpoint=as.character(value$endpoint),
           matched_sifts_rows=as.integer(value$matched_sifts_rows),

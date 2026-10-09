@@ -81,6 +81,9 @@ ${atoms}${component}
     await page.setViewport({width:1366,height:900});
     const requests = [];
     const errors = [];
+    // The connectivity diagnostic deliberately checks known-good 4AKE.
+    // Switch to missing exact SIFTS only in the later crash regression.
+    let simulateMissingExactSifts = false;
     page.on("pageerror", error => errors.push(String(error.message || error)));
     await page.setRequestInterception(true);
     page.on("request", request => {
@@ -118,7 +121,8 @@ ${atoms}${component}
       } else if (url === "https://www.ebi.ac.uk/pdbe/static/entry/4ake_updated.cif") {
         request.respond({status:200,
           headers:{...cors,"content-type":"text/plain"},
-          body:syntheticUpdatedCif(101,false).replace(/P00533/g,"P69441")});
+          body:syntheticUpdatedCif(101,false).replace(/P00533/g,
+             simulateMissingExactSifts ? "P00000" : "P69441")});
       } else if (url === "https://www.ebi.ac.uk/pdbe/static/entry/1crn_updated.cif") {
         const mockCif = syntheticUpdatedCif(101,false);
         request.respond({status:200,
@@ -441,6 +445,45 @@ ${atoms}${component}
     await page.setViewport({width:390,height:844});
     await page.screenshot({path:path.join(output,"atlas-inventory-mobile.png"),
       fullPage:true});
+    // An RCSB-linked polymer entity can have NO matching exact PDBe
+    // SIFTS rows. Its card must explain the limitation without crashing
+    // the Shiny observer, and a subsequent valid verification must work.
+    simulateMissingExactSifts = true;
+    await page.setViewport({width:1366,height:900});
+    await page.$eval("#atlasAccession",element=>{
+      element.value="P69441";
+      element.dispatchEvent(new Event("input",{bubbles:true}));
+      element.dispatchEvent(new Event("change",{bubbles:true}));
+    });
+    await page.click("#atlasDiscover");
+    await page.waitForFunction(() =>
+      document.querySelector("#atlasResults")?.textContent.includes("4AKE"),
+      {timeout:25000});
+    await page.click(".ram-atlas-verify");
+    await page.waitForFunction(() =>
+      document.querySelector("#atlasResults")?.textContent.includes(
+        "SIFTS unavailable: No exact SIFTS residue mapping was found"),
+      {timeout:25000});
+    const failedText=await page.$eval("#atlasResults",element=>element.textContent);
+    assert.match(failedText,/4AKE/);
+    assert.match(failedText,/cannot be used for Atlas clustering/);
+    assert.equal(await page.evaluate(()=>
+      document.querySelectorAll(".shiny-output-error").length),0,
+      "Zero exact SIFTS matches must not throw into an output or observer.");
+    await page.$eval("#atlasAccession",element=>{
+      element.value="P00533";
+      element.dispatchEvent(new Event("input",{bubbles:true}));
+      element.dispatchEvent(new Event("change",{bubbles:true}));
+    });
+    await page.click("#atlasDiscover");
+    await page.waitForFunction(() =>
+      document.querySelector("#atlasResults")?.textContent.includes(
+        "Synthetic atlas test protein"),{timeout:25000});
+    await page.click(".ram-atlas-verify");
+    await page.waitForFunction(() =>
+      document.querySelector("#atlasResults")?.textContent.includes(
+        "Verified exact SIFTS: 40 distinct PDB residues"),
+      {timeout:25000});
     // Results are not permitted to act as conformation-cluster labels.
     assert.doesNotMatch(visible,/experimental state [1-9]/i);
     assert.ok(!errors.length,"Atlas browser JavaScript errors: "+errors.join(" | "));

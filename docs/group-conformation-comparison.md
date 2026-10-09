@@ -34,8 +34,9 @@ invented as comparable positions.
 For each residue and each group RamplotR calculates:
 
 - number of models contributing phi and psi;
-- circular mean phi and psi;
-- circular standard deviation of phi and psi;
+- circular mean phi and psi using only members with **both angles observed**;
+- circular standard deviation of phi and psi on that same paired subset;
+- separate marginal phi/psi counts and the number of complete pairs;
 - modal coarse backbone state and its within-group consistency;
 - modal Rama8000 category and its within-group consistency.
 
@@ -48,7 +49,7 @@ delta_psi = wrap(psi_mean_B - psi_mean_A)
 backbone_shift = sqrt(delta_phi^2 + delta_psi^2)
 ```
 
-Wrapping is performed independently across the -180/180-degree boundary.
+Wrapping is performed independently across the -180/180-degree boundary. When phi and psi come from different structures but no member has both, the group centroid and between-group displacement are **unavailable**. Partial observations remain recorded for coverage audits. This is also how the local conformational fingerprint overlays calculate their mean crosses.
 
 Click a residue in the between-group track or results table to open its
 **local conformational fingerprint**. The overlay contains one measured φ/ψ

@@ -2,15 +2,17 @@
 source(file.path("shinyRam","R","canonical.R"))
 source(file.path("shinyRam","R","atlas-sifts.R"))
 assert <- function(x,msg) if(!isTRUE(x)) stop(msg,call.=FALSE)
-row <- function(resi,ins,unp,observed=TRUE) {
+row <- function(resi,ins,unp,observed=TRUE,mon="ALA") {
   list(chain="A",resi=resi,insertion_code=ins,
        uniprot_accession="P12345",uniprot_resi=unp,
-       entity_id=1L,struct_asym_id="X",observed=observed)
+       entity_id=1L,struct_asym_id="X",observed=observed,mon_id=mon)
 }
 payload <- list(pdb_id="1ABC",entity_id="1",accession="P12345",
-  rows=list(row(101L,"",20L),row(101L,"A",21L),
+  rows=list(row(101L,"",20L,mon="MET"),row(101L,"A",21L,mon="MSE"),
             row(103L,"",25L,FALSE)))
 mapping <- ram_atlas_exact_sifts_map(payload,"1abc",1L,"p12345")
+assert(identical(mapping$mon_id,c("MET","MSE","ALA")),
+  "Experimental sequence scheme must retain modified-residue chemistry.")
 assert(nrow(mapping)==3L &&
        identical(mapping$uniprot_resi,c(20L,21L,25L)) &&
        identical(mapping$insertion_code,c("","A","")),

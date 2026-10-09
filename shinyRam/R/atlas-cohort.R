@@ -9,7 +9,8 @@ ram_atlas_cohort_table <- function(verified,accession) {
     resi=integer(),insertion_code=character(),
     uniprot_accession=character(),uniprot_resi=integer(),
     observed=logical(),mapping_status=character(),
-    struct_asym_id=character(),canonical_source=character(),
+    struct_asym_id=character(),mon_id=character(),
+    canonical_source=character(),
     stringsAsFactors=FALSE
   )
   if(!is.list(verified) || !length(verified)) return(empty)
@@ -46,6 +47,8 @@ ram_atlas_cohort_table <- function(verified,accession) {
       observed=as.logical(map$observed),
       mapping_status=state,
       struct_asym_id=as.character(map$struct_asym_id),
+      mon_id=if("mon_id" %in% names(map)) as.character(map$mon_id)
+        else rep(NA_character_,nrow(map)),
       canonical_source=as.character(map$canonical_source),
       stringsAsFactors=FALSE
     )

@@ -14,10 +14,11 @@ _pdbx_poly_seq_scheme.pdb_strand_id
 _pdbx_poly_seq_scheme.pdb_seq_num
 _pdbx_poly_seq_scheme.auth_seq_num
 _pdbx_poly_seq_scheme.pdb_ins_code
-X 1 1 A 101 101 .
-X 1 2 A 101 101 A
-X 1 3 A 103 103 .
-Y 2 1 B 201 201 .
+_pdbx_poly_seq_scheme.mon_id
+X 1 1 A 101 101 . MET
+X 1 2 A 101 101 A GLY
+X 1 3 A 103 103 . SER
+Y 2 1 B 201 201 . ALA
 #
 loop_
 _pdbx_sifts_xref_db.entity_id
@@ -39,6 +40,7 @@ assert.deepEqual(result.rows.map(x=>x.uniprot_resi),[20,21,25]);
 assert.deepEqual(result.rows.map(x=>x.resi),[101,101,103]);
 assert.deepEqual(result.rows.map(x=>x.insertion_code),["","A",""]);
 assert.equal(result.rows[2].observed,false);
+assert.deepEqual(result.rows.map(x=>x.mon_id),["MET","GLY","SER"]);
 assert.equal(result.unobserved_rows,1);
 assert.deepEqual(result.rows.map(x=>x.chain),["A","A","A"]);
 assert.equal(sifts.exactRows(mmcif,"1abc","2","Q99999").rows[0].chain,"B");
@@ -49,6 +51,12 @@ assert.throws(()=>sifts.exactRows(mmcif.replace(
 const duplicate = mmcif.replace("1 X 2 P12345 21 1",
   "1 X 2 P12345 21 1\n1 X 2 P12345 21 1");
 assert.equal(sifts.exactRows(duplicate,"1abc","1","P12345").rows.length,3);
+// Unknown monomer metadata is never inferred from the UniProt accession.
+const noMon = mmcif.replace("_pdbx_poly_seq_scheme.mon_id\n","")
+  .replace(/ (MET|GLY|SER|ALA)(?=\n)/g, "");
+assert.equal(sifts.exactRows(noMon,"1abc","1","P12345")
+  .rows[0].mon_id,null,
+  "Missing monomer fields must be unknown, not guessed.");
 // No interpolated 102: the PDB-author 101A and 103 identifiers are literal.
 assert.ok(!result.rows.some(x=>x.resi===102));
 assert.deepEqual(sifts.tokenize('  \'A title\'  "other title" # comment'),

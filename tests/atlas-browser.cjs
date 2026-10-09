@@ -10,7 +10,7 @@ const puppeteer = require("puppeteer-core");
 // and the Shiny distance-map grouping without depending on live PDBe APIs.
 function syntheticUpdatedCif(pdbOffset,shifted) {
   const residues=Array.from({length:40},(_,i)=>i+1);
-  const sequence=residues.map(i=>`X 1 ${i} A ${pdbOffset+i-1} .`).join("\n");
+  const sequence=residues.map(i=>`X 1 ${i} A ${pdbOffset+i-1} . ALA`).join("\n");
   const sifts=residues.map(i=>`1 X ${i} P00533 ${i+49} 1`).join("\n");
   const atoms=residues.flatMap(i=>{
     const base=[1.5*i,0.5*Math.sin(i),0.5*Math.cos(i)];
@@ -33,6 +33,7 @@ _pdbx_poly_seq_scheme.seq_id
 _pdbx_poly_seq_scheme.pdb_strand_id
 _pdbx_poly_seq_scheme.pdb_seq_num
 _pdbx_poly_seq_scheme.pdb_ins_code
+_pdbx_poly_seq_scheme.mon_id
 ${sequence}
 #
 loop_
@@ -200,6 +201,15 @@ ${atoms}
     assert.ok(await page.$("#downloadAtlasCanonical"));
     assert.ok(await page.$("#downloadAtlasSupport"));
     await page.waitForSelector("#atlasGeometryEntities",{timeout:15000});
+    await page.waitForFunction(() => {
+      const review=document.querySelector("#atlasConstructReview");
+      const data=document.querySelector("#atlasConstructTable");
+      return review && review.textContent.includes("Construct and sequence-chemistry review") &&
+        data && data.textContent.includes("Chemistry checked");
+    },{timeout:20000});
+    const reviewText=await page.$eval("#atlasConstructReview",el=>el.textContent);
+    assert.match(reviewText,/2 experimental-entity pairs|1 experimental-entity pair/i);
+    assert.ok(await page.$("#downloadAtlasConstruct"));
     await page.click("#atlasRunGeometry");
     await page.waitForFunction(() => {
       const panel=document.querySelector("#atlasGeometrySummary");

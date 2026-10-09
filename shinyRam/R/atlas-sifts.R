@@ -51,6 +51,10 @@ ram_atlas_exact_sifts_map <- function(payload, pdb_id, entity_id, accession) {
       entity_id=entity,struct_asym_id=asym,
       label_seq_id=if(is.null(row$label_seq_id)) NA_integer_
         else suppressWarnings(as.integer(row$label_seq_id)),
+      mon_id=if(is.null(row$mon_id) || length(row$mon_id)!=1L ||
+                is.na(row$mon_id) ||
+                !grepl("^[A-Za-z0-9-]{1,8}$",as.character(row$mon_id)))
+        NA_character_ else toupper(as.character(row$mon_id)),
       identity=NA_real_,coverage=NA_real_,
       canonical_source="PDBe updated mmCIF exact SIFTS",
       observed=isTRUE(row$observed),

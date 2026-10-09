@@ -32,6 +32,7 @@ source(file.path("R", "canonical.R"), local = TRUE)
 source(file.path("R", "atlas-sifts.R"), local = TRUE)
 source(file.path("R", "atlas-cohort.R"), local = TRUE)
 source(file.path("R", "atlas-geometry.R"), local = TRUE)
+source(file.path("R", "atlas-construct.R"), local = TRUE)
 source(file.path("R", "atlas-switch.R"), local = TRUE)
 source(file.path("R", "atlas.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
@@ -2154,6 +2155,7 @@ server <- function(input, output, session) {
         "Only observed residues with exact SIFTS coordinates count.")),
       selectInput("atlasGeometryEntities","Verified experimental entities",
         choices=eligible,selected=prior,multiple=TRUE),
+      uiOutput("atlasConstructReview"),
       numericInput("atlasGeometryCutoff","Distance-map RMSD group cutoff (Å)",
         value=1.5,min=0.1,max=10,step=0.1),
       actionButton("atlasRunGeometry","Compare structural geometries",
@@ -2163,15 +2165,91 @@ server <- function(input, output, session) {
       tableOutput("atlasGeometryTable"))
   })
 
+  atlas_construct_audit <- reactive({
+    cohort <- req(atlas_payload())
+    ids <- input$atlasGeometryEntities
+    if(length(ids)<2L) return(NULL)
+    ram_atlas_construct_audit(atlas_exact_results(),cohort$accession,ids)
+  })
+  output$atlasConstructReview <- renderUI({
+    audit <- tryCatch(atlas_construct_audit(),
+      error=function(e) list(error=conditionMessage(e)))
+    if(is.null(audit)) return(NULL)
+    if(!is.null(audit$error))
+      return(tags$p(class="ram-confidence-warning",audit$error))
+    tags$div(class="ram-atlas-construct-review",
+      tags$h4("Construct and sequence-chemistry review"),
+      tags$p(class="ram-field-hint",sprintf(
+        "%d experimental-entity pairs compared using their shared observed UniProt positions.",
+        audit$pair_count)),
+      if(audit$differs)
+        tags$p(class="ram-confidence-warning",
+          "Verified polymer residue chemistry differs between some structures. Different residue chemistry can reflect mutations, modifications or construct differences; the geometry groups cannot isolate their effects."),
+      if(audit$incomplete)
+        tags$p(class="ram-field-hint",
+          "Some experimental residues lack comparable chemistry metadata or occur outside the shared observed core. Unknown does not mean equivalent."),
+      DT::DTOutput("atlasConstructTable"),
+      downloadButton("downloadAtlasConstruct",
+        "Export construct-comparability CSV"),
+      if(audit$differs)
+        checkboxInput("atlasConfirmDifferentChemistry",
+          "Include structures with verified residue-chemistry differences in exploratory geometry grouping",
+          value=FALSE),
+      tags$p(class="ram-field-hint",
+        "This is not a biological-state equivalence test. Structure preparation, missing regions, ligands, sequence changes and experimental conditions can affect the geometry."))
+  })
+  output$atlasConstructTable <- DT::renderDT({
+    audit <- atlas_construct_audit()
+    req(!is.null(audit))
+    data <- audit$pairs[,c("entity_a","entity_b","common_observed",
+      "chemistry_checked","chemistry_unknown","chemistry_differences",
+      "unmatched_a","unmatched_b","difference_examples"),drop=FALSE]
+    names(data) <- c("Structure A","Structure B","Common C-alpha",
+      "Chemistry checked","Chemistry unknown","Different residues",
+      "A-only","B-only","Differences (UniProt: A/B)")
+    DT::datatable(data,rownames=FALSE,selection="none",
+      options=list(pageLength=8,scrollX=TRUE,dom="tip"),
+      class="compact stripe hover")
+  },server=FALSE)
+  output$downloadAtlasConstruct <- downloadHandler(
+    filename=function() "ramplotr_atlas_construct_review.csv",
+    content=function(file) {
+      audit <- req(atlas_construct_audit())
+      utils::write.csv(audit$pairs,file,row.names=FALSE,na="")
+    }
+  )
+  atlas_chemistry_acknowledged <- reactiveVal(NULL)
+  observeEvent(input$atlasGeometryEntities, {
+    atlas_chemistry_acknowledged(NULL)
+  },ignoreInit=TRUE)
+  observeEvent(atlas_exact_results(), {
+    atlas_chemistry_acknowledged(NULL)
+  },ignoreInit=TRUE)
+  observeEvent(input$atlasConfirmDifferentChemistry, {
+    ids <- isolate(input$atlasGeometryEntities)
+    atlas_chemistry_acknowledged(
+      if(isTRUE(input$atlasConfirmDifferentChemistry) && length(ids)>=2L)
+        sort(as.character(ids)) else NULL)
+  },ignoreInit=TRUE)
   observeEvent(input$atlasRunGeometry, {
     cohort <- isolate(atlas_payload())
     if(is.null(cohort)) return()
-    output <- tryCatch(ram_atlas_geometry_groups(
-      isolate(atlas_exact_results()),cohort$accession,
-      isolate(input$atlasGeometryEntities),
-      min_core=30L,min_fraction=0.6,
-      cutoff=isolate(input$atlasGeometryCutoff),max_core=300L),
-      error=function(e) list(error=conditionMessage(e)))
+    output <- tryCatch({
+      verified <- isolate(atlas_exact_results())
+      ids <- isolate(input$atlasGeometryEntities)
+      audit <- ram_atlas_construct_audit(verified,cohort$accession,ids)
+      if(audit$differs &&
+         !identical(isolate(atlas_chemistry_acknowledged()),
+                    sort(as.character(ids))))
+        stop("Review the observed residue-chemistry differences and explicitly acknowledge their confounding effects before exploratory grouping.",
+          call.=FALSE)
+      geometry <- ram_atlas_geometry_groups(
+        verified,cohort$accession,ids,
+        min_core=30L,min_fraction=0.6,
+        cutoff=isolate(input$atlasGeometryCutoff),max_core=300L)
+      geometry$construct_audit <- audit
+      geometry
+    },error=function(e) list(error=conditionMessage(e)))
     atlas_geometry_result(output)
   },ignoreInit=TRUE)
 

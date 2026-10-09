@@ -758,6 +758,7 @@ ui <- fluidPage(
   tags$script(src = "custom.js"),
   tags$script(src = "canonical-mapping.js"),
   tags$script(src = "atlas-sifts-exact.js"),
+  tags$script(src = "atlas-ligand-contacts.js"),
   tags$script(src = "atlas-discovery.js"),
   tags$script(src = "atlas-connectivity.js"),
   tags$script(src = "experimental-search.js"),
@@ -2078,7 +2079,10 @@ server <- function(input, output, session) {
               else value$backbone_atoms,
             ca_points=if(is.null(value$ca_points)) list() else value$ca_points,
             ca_warning=if(is.null(value$ca_warning)) "" else
-              as.character(value$ca_warning)))
+              as.character(value$ca_warning),
+            ligand_contacts=if(is.null(value$ligand_contacts))
+              list(status="unavailable",warning="Contact evidence missing.")
+              else value$ligand_contacts))
       }
     }
     atlas_exact_results(outcomes)

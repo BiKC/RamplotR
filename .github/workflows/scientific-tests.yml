@@ -85,6 +85,7 @@ jobs:
           Rscript tests/atlas-sifts.R
           Rscript tests/atlas-cohort.R
           Rscript tests/atlas-geometry.R
+          Rscript tests/atlas-construct.R
           Rscript tests/atlas-switch.R
         shell: bash
       - name: Verify peptide continuity and torsion calculations

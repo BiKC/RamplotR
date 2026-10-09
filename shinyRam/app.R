@@ -3513,6 +3513,16 @@ server <- function(input, output, session) {
   group_comparison_matches <- reactive({
     value <- group_comparison_results()
     if (is.null(value)) return(NULL)
+    if(identical(value$source,"atlas")) {
+      geometry <- atlas_geometry_result()
+      picked <- atlas_group_transfer()
+      if(is.null(geometry) || !is.null(geometry$error) ||
+         is.null(picked) ||
+         !identical(value$selection,picked) ||
+         !identical(value$result$accession,geometry$accession))
+        return(NULL)
+      return(value$result)
+    }
     structure <- req(loaded())
     if (!identical(value$key,structure$key) ||
         !identical(value$mode,input$validationMode) ||
@@ -3535,6 +3545,33 @@ server <- function(input, output, session) {
   },ignoreInit=TRUE)
 
   observeEvent(input$runGroupComparison, {
+    if(identical(input$groupInputMode,"atlas")) {
+      picked <- isolate(atlas_group_transfer())
+      geometry <- isolate(atlas_geometry_result())
+      if(is.null(picked) || is.null(geometry) ||
+         !is.null(geometry$error)) {
+        showNotification("Select both verified experimental groups in Atlas first.",
+          type="warning",duration=12)
+        return()
+      }
+      result <- tryCatch(withProgress(
+        message="Comparing exact UniProt-mapped Atlas groups",{
+          ram_atlas_group_prepare(isolate(atlas_exact_results()),geometry,
+            picked$group_a,picked$group_b,
+            input$groupALabel,input$groupBLabel)
+        }),error=function(e)e)
+      if(inherits(result,"error")) {
+        showNotification(conditionMessage(result),type="error",duration=16)
+        return()
+      }
+      group_comparison_results(list(
+        source="atlas",selection=picked,result=result))
+      showNotification(sprintf(
+        "Compared %d + %d verified structures over %d canonical positions.",
+        result$n_a,result$n_b,result$core_positions),
+        type="message",duration=10)
+      return()
+    }
     structure <- req(loaded())
     ref_chain <- req(input$groupReferenceChain)
     label_a <- trimws(input$groupALabel)
@@ -3658,6 +3695,19 @@ server <- function(input, output, session) {
     data <- result$comparison
     finite <- is.finite(data$angular_displacement)
     tags$div(
+      if(identical(result$source,"atlas"))
+        tags$div(class="ram-field-hint",
+          tags$strong("Verified Atlas group comparison · UniProt ",
+            result$accession),
+          tags$p(sprintf(paste0(
+            "%d exact shared observed canonical positions; ",
+            "%d positions lack agreement on experimental monomer identity. ",
+            "All structures were reused from the verified Atlas cohort."),
+            result$core_positions,result$unknown_chemistry_positions)),
+          if(isTRUE(result$known_chemistry_differences))
+            tags$p(class="ram-confidence-warning",
+              "Observed residue chemistry differs between selected structures. This is a potentially confounded structural comparison."),
+          tags$p("Rama8000/native RamplotR classifications are not inferred from the Atlas backbone-only cache; local circular φ/ψ and backbone-state summaries remain available. No geometric cluster is interpreted as a validated biological state.")),
       tags$div(class="ram-confidence-metrics",
         tags$span(class="ram-confidence-metric",
           sprintf("%s: %d structures",result$label_a,result$n_a)),

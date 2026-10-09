@@ -250,6 +250,15 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 - Current `main` is the authoritative merged baseline. Future branch work should start there; do not reuse `feature/atlas-construct-compatibility`.
 - Next scientific milestone: **broader experimental controls across independent folds, different constructs, changed/nonchanged ligand conditions and isoforms**, with honest denominators. Separately verify PDBe/RCSB CORS on the actual static Shinylive deployment.
 
+## October 9: additional independent-fold benchmark (active branch)
+
+- Active branch: `feature/atlas-citrate-synthase-benchmark`, based on `main` at `0e25a3fdacf7b2a4169bc19e599cdb6f65db0fc3`. Manuscript PR #20 remains separate.
+- Added *Sus scrofa* citrate synthase (UniProt P00889): 1CTS open, 2CTS closed, 3ENJ separately crystallized open-like control. Ground truth from the original X-ray literature and <https://pmc.ncbi.nlm.nih.gov/articles/PMC2675578/>. 3ENJ's Cys184 cystamine modification and conditions are explicitly documented as confounders.
+- Case manifest is now four proteins, 10 deposited polymer entities, three fold-family groupings. MBP and RBP remain one related family, and same-crystal chain pairs are explicitly non-independent.
+- Generalized the live PDBe fetch/benchmark and its provenance, with a per-protein control summary comparing the documented global/local contrast against the largest observed control. No cutoff calibration, statistical independence or state classifier inferred.
+- Extended manifest validation to assert an independent third fold and known open/closed/control PDBs. Live case checks still require PR-ready Actions with fresh updated-mmCIF downloads.
+- Next: once PR is ready, inspect live checks, archive source SHA256s and measured control margins before merging. Continue with additional independent experimental folds, condition metadata and construct controls after verification.
+
 ## Next implementation steps
 
 1. Verify **deployed-browser** PDBe and RCSB CORS in RamplotR's actual

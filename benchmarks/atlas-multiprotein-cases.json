@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "notes": "Curated literature-based contrast cases. PDB chain-copy controls and single-entry identities are not independent biological replicates. All conformational labels are literature context, not model predictions.",
+  "notes": "Curated literature-based contrast cases. PDB chain-copy controls and single-entry identities are not independent biological replicates. All conformational labels are literature context, not model predictions. The pig-heart citrate synthase case adds a distinct all-alpha fold. A separate-crystal open-state control is not proof of biological independence or identical chemical conditions.",
   "proteins": [
     {
       "id": "adenylate_kinase",
@@ -41,7 +41,8 @@
           "right_chain_rank": 2,
           "class": "within_crystal"
         }
-      ]
+      ],
+      "fold_family": "nucleoside_monophosphate_kinase"
     },
     {
       "id": "maltose_binding_protein",
@@ -79,7 +80,8 @@
           "right": "1JW4",
           "class": "separate_crystal_open_control"
         }
-      ]
+      ],
+      "fold_family": "periplasmic_binding_protein"
     },
     {
       "id": "ribose_binding_protein",
@@ -112,6 +114,46 @@
           "left_chain_rank": 1,
           "right_chain_rank": 2,
           "class": "within_crystal"
+        }
+      ],
+      "fold_family": "periplasmic_binding_protein"
+    },
+    {
+      "id": "pig_citrate_synthase",
+      "name": "Sus scrofa mitochondrial citrate synthase",
+      "uniprot": "P00889",
+      "fold_family": "citrate_synthase_all_alpha",
+      "source": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2675578/",
+      "entries": [
+        {
+          "pdb": "1CTS",
+          "entity": 1,
+          "label": "open",
+          "condition": "citrate-containing open enzyme crystal; early 2.7 Å model"
+        },
+        {
+          "pdb": "2CTS",
+          "entity": 1,
+          "label": "closed",
+          "condition": "coenzyme A/citrate-bound closed enzyme crystal"
+        },
+        {
+          "pdb": "3ENJ",
+          "entity": 1,
+          "label": "open",
+          "condition": "separate 1.78 Å open-like crystal; cystamine-modified Cys184"
+        }
+      ],
+      "comparisons": [
+        {
+          "left": "1CTS",
+          "right": "2CTS",
+          "class": "documented_open_closed"
+        },
+        {
+          "left": "1CTS",
+          "right": "3ENJ",
+          "class": "separate_crystal_open_control"
         }
       ]
     }

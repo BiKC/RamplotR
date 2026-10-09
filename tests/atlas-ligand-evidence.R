@@ -31,4 +31,24 @@ assert(broken$unavailable==2L &&
 assert(grepl("not",res$method,fixed=TRUE) &&
        !grepl("classified as apo",res$method,fixed=TRUE),
   "Observed contacts must not claim functional ligand states.")
+
+# Per-site distances include all exact mapped residues when available.
+verified_full <- verified
+verified_full[["1ABC_1"]]$ligand_contacts$sites[[1L]]$residue_contacts <-
+  list(list(uniprot_resi=104L,min_distance_A=3.5),
+       list(uniprot_resi=105L,min_distance_A=4.2))
+mapped <- ram_atlas_observed_ligand_context(verified_full,geometry)
+assert(nrow(mapped$residue_contacts)==2L &&
+       all(mapped$residue_contacts$scope=="all-mapped-contacts") &&
+       identical(mapped$residue_contacts$uniprot_resi,c(104L,105L)),
+  "All exact mapped residues near a component must be kept.")
+assert(nrow(res$residue_contacts)==1L &&
+       res$residue_contacts$scope[[1L]]=="nearest-only",
+  "Old cached evidence must be identified as nearest-only, not comprehensive.")
+# Both present and unknown records should remain distinct after invalid data.
+invalid_second <- verified_full
+invalid_second[["1ABC_1"]]$ligand_contacts$sites[[1L]]$residue_contacts[[2L]]$min_distance_A <- -1
+reject <- ram_atlas_observed_ligand_context(invalid_second,geometry)
+assert(reject$unavailable==2L && nrow(reject$residue_contacts)==0L,
+  "Invalid per-residue distances must invalidate the whole entry.")
 message("Observed ligand proximity scientific tests passed.")

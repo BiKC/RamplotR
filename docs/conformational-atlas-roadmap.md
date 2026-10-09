@@ -106,6 +106,10 @@ Confirmed chemistry differences require explicit acknowledgement before geometry
 
 A fourth protein, *Sus scrofa* citrate synthase P00889 (1CTS open, 2CTS closed, 3ENJ independent open-like crystal), expands the live case set to **four proteins and three fold families**. The benchmark records explicit family groupings rather than falsely counting MBP and RBP as independent structural families. A new per-protein output compares each literature-described contrast with its strongest available observed control, distinguishing within-crystal chain copies from separate crystals. It records global distance-map difference and exploratory local angular fractions without training or validating a universal discriminator. The 3ENJ cystamine adduct and changes in experimental condition are confounders, not hidden equivalences. Raw PDBe updated-mmCIF SHA256 provenance remains part of every live run. See `docs/atlas-multiprotein-benchmark.md`.
 
+## Browser deployment verification (October 9, 2026)
+
+Atlas now offers an opt-in in-browser diagnostic for the **real** RCSB experimental search, RCSB polymer metadata and PDBe updated mmCIF/SIFTS archive connections. A separately configured Chromium PR-ready check visits the public `bikc.be` Shinylive **origin** and exercises the current PR's parsers from that origin. This closes the gap between successful Node/localhost tests and actual browser CORS/network restrictions, without confusing archive reachability with biological validity or claiming that the unpublished UI is already deployed. Endpoint failures remain explicit; no insecure transparent proxy or guessed residue mapping is introduced. See `docs/atlas-browser-connectivity.md`.
+
 ## Scientific principles
 
 1. Keep evidence types separate. Rama8000 validation, native RamplotR density,

@@ -367,3 +367,23 @@ branch, and do not reuse historical feature branches.
   mismatched missing-angle patterns and complete absence of paired residues.
 - This is a scientific correctness fix, not a classifier or new validation
   threshold. CI runs only when the pull request becomes ready for review.
+
+## October 9: sensitivity of experimental Atlas cluster suggestions
+
+- Branch `feature/atlas-cluster-jackknife` originates from merged
+  `main` at `519c9257063ca33a0f1e391e8f84af4a79af3805`;
+  the `arxiv-preprint` PR #20 is not modified.
+- Uses deterministic leave-one-contiguous-block-out sensitivity of the same
+  exact-mapped, sampled canonical C-alpha coordinate matrices as the Atlas
+  dendrogram. Recomputes structural distances and automatic/manual
+  average-linkage grouping with unchanged settings.
+- Reports whole-partition reproduction, exact membership recovery, pairwise
+  co-assignment, the exact omitted residue spans and duplicated PDB entry IDs.
+  Two-structure cohorts receive no potentially misleading stability score.
+- The diagnostic is not a bootstrap confidence measure, biological-state
+  assignment or measure of structural sampling probability. The manual group
+  cutoff, construct-chemistry audit and researcher-defined Group A/B remain
+  unchanged.
+- Added collapsed Atlas UI, three CSV exports, help text, scientific tests,
+  and browser smoke coverage. CI runs when a new PR becomes ready, not on
+  every commit. Keep this feature on its own PR until validation is green.

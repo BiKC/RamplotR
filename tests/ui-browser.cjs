@@ -1036,7 +1036,7 @@ const assert = require("node:assert/strict");
       document.querySelector(".ram-group-evidence-card"),{timeout:12000});
     const groupEvidence = await page.$eval(".ram-group-evidence-card",
       node => node.textContent);
-    assert.ok(groupEvidence.includes("Small shift") &&
+    assert.ok(groupEvidence.includes("Unreplicated structural difference") &&
               groupEvidence.includes("Between-group shift") &&
               groupEvidence.includes("Residue coverage"),
       "Selected group residue should explain its effect size, coverage and evidence profile.");

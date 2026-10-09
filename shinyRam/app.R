@@ -3628,6 +3628,11 @@ server <- function(input, output, session) {
     label_b <- trimws(input$groupBLabel)
     if (!nzchar(label_a)) label_a <- "Group A"
     if (!nzchar(label_b)) label_b <- "Group B"
+    if(identical(label_a,label_b)) {
+      showNotification("Give Group A and Group B distinct labels.",
+        type="warning",duration=12)
+      return()
+    }
     min_identity <- suppressWarnings(as.numeric(input$groupMinIdentity)/100)
     min_coverage <- suppressWarnings(as.numeric(input$groupMinCoverage)/100)
     if (!is.finite(min_identity)) min_identity <- 0.70

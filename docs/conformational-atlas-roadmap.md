@@ -102,6 +102,10 @@ The exploratory Atlas now checks **all pairs** among the selected verified exper
 
 Confirmed chemistry differences require explicit acknowledgement before geometry grouping. A downloadable CSV preserves the comparison denominators and positional evidence. Unknown chemistry remains visibly unresolved, not assumed identical. The gate is a **review safeguard**, not evidence that matching monomer chemistry means matching constructs, experimental conditions, isoforms or biological states. Distinct isoform accessions may not be mixed by a single UniProt-cohort query. No functional-state labels or universal thresholds are inferred.
 
+## October 9 experimental benchmark extension
+
+A fourth protein, *Sus scrofa* citrate synthase P00889 (1CTS open, 2CTS closed, 3ENJ independent open-like crystal), expands the live case set to **four proteins and three fold families**. The benchmark records explicit family groupings rather than falsely counting MBP and RBP as independent structural families. A new per-protein output compares each literature-described contrast with its strongest available observed control, distinguishing within-crystal chain copies from separate crystals. It records global distance-map difference and exploratory local angular fractions without training or validating a universal discriminator. The 3ENJ cystamine adduct and changes in experimental condition are confounders, not hidden equivalences. Raw PDBe updated-mmCIF SHA256 provenance remains part of every live run. See `docs/atlas-multiprotein-benchmark.md`.
+
 ## Scientific principles
 
 1. Keep evidence types separate. Rama8000 validation, native RamplotR density,

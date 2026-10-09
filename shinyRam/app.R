@@ -2248,13 +2248,21 @@ server <- function(input, output, session) {
       selectInput("atlasGeometryEntities","Verified experimental entities",
         choices=eligible,selected=prior,multiple=TRUE),
       uiOutput("atlasConstructReview"),
-      numericInput("atlasGeometryCutoff","Distance-map RMSD group cutoff (Å)",
-        value=1.5,min=0.1,max=10,step=0.1),
-      actionButton("atlasRunGeometry","Compare structural geometries",
+      radioButtons("atlasClusterMode","How should structures be grouped?",
+        choices=c("Suggest groups automatically"="automatic",
+          "Choose a distance cutoff myself"="manual"),
+        selected="automatic",inline=TRUE),
+      conditionalPanel(condition="input.atlasClusterMode === 'manual'",
+        numericInput("atlasGeometryCutoff","Distance-map RMSD group cutoff (Å)",
+          value=1.5,min=0.1,max=10,step=0.1)),
+      tags$p(class="ram-field-hint",
+        "Automatic mode evaluates geometry-only cohesion and separation on the same verified UniProt core. It can recommend one group when no clear split is supported. This does not infer functional states."),
+      actionButton("atlasRunGeometry","Cluster experimental structures",
         class="btn-primary btn-sm"),
       uiOutput("atlasGeometrySummary"),
       plotOutput("atlasGeometryPlot",height="260px"),
       tableOutput("atlasGeometryTable"),
+      uiOutput("atlasAutoQuality"),
       uiOutput("atlasGroupsHandoffPanel"))
   })
 
@@ -2266,14 +2274,23 @@ server <- function(input, output, session) {
        length(geometry$selected)<2L) return(NULL)
     members <- split(as.character(geometry$assignment$entity),
       geometry$assignment$geometric_group)
-    default_a <- if(length(members)>0L) members[[1L]]
+    # A one-group automatic suggestion must not select the entire cohort
+    # as Group A and leave Group B empty. Offer an explicit editable pair.
+    default_a <- if(length(members)>1L) members[[1L]]
       else geometry$selected[[1L]]
     default_b <- if(length(members)>1L) members[[2L]]
-      else setdiff(geometry$selected,default_a)[[1L]]
+      else geometry$selected[[2L]]
     tags$section(class="ram-atlas-group-handoff",
       tags$h4("Compare Atlas structures as groups"),
       tags$p(class="ram-field-hint",
-        "Choose which verified experimental structures belong to each condition. Geometry clusters can suggest a starting point, but group names and biological interpretations are yours. The analysis reuses exact SIFTS-mapped backbone atoms without reuploading files."),
+        "Review the suggested clusters, then freely edit Group A and Group B. Geometric grouping is not a functional-state label. The analysis reuses exact SIFTS-mapped backbone atoms without reuploading files."),
+      if(length(members)<2L)
+        tags$p(class="ram-confidence-warning",
+          "Atlas did not identify two well-separated clusters. These default single-entry groups are only a starting point for an explicitly researcher-defined comparison."),
+      if(length(members)>2L)
+        tags$p(class="ram-field-hint",
+          sprintf("%d geometric clusters found. Group Compare accepts two sets: select which clusters or individual structures to compare.",
+            length(members))),
       tags$div(class="ram-atlas-group-handoff-grid",
         selectInput("atlasGroupAEntities","Group A experimental entries",
           choices=geometry$selected,selected=default_a,multiple=TRUE),
@@ -2418,7 +2435,8 @@ server <- function(input, output, session) {
       geometry <- ram_atlas_geometry_groups(
         verified,cohort$accession,ids,
         min_core=30L,min_fraction=0.6,
-        cutoff=isolate(input$atlasGeometryCutoff),max_core=300L)
+        cutoff=isolate(input$atlasGeometryCutoff),max_core=300L,
+        cluster_mode=isolate(input$atlasClusterMode))
       geometry$construct_audit <- audit
       geometry
     },error=function(e) list(error=conditionMessage(e)))
@@ -2430,18 +2448,43 @@ server <- function(input, output, session) {
     if(is.null(result)) return(NULL)
     if(!is.null(result$error))
       return(tags$p(class="ram-confidence-warning",result$error))
+    automatic <- result$auto_cluster
+    count <- length(unique(result$assignment$geometric_group))
     tags$div(class="ram-field-hint",
       tags$p(sprintf(paste0(
-        "%d entities compared on %d common observed UniProt C-alpha positions ",
-        "(%d evenly sampled for distance calculations). %d exploratory ",
-        "geometric group(s) at %.2f Å distance-map RMSD."),
+        "%d experimental entities, %d common observed UniProt C-alpha ",
+        "positions (%d sampled). %d exploratory geometry group(s)."),
         length(result$selected),length(result$common_positions),
-        length(result$sampled_positions),
-        length(unique(result$assignment$geometric_group)),
-        result$cutoff)),
-      tags$p("Average-linkage hierarchical clustering of intrachain C-alpha distance differences. Rigid-body alignment is not required; this is not experimental evidence for functional state identity."),
-      tags$p(paste("Representative entries:",
+        length(result$sampled_positions),count)),
+      if(!is.null(automatic))
+        tags$p(tags$strong("Automatic suggestion: "),
+          automatic$reason)
+      else tags$p(sprintf(
+        "Manual distance-map RMSD cutoff: %.2f Å.",result$cutoff)),
+      tags$p("Average-linkage clustering of C-alpha internal distance differences. All comparisons use the same verified canonical core. Neither automated clusters nor manual groups establish biological states, independent experimental replicates or ligand conditions."),
+      tags$p(paste("Group representatives:",
         paste(unname(result$representatives),collapse=", "))))
+  })
+  output$atlasAutoQuality <- renderUI({
+    result <- atlas_geometry_result()
+    if(is.null(result) || !is.null(result$error) ||
+       is.null(result$auto_cluster)) return(NULL)
+    quality <- result$auto_cluster$candidates
+    if(!nrow(quality)) return(NULL)
+    tags$details(class="ram-details",
+      tags$summary("Why did Atlas suggest these groups?"),
+      tags$p(class="ram-field-hint",
+        "Mean silhouette compares each structure with its own and other clusters (range -1 to 1; singletons score 0). The distance gap is median between-cluster minus within-cluster C-alpha dRMSD in Å. Exploratory safeguards require silhouette ≥0.50 and gap ≥0.35 Å; these values are not biologically calibrated thresholds."),
+      tags$table(class="table table-condensed",
+        tags$thead(tags$tr(lapply(
+          c("Groups","Mean silhouette","Distance gap (Å)","Singleton groups"),
+          tags$th))),
+        tags$tbody(lapply(seq_len(nrow(quality)),function(i)
+          tags$tr(lapply(as.list(quality[i,c("k","silhouette",
+            "separation_A","singleton_groups")]),tags$td))))),
+      tags$p(class="ram-field-hint",
+        "For two structures, no automatic split is proposed. Switch to manual mode to inspect a two-structure comparison.")
+    )
   })
 
   output$atlasGeometryPlot <- renderPlot({
@@ -2456,6 +2499,9 @@ server <- function(input, output, session) {
     table <- result$assignment
     names(table) <- c("PDB entity","Chain","Mapped C-alpha",
       "Common core fraction","Geometry group")
+    group_counts <- base::table(table[["Geometry group"]])
+    table[["Group size"]] <- as.integer(group_counts[
+      as.character(table[["Geometry group"]])])
     table
   },striped=TRUE,spacing="xs",rownames=FALSE)
 

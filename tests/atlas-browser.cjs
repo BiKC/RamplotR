@@ -243,11 +243,30 @@ ${atoms}
     const reviewText=await page.$eval("#atlasConstructReview",el=>el.textContent);
     assert.match(reviewText,/2 experimental-entity pairs|1 experimental-entity pair/i);
     assert.ok(await page.$("#downloadAtlasConstruct"));
+    // Automatic mode is deliberately conservative with only two entities:
+    // no within-cluster replication, so Atlas must not invent a split.
     await page.click("#atlasRunGeometry");
     await page.waitForFunction(() => {
       const panel=document.querySelector("#atlasGeometrySummary");
       return panel && panel.textContent.includes(
-        "2 exploratory geometric group(s)") &&
+        "Fewer than three structures") &&
+        panel.textContent.includes("1 exploratory geometry group(s)");
+    },{timeout:25000});
+    const automaticNotice=await page.$eval("#atlasGeometrySummary",
+      el=>el.textContent);
+    assert.match(automaticNotice,/no automatic split recommended/i);
+    await page.waitForSelector("#atlasGroupAEntities");
+    await page.waitForSelector("#atlasGroupBEntities");
+    // Researchers can override a conservative recommendation.
+    await page.click('input[name="atlasClusterMode"][value="manual"]');
+    await page.waitForFunction(() =>
+      !!document.querySelector("#atlasGeometryCutoff") &&
+      document.querySelector("#atlasGeometryCutoff").offsetParent!==null);
+    await page.click("#atlasRunGeometry");
+    await page.waitForFunction(() => {
+      const panel=document.querySelector("#atlasGeometrySummary");
+      return panel && panel.textContent.includes(
+        "2 exploratory geometry group(s)") &&
         panel.textContent.includes("40 common observed UniProt");
     },{timeout:25000});
     const geometryTable=await page.$eval("#atlasGeometryTable",

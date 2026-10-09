@@ -3792,7 +3792,7 @@ server <- function(input, output, session) {
             sum(data$basin_mode_changed,na.rm=TRUE)))
       ),
       tags$p(class="ram-confidence-explainer",
-        "Between-group displacement compares circular mean φ/ψ values. A high-support shift combines ≥30° displacement, ≤15° within-group circular SD and ≥75% residue coverage in both groups. These are transparent navigation criteria, not statistical significance tests.")
+        "Between-group displacement compares circular mean φ/ψ values from the same complete-pair observations in each group. A high-support shift also requires at least two paired observations per group, ≥30° displacement, ≤15° within-group circular SD and ≥75% paired coverage in both groups. These are navigation criteria, not significance tests.")
     )
   })
 
@@ -4008,7 +4008,7 @@ server <- function(input, output, session) {
     data <- result$comparison
     shown <- data[,c(
       "chain","resi","insertion_code","resn",
-      "a_phi_models","b_phi_models",
+      "a_paired_angle_models","b_paired_angle_models",
       "a_phi_mean","b_phi_mean","delta_phi",
       "a_psi_mean","b_psi_mean","delta_psi",
       "angular_displacement","max_within_group_sd",
@@ -4030,7 +4030,7 @@ server <- function(input, output, session) {
     shown$rama8000_mode_changed <- ifelse(shown$rama8000_mode_changed,
                                            "Yes","No")
     DT::datatable(shown,rownames=FALSE,selection="single",
-      colnames=c("Chain","Residue","Ins.","AA","n A","n B",
+      colnames=c("Chain","Residue","Ins.","AA","Paired A","Paired B",
         "φ A","φ B","Δφ","ψ A","ψ B","Δψ",
         "Mean shift","Max within SD","Coverage A (%)","Coverage B (%)",
         "Min Rama8000 agreement (%)","Evidence profile",

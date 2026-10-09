@@ -44,9 +44,11 @@ jobs:
           node --check shinyRam/www/canonical-mapping.js
           node --check shinyRam/www/atlas-discovery.js
           node --check shinyRam/www/atlas-sifts-exact.js
+          node --check shinyRam/www/atlas-ligand-contacts.js
           node --check shinyRam/www/atlas-connectivity.js
           node tests/atlas-discovery.test.cjs
           node tests/atlas-sifts-exact.test.cjs
+          node tests/atlas-ligand-contacts.test.cjs
           node tests/atlas-connectivity.test.cjs
           node tests/atlas-multiprotein-config.test.cjs
           node --check shinyRam/www/experimental-search.js
@@ -90,6 +92,7 @@ jobs:
           Rscript tests/atlas-geometry.R
           Rscript tests/atlas-construct.R
           Rscript tests/atlas-experimental-context.R
+          Rscript tests/atlas-ligand-evidence.R
           Rscript tests/atlas-switch.R
           Rscript tests/atlas-group-handoff.R
         shell: bash

@@ -372,6 +372,20 @@ ${atoms}${component}
     assert.match(groupText,/Rama8000\/native RamplotR classifications are not inferred/);
     assert.ok(await page.$("#downloadGroupComparison"));
     assert.ok(await page.$("#downloadGroupMembers"));
+    await page.waitForFunction(() => {
+      const panel=document.querySelector(".ram-group-ligand-evidence");
+      return panel && panel.textContent.includes(
+        "Deposited component proximity at this UniProt position") &&
+        panel.textContent.includes("does not establish an apo state");
+    },{timeout:15000});
+    assert.ok(await page.$("#downloadGroupFingerprintLigand"));
+    await page.waitForFunction(() => !!document.querySelector(
+      "#groupFingerprintLigandMembers tbody tr"),{timeout:15000});
+    // Selecting a residue near the synthetic ATP should update the matched
+    // component table; the other structure has a measured zero-site result.
+    const near=await page.$eval(".ram-group-ligand-evidence",
+      element=>element.textContent);
+    assert.match(near,/nearby|Deposited proximity/i);
     await page.click('.nav-tabs a[data-value="atlas"]');
     await page.waitForFunction(()=>document.querySelector(
       "#atlasSwitchPlot img")?.complete,{timeout:15000});

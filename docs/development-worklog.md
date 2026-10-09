@@ -424,3 +424,21 @@ branch, and do not reuse historical feature branches.
   No extra network request or database needed.
 - Validate positive/negative cases in Node parser tests, R adapter tests and
   the existing end-to-end mock browser Atlas flow. PR-ready CI only.
+
+## October 9: link deposited components to selected backbone changes
+
+- Branch `feature/atlas-contact-linked-fingerprint`, based on merged
+  `main` `9ee812b28d6798cbd8247f303a6df70318364ed5`.
+- The PDBe updated-mmCIF parser now retains all exact mapped UniProt residues
+  within 4.5 Å of each deposited non-water HETATM component, with the
+  minimum heavy-atom distance for each residue, rather than only the
+  globally closest residue.
+- The Atlas group handoff carries validated measured component records and
+  their availability. Selecting a residue in the group conformational
+  fingerprint shows observed nearby components per member, no recorded
+  local proximity, incomplete nearest-only legacy evidence and unavailable
+  extraction separately from backbone-angle completeness.
+- Adds a reproducible selected-residue CSV, in-app Guide section, Node parser,
+  R group-handoff and browser regression coverage. No new network requests.
+- Avoid automatic functional-ligand or apo/holo classification and treat
+  structures from a single PDB deposition as non-independent observations.

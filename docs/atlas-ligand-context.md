@@ -18,8 +18,18 @@ For every verified polymer entity in a clustered Atlas cohort:
 3. Identify non-water, nonpolymer HETATM residues and find those with a heavy
    atom within 4.5 Å of any mapped heavy protein atom. Only positions with
    unambiguous exact mapping are used.
-4. Report deposited three-letter component code, ligand asym/author residue
+4. Retain every exactly mapped UniProt residue within 4.5 Å of each
+   component, together with its own minimum heavy-atom distance. Old
+   nearest-only records remain labelled as limited evidence, so a contact
+   absent from that limited representation is not treated as a negative.
+5. Report deposited three-letter component code, ligand asym/author residue
    identifiers, nearest exact UniProt residue and minimum heavy-atom distance.
+
+Compare Groups reuses these measurements in its residue-first conformational
+fingerprint. Selecting a residue updates the per-member contact table without
+another archive request. Missing φ/ψ angles and unavailable deposited
+components are presented separately. The selected-residue CSV retains
+component identity and the measured minimum heavy-atom distance.
 
 The spatial search uses 5 Å bins and inspects neighboring bins. It never
 approximates contacts from residue numbering or uses AlphaFold pLDDT as a

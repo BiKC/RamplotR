@@ -30,6 +30,20 @@ assert.equal(out.sites[0].comp_id,"ATP");
 assert.equal(out.sites[0].nearest_uniprot_resi,101);
 assert.equal(out.sites[0].min_distance_A,2);
 assert.equal(out.sites[0].heavy_atoms,1);
+assert.deepEqual(out.sites[0].residue_contacts,
+  [{uniprot_resi:101,min_distance_A:2}],
+  "Observed component must retain all exact mapped protein residue contacts.");
+const twoResidues=cif.replace(
+  "ATOM CA X 2 GLY C 30 0 0 1 . 102 .",
+  "ATOM CA X 2 GLY C 4 0 0 1 . 102 .");
+const multi=ligand.extract(twoResidues,exact);
+assert.equal(multi.sites.length,1);
+assert.deepEqual(multi.sites[0].residue_contacts,
+  [{uniprot_resi:101,min_distance_A:2},
+   {uniprot_resi:102,min_distance_A:1}],
+  "A ligand can contact several mapped residues; never keep only the nearest.");
+assert.equal(multi.sites[0].nearest_uniprot_resi,102);
+
 assert.equal(out.radius_A,4.5);
 const noLigand=ligand.extract(cif.replace(/HETATM (?:C1 L|H1 L|MG I).*\n/g,""),exact);
 assert.equal(noLigand.status,"measured");

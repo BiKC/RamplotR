@@ -85,7 +85,7 @@ ram_group_fingerprint_summary <- function(records,group_names,group_sizes) {
   }))
 }
 
-ram_group_fingerprint_plot <- function(records,group_names) {
+ram_group_fingerprint_plot <- function(records,group_names,contacts=NULL) {
   if(!is.data.frame(records) || length(group_names)!=2L)
     stop("Invalid fingerprint plot data.",call.=FALSE)
   colours <- c("#CE6A4D","#317E9A")
@@ -102,6 +102,15 @@ ram_group_fingerprint_plot <- function(records,group_names) {
     if(!nrow(data)) next
     graphics::points(data$phi,data$psi,pch=if(i==1L) 16 else 17,
       col=grDevices::adjustcolor(colours[[i]],alpha.f=0.75),cex=1.25)
+    # Outline models with a measured deposited nonwater component close
+    # to this exact canonical residue; keep group identity in point shape.
+    if(is.data.frame(contacts) &&
+       all(c("member","evidence") %in% names(contacts))) {
+      present <- data$member %in% contacts$member[
+        contacts$evidence=="Deposited proximity observed"]
+      if(any(present)) graphics::points(data$phi[present],data$psi[present],
+        pch=1,col=colours[[i]],cex=1.95,lwd=1.8)
+    }
     center <- c(ram_ensemble_circular(data$phi)[["mean"]],
                 ram_ensemble_circular(data$psi)[["mean"]])
     if(all(is.finite(center)))
@@ -110,5 +119,9 @@ ram_group_fingerprint_plot <- function(records,group_names) {
   }
   graphics::legend("bottomleft",legend=legend,pch=c(16,17),
     col=colours,bty="n",cex=0.8)
+  if(is.data.frame(contacts) &&
+     any(contacts$evidence=="Deposited proximity observed",na.rm=TRUE))
+    graphics::legend("bottomright",legend="ring = nearby deposited component",
+      pch=1,col="#3B5267",bty="n",cex=0.7)
   invisible(records)
 }

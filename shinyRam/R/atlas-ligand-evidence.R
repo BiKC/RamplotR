@@ -10,6 +10,7 @@ ram_atlas_observed_ligand_context <- function(verified,geometry) {
       call.=FALSE)
   rows <- list()
   contacts <- list()
+  residue_contacts <- list()
   for(id in ids) {
     item <- verified[[id]]
     raw <- item$ligand_contacts
@@ -53,7 +54,49 @@ ram_atlas_observed_ligand_context <- function(verified,geometry) {
         status <- "unavailable";parsed <- list()
       }
     }
-    if(length(parsed)) contacts[[length(contacts)+1L]] <- do.call(rbind,parsed)
+    # Keep per-residue distances, not just the single closest residue.
+    # Older cached records with no residue_contacts supply nearest-only
+    # evidence and must never be mistaken for exhaustive local contacts.
+    residue_site_rows <- list()
+    if(identical(status,"measured") && length(parsed)) {
+      for(i in seq_along(sites)) {
+        site <- sites[[i]]
+        atoms <- site$residue_contacts
+        full <- is.list(atoms) && length(atoms)>0L
+        if(!full)
+          atoms <- list(list(uniprot_resi=site$nearest_uniprot_resi,
+                             min_distance_A=site$min_distance_A))
+        validated <- tryCatch(lapply(atoms,function(atom) {
+          pos <- suppressWarnings(as.integer(atom$uniprot_resi))
+          distance <- suppressWarnings(as.numeric(atom$min_distance_A))
+          if(length(pos)!=1L || is.na(pos) || pos<1L ||
+             length(distance)!=1L || !is.finite(distance) ||
+             distance<0 || distance>4.5)
+            stop("Invalid per-residue component distance.")
+          data.frame(entity=id,comp_id=parsed[[i]]$comp_id,
+            asym_id=parsed[[i]]$asym_id,
+            auth_seq_id=parsed[[i]]$auth_seq_id,
+            uniprot_resi=pos,min_distance_A=round(distance,3),
+            scope=if(full) "all-mapped-contacts" else "nearest-only",
+            stringsAsFactors=FALSE)
+        }),error=function(e)e)
+        if(inherits(validated,"error")) {
+          status <- "unavailable"
+          warning <- conditionMessage(validated)
+          residue_site_rows <- list()
+          break
+        }
+        positions <- vapply(validated,function(d)d$uniprot_resi[[1L]],
+                            integer(1L))
+        if(anyDuplicated(positions)) {
+          status <- "unavailable"
+          warning <- "Duplicate canonical contact positions."
+          residue_site_rows <- list()
+          break
+        }
+        residue_site_rows <- c(residue_site_rows,validated)
+      }
+    }
     reported <- if(status=="measured") length(parsed) else NA_integer_
     total <- if(status=="measured" && !is.null(raw$total_nonwater_sites))
       suppressWarnings(as.integer(raw$total_nonwater_sites)) else NA_integer_
@@ -61,9 +104,13 @@ ram_atlas_observed_ligand_context <- function(verified,geometry) {
       if(status=="measured") {
         status <- "unavailable";reported <- NA_integer_
         warning <- "Invalid deposited nonpolymer component count."
-        if(length(parsed)) contacts[[length(contacts)]]<-NULL
       }
       total <- NA_integer_
+    }
+    if(identical(status,"measured") && length(parsed)) {
+      contacts[[length(contacts)+1L]] <- do.call(rbind,parsed)
+      residue_contacts[[length(residue_contacts)+1L]] <-
+        do.call(rbind,residue_site_rows)
     }
     rows[[length(rows)+1L]] <- data.frame(
       entity=id,geometry_group=as.character(
@@ -79,8 +126,14 @@ ram_atlas_observed_ligand_context <- function(verified,geometry) {
     auth_seq_id=character(),nearest_uniprot_resi=integer(),
     min_distance_A=numeric(),heavy_atoms=integer(),
     stringsAsFactors=FALSE)
+  residues <- if(length(residue_contacts))
+    do.call(rbind,residue_contacts) else data.frame(
+      entity=character(),comp_id=character(),asym_id=character(),
+      auth_seq_id=character(),uniprot_resi=integer(),
+      min_distance_A=numeric(),scope=character(),stringsAsFactors=FALSE)
+  rownames(residues) <- NULL
   rownames(summary) <- NULL; rownames(hits) <- NULL
-  list(entries=summary,contacts=hits,
+  list(entries=summary,contacts=hits,residue_contacts=residues,
     measured=sum(summary$status=="measured"),
     unavailable=sum(summary$status!="measured"),
     with_proximity=sum(summary$nearby_nonwater_sites>0L,na.rm=TRUE),

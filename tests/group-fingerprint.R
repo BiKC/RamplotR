@@ -35,6 +35,9 @@ assert(inherits(try(ram_group_fingerprint(bad,B),silent=TRUE),
 fig <- tempfile(fileext=".pdf")
 grDevices::pdf(fig)
 ram_group_fingerprint_plot(residue,c("apo","holo"))
+ram_group_fingerprint_plot(residue,c("apo","holo"),contacts=data.frame(
+  member=c("apo-1","holo-1"),
+  evidence=c("Deposited proximity observed","Evidence unavailable")))
 grDevices::dev.off()
 assert(file.exists(fig) && file.info(fig)$size>100L,
   "Fingerprint plot must render from measured member angles.")

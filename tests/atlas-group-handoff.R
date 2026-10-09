@@ -10,6 +10,8 @@ source(file.path("shinyRam","R","group-fingerprint.R"))
 source(file.path("shinyRam","R","atlas-geometry.R"))
 source(file.path("shinyRam","R","atlas-switch.R"))
 source(file.path("shinyRam","R","atlas-construct.R"))
+source(file.path("shinyRam","R","atlas-ligand-evidence.R"))
+source(file.path("shinyRam","R","atlas-group-ligand.R"))
 source(file.path("shinyRam","R","atlas-group-handoff.R"))
 assert <- function(x,msg) if(!isTRUE(x))stop(msg,call.=FALSE)
 
@@ -106,4 +108,35 @@ assert(single$n_a==1L && single$n_b==1L &&
        !any(single$comparison$high_support_shift,na.rm=TRUE),
   "A one-vs-one exploratory comparison must not claim high-support shifts.")
 
+
+# Contact evidence must follow exact UniProt positions through group handoff.
+with_contacts <- verified
+with_contacts[["1ABC_1"]]$ligand_contacts <- list(status="measured",
+  total_nonwater_sites=1L,sites=list(list(comp_id="ATP",asym_id="L",
+    auth_seq_id="900",nearest_uniprot_resi=19L,
+    min_distance_A=2.2,heavy_atoms=13L,
+    residue_contacts=list(
+      list(uniprot_resi=19L,min_distance_A=2.2),
+      list(uniprot_resi=20L,min_distance_A=4.0)))),warning="")
+with_contacts[["2ABC_1"]]$ligand_contacts <- list(status="measured",
+  total_nonwater_sites=0L,sites=list(),warning="")
+direct <- ram_atlas_group_prepare(with_contacts,geometry,ids[1:2],
+  ids[3:4],"Condition A","Condition B")
+site19 <- ram_atlas_group_ligand_at(direct,19L)
+assert(nrow(site19)==4L && site19$member[[1L]]=="1ABC_1" &&
+       site19$evidence[[1L]]=="Deposited proximity observed" &&
+       site19$nearby_components[[1L]]==1L &&
+       site19$evidence[[2L]]=="No deposited proximity reported" &&
+       all(site19$evidence[3:4]=="Evidence unavailable"),
+  "Selected residue must show each group's measured and unavailable evidence.")
+site20 <- ram_atlas_group_ligand_at(direct,20L)
+assert(site20$evidence[[1L]]=="Deposited proximity observed" &&
+       abs(site20$minimum_distance_A[[1L]]-4)<1e-8,
+  "Selected non-nearest UniProt residues must retain true contact distances.")
+site22 <- ram_atlas_group_ligand_at(direct,22L)
+assert(site22$nearby_components[[1L]]==0L &&
+       !any(grepl("apo",site22$evidence,fixed=TRUE)),
+  "No deposited proximity must never be reported as an apo state.")
+assert(inherits(try(ram_atlas_group_ligand_at(direct,NA_integer_),
+  silent=TRUE),"try-error"),"Invalid residue positions must be rejected.")
 cat("Exact-SIFTS Atlas -> Compare Groups scientific tests passed.\n")

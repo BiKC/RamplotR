@@ -110,6 +110,7 @@
     const close=[];
     for(const site of hetero.values()) {
       let best=Infinity,pos=null;
+      const residueDistances=new Map();
       for(const atom of site.coords) {
         const c=atom.map(x=>Math.floor(x/5));
         // Neighboring 5 Å grid cells contain every point within 4.5 Å.
@@ -119,8 +120,11 @@
             for(const p of neighbors) {
               const d2=(atom[0]-p.xyz[0])**2+(atom[1]-p.xyz[1])**2+
                 (atom[2]-p.xyz[2])**2;
-              if(d2<best && d2<=radius*radius) {
-                best=d2;pos=p.pos;
+              if(d2<=radius*radius) {
+                const old=residueDistances.get(p.pos);
+                if(old===undefined || d2<old)
+                  residueDistances.set(p.pos,d2);
+                if(d2<best) { best=d2;pos=p.pos; }
               }
             }
           }
@@ -129,7 +133,10 @@
         asym_id:site.asym_id,auth_seq_id:site.auth_seq_id,
         insertion_code:site.insertion_code,
         heavy_atoms:site.coords.length,min_distance_A:Math.sqrt(best),
-        nearest_uniprot_resi:pos});
+        nearest_uniprot_resi:pos,
+        residue_contacts:[...residueDistances].sort((a,b)=>a[0]-b[0])
+          .map(([uniprot_resi,d2])=>({uniprot_resi,
+            min_distance_A:Math.sqrt(d2)}))});
     }
     close.sort((a,b)=>a.min_distance_A-b.min_distance_A||
       a.comp_id.localeCompare(b.comp_id));

@@ -85,6 +85,7 @@ ram_map_chain_to_reference <- function(reference, candidate,
   optional <- c("rama8000_region","rama8000_group","rama8000_score","plddt")
   for(field in optional)
     if(field %in% names(candidate)) out[[field]] <- candidate[[field]][cand_idx]
+  out$source_resn <- as.character(candidate$resn[cand_idx])
   out$source_label <- as.character(source_label)
   out$source_chain <- as.character(source_chain)
   out

@@ -122,14 +122,36 @@ ram_prepare_structure_group <- function(reference, structures, labels=NULL,
   list(models=mapped, model_summary=do.call(rbind,model_info))
 }
 
+# Group-level phi/psi means represent positions in two-dimensional
+# backbone-angle space. Calculate both angles from the SAME members so that
+# a partial phi in model 1 and partial psi in model 2 cannot manufacture a
+# group centroid. Preserve the separate marginal angle counts for audit.
+ram_group_paired_angle_summary <- function(models,summary) {
+  only_pairs <- lapply(models,function(tbl) {
+    complete <- is.finite(tbl$phi) & is.finite(tbl$psi)
+    tbl$phi[!complete] <- NA_real_
+    tbl$psi[!complete] <- NA_real_
+    tbl
+  })
+  paired <- ram_ensemble_summary(only_pairs)
+  rows <- match(ram_ensemble_key(summary),ram_ensemble_key(paired))
+  if(anyNA(rows))
+    stop("Paired group angle summary lost residue identities.",call.=FALSE)
+  for(column in c("phi_mean","phi_sd","psi_mean","psi_sd"))
+    summary[[column]] <- paired[[column]][rows]
+  summary
+}
+
 ram_group_conformation_compare <- function(reference, group_a, group_b,
                                            label_a="Group A",
                                            label_b="Group B") {
   if (!is.list(group_a) || !length(group_a) ||
       !is.list(group_b) || !length(group_b))
     stop("Both groups need at least one mapped structure.")
-  a <- ram_ensemble_summary(group_a)
-  b <- ram_ensemble_summary(group_b)
+  a <- ram_group_paired_angle_summary(
+    group_a,ram_ensemble_summary(group_a))
+  b <- ram_group_paired_angle_summary(
+    group_b,ram_ensemble_summary(group_b))
   key <- function(data)
     paste(data$chain,data$resi,data$insertion_code,toupper(data$resn),sep="\r")
   ka <- key(a); kb <- key(b)

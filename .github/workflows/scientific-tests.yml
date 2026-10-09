@@ -70,6 +70,7 @@ jobs:
           Rscript tests/experimental.R
           Rscript tests/ensemble.R
           Rscript tests/group-comparison.R
+          Rscript tests/group-fingerprint.R
           Rscript tests/batch.R
         shell: bash
       - name: Verify AlphaFold and ESMFold confidence formats

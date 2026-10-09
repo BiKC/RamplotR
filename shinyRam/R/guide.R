@@ -158,10 +158,12 @@ ram_guide_ui <- function() {
           "For the selected structures, inspect pairwise observed UniProt core coverage and the monomer identities encoded in the mmCIF polymer scheme. Missing or unmatched positions do not establish equivalence. Any confirmed residue-chemistry differences require your explicit acknowledgement before exploratory grouping; export the review CSV for provenance."),
         step(6, "Let Atlas suggest geometric clusters",
           "Select at least two exact-verified experimental entities, review construct chemistry and choose Cluster experimental structures. Automatic mode searches for coherent groupings using Cα distance-map separation and mean silhouette, and can recommend no split when evidence is weak. Its numeric checks are exploratory, not calibrated functional-state labels."),
+        step(7, "Check cluster robustness",
+          "Expand Cluster robustness and shared-entry cautions to see how often the original groups survive omission of contiguous blocks of canonical backbone positions. Download the group, pair and omitted-block CSVs. This measures sensitivity to residue selection only, not functional-state confidence. Entries from one PDB deposition are not independent experiments."),
         step(7, "Review or adjust cluster membership",
           "Examine the dendrogram, group sizes and the Why did Atlas suggest these groups? quality details. You can switch to a manual distance cutoff or edit the suggested Group A/Group B memberships. Use these entries in Compare Groups passes verified experimental backbone torsions directly without file uploads."),
         step(8, "Investigate local differences",
-          "Choose two geometric-group representatives, then select Find local backbone changes. Click a canonical residue to see paired φ/ψ and exact PDB residue identifiers."),
+          "Choose any two verified experimental structures, then select Find local backbone changes. Click a canonical residue to see paired φ/ψ and exact PDB residue identifiers."),
         step(9, "Inspect both representative structures in 2D/3D",
           "Click Inspect both structures in 2D/3D. Compare now uses shared, observed UniProt positions from the exact verified SIFTS mappings, even when author numbering or constructs differ. Unmapped residues are excluded and the compared coverage is shown. A missing or ambiguous mapping is never replaced by a guessed match.")
       ),

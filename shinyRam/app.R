@@ -32,6 +32,7 @@ source(file.path("R", "canonical.R"), local = TRUE)
 source(file.path("R", "atlas-sifts.R"), local = TRUE)
 source(file.path("R", "atlas-cohort.R"), local = TRUE)
 source(file.path("R", "atlas-geometry.R"), local = TRUE)
+source(file.path("R", "atlas-robustness.R"), local = TRUE)
 source(file.path("R", "atlas-construct.R"), local = TRUE)
 source(file.path("R", "atlas-switch.R"), local = TRUE)
 source(file.path("R", "atlas.R"), local = TRUE)
@@ -2265,6 +2266,7 @@ server <- function(input, output, session) {
       plotOutput("atlasGeometryPlot",height="260px"),
       tableOutput("atlasGeometryTable"),
       uiOutput("atlasAutoQuality"),
+      uiOutput("atlasRobustnessPanel"),
       uiOutput("atlasGroupsHandoffPanel"))
   })
 
@@ -2488,6 +2490,86 @@ server <- function(input, output, session) {
         "For two structures, no automatic split is proposed. Switch to manual mode to inspect a two-structure comparison.")
     )
   })
+
+  output$atlasRobustnessPanel <- renderUI({
+    result <- atlas_geometry_result()
+    if(is.null(result) || !is.null(result$error) ||
+       is.null(result$robustness)) return(NULL)
+    stability <- result$robustness
+    if(identical(stability$status,"insufficient_structures"))
+      return(tags$p(class="ram-field-hint",
+        "Cluster robustness: two experimental structures cannot provide a meaningful sensitivity estimate. You can still inspect their measured structural difference."))
+    tags$details(class="ram-details ram-atlas-robustness",
+      tags$summary("Cluster robustness and shared-entry cautions"),
+      tags$p(class="ram-field-hint",
+        sprintf("%d of %d leave-block-out analyses reproduced the full geometric grouping.",
+          sum(stability$replicates$baseline_partition_reproduced),
+          stability$iterations)),
+      tags$p(class="ram-field-hint",
+        paste("Contiguous blocks of sampled canonical UniProt positions are",
+          "omitted one at a time. Atlas recalculates C-alpha distance maps",
+          "and reruns the same automatic or manual clustering.",
+          "A stable partition shows robustness to this particular position",
+          "selection, not statistical confidence or biological states.")),
+      if(stability$shared_pdb_pairs>0L)
+        tags$p(class="ram-confidence-warning",
+          sprintf(paste("%d selected entity pair(s) originate in the same",
+            "PDB entry. Polymer chains from a single deposition cannot be",
+            "treated as independent experimental replicates."),
+            stability$shared_pdb_pairs)),
+      tags$h5("Exact group recovery"),
+      tableOutput("atlasRobustnessGroups"),
+      tags$h5("Pairwise grouping under position deletion"),
+      DT::DTOutput("atlasRobustnessPairs"),
+      tags$div(class="ram-ensemble-actions",
+        downloadButton("downloadAtlasRobustnessGroups",
+          "Export group robustness CSV"),
+        downloadButton("downloadAtlasRobustnessPairs",
+          "Export pair robustness CSV"),
+        downloadButton("downloadAtlasRobustnessRuns",
+          "Export omitted-block runs CSV")),
+      tags$p(class="ram-field-hint",
+        "Group recovery requires the exact same member set, regardless of numeric group labels. Pairwise co-assignment is the fraction of block omissions keeping two entries together. It is not a transition probability.")
+    )
+  })
+  output$atlasRobustnessGroups <- renderTable({
+    result <- req(atlas_geometry_result())
+    req(is.null(result$error),identical(result$robustness$status,"ok"))
+    shown <- result$robustness$groups
+    shown$exact_group_fraction <- sprintf("%.0f%%",
+      100*shown$exact_group_fraction)
+    names(shown) <- c("Group","Size","PDB entities","Recovered",
+      "Runs","Recovery","Same-PDB pairs")
+    shown
+  },striped=TRUE,spacing="xs",rownames=FALSE)
+  output$atlasRobustnessPairs <- DT::renderDT({
+    result <- req(atlas_geometry_result())
+    req(is.null(result$error),identical(result$robustness$status,"ok"))
+    shown <- result$robustness$pairs
+    shown$same_group_fraction <- round(100*shown$same_group_fraction,1L)
+    shown$baseline_same_group <- ifelse(shown$baseline_same_group,"Yes","No")
+    shown$same_pdb_entry <- ifelse(shown$same_pdb_entry,"Yes","No")
+    DT::datatable(shown,rownames=FALSE,
+      colnames=c("Entry A","Entry B","Same baseline group",
+        "Together after omissions","Runs","Together (%)","Same PDB"),
+      options=list(pageLength=8,scrollX=TRUE,dom="ftip"),
+      class="compact stripe")
+  },server=FALSE)
+  output$downloadAtlasRobustnessGroups <- downloadHandler(
+    filename=function() "ramplotr_atlas_cluster_group_robustness.csv",
+    content=function(file) utils::write.csv(
+      req(atlas_geometry_result())$robustness$groups,
+      file,row.names=FALSE,na=""))
+  output$downloadAtlasRobustnessPairs <- downloadHandler(
+    filename=function() "ramplotr_atlas_cluster_pair_robustness.csv",
+    content=function(file) utils::write.csv(
+      req(atlas_geometry_result())$robustness$pairs,
+      file,row.names=FALSE,na=""))
+  output$downloadAtlasRobustnessRuns <- downloadHandler(
+    filename=function() "ramplotr_atlas_cluster_position_omissions.csv",
+    content=function(file) utils::write.csv(
+      req(atlas_geometry_result())$robustness$replicates,
+      file,row.names=FALSE,na=""))
 
   output$atlasGeometryPlot <- renderPlot({
     result <- atlas_geometry_result()

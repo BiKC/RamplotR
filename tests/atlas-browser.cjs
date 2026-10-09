@@ -269,6 +269,11 @@ ${atoms}
         "2 exploratory geometry group(s)") &&
         panel.textContent.includes("40 common observed UniProt");
     },{timeout:25000});
+    await page.waitForFunction(() => {
+      const notice = document.getElementById("atlasRobustnessPanel");
+      return notice && notice.textContent.includes(
+        "two experimental structures cannot provide a meaningful sensitivity estimate");
+    }, {timeout:12000});
     const geometryTable=await page.$eval("#atlasGeometryTable",
       el=>el.textContent);
     assert.match(geometryTable,/1CRN_1/);

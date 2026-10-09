@@ -230,12 +230,17 @@ ram_atlas_geometry_groups <- function(verified,accession,selected,
     for(j in seq.int(i+1L,n))
       D[i,j] <- D[j,i] <- sqrt(mean((dists[[i]]-dists[[j]])^2))
   hc <- stats::hclust(stats::as.dist(D),method="average")
+  requested_cutoff <- cutoff
   automatic <- if(identical(cluster_mode,"automatic"))
     ram_atlas_auto_clusters(D,hc) else NULL
   if(!is.null(automatic)) {
     labels <- stats::setNames(automatic$assignment,ids)
     cutoff <- automatic$cutoff
   } else labels <- stats::cutree(hc,h=cutoff)
+  robustness <- ram_atlas_cluster_robustness(
+    matrices=matrices,ids=ids,positions=sampled,
+    baseline_labels=stats::setNames(labels[ids],ids),
+    cluster_mode=cluster_mode,cutoff=requested_cutoff,blocks=10L)
   groups <- split(ids,labels)
   representatives <- vapply(groups,function(members) {
     idx <- match(members,ids)
@@ -254,6 +259,7 @@ ram_atlas_geometry_groups <- function(verified,accession,selected,
       stringsAsFactors=FALSE),
     representatives=representatives,cutoff=cutoff,
     cluster_mode=cluster_mode,auto_cluster=automatic,
+    robustness=robustness,
     distance_method="C-alpha intrachain distance-map RMSD (Å), common canonical UniProt positions; average-linkage hierarchical clustering")
 }
 

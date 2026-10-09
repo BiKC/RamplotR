@@ -1,6 +1,7 @@
 source(file.path("shinyRam","R","canonical.R"))
 source(file.path("shinyRam","R","atlas-sifts.R"))
 source(file.path("shinyRam","R","atlas-geometry.R"))
+source(file.path("shinyRam","R","atlas-robustness.R"))
 assert <- function(x,message) if(!isTRUE(x)) stop(message,call.=FALSE)
 
 positions <- 1:40
@@ -41,10 +42,26 @@ assert(groups$assignment$geometric_group[1] ==
        groups$assignment$geometric_group[1] !=
        groups$assignment$geometric_group[3],
        "Exploratory clustering must separate shifted internal geometries.")
+assert(identical(groups$robustness$status,"ok") &&
+       groups$robustness$iterations==10L &&
+       nrow(groups$robustness$pairs)==3L &&
+       nrow(groups$robustness$groups)==2L &&
+       nrow(groups$robustness$replicates)==10L,
+       "Manual clustering should include exact-core position sensitivity.")
+assert(identical(groups$robustness$replicates,
+  ram_atlas_geometry_groups(verified,"P12345",names(verified),
+    min_core=30,min_fraction=.6,cutoff=1.5)$robustness$replicates),
+  "Repeated manual grouping must give identical position-deletion results.")
+assert(!any(groups$robustness$pairs$same_pdb_entry),
+       "Different PDB entries must not be labelled as shared experiments.")
 assert(length(groups$representatives)==2L,
        "Each geometric group should have one observed representative.")
 auto <- ram_atlas_geometry_groups(verified,"P12345",names(verified),
   min_core=30,min_fraction=.6,cluster_mode="automatic")
+assert(identical(auto$robustness$status,"ok") &&
+       all(auto$robustness$replicates$pair_agreement>=0 &
+           auto$robustness$replicates$pair_agreement<=1),
+       "Automatic clustering must report bounded position sensitivity.")
 assert(identical(auto$cluster_mode,"automatic") &&
        auto$auto_cluster$k==2L &&
        length(auto$representatives)==2L,
@@ -74,6 +91,9 @@ assert(close_split$k==1L,
   "Small numerical coordinate differences cannot force biological-looking groups.")
 two_auto <- ram_atlas_geometry_groups(verified,"P12345",
   c("1ABC_1","3ABC_1"),cluster_mode="automatic")
+assert(identical(two_auto$robustness$status,"insufficient_structures") &&
+       two_auto$robustness$iterations==0L,
+       "Two entries must never receive a misleading cluster stability score.")
 assert(two_auto$auto_cluster$k==1L &&
        grepl("Fewer than three",two_auto$auto_cluster$reason),
   "Two PDBs cannot provide within-cluster support for an automatic two-group recommendation.")
@@ -133,4 +153,34 @@ grDevices::dev.off()
 assert(file.exists(pdf_path) && file.info(pdf_path)$size>100L,
        "Geometry charts must render for pairs and multi-entity cohorts.")
 unlink(pdf_path)
+# Two entities in the same PDB deposition cannot count as independent
+# experimental replicates even when their coordinates are different.
+within_deposit <- verified
+names(within_deposit) <- c("1ABC_1","1ABC_2","3ABC_1")
+with_pdb_warning <- ram_atlas_geometry_groups(within_deposit,"P12345",
+  names(within_deposit),cluster_mode="automatic")
+assert(with_pdb_warning$robustness$shared_pdb_pairs==1L &&
+       sum(with_pdb_warning$robustness$pairs$same_pdb_entry)==1L,
+       "Same-deposition entities must be flagged regardless of geometry.")
+# A short, geometry-driving segment should reduce robustness when omitted.
+# The first two structures are rigid-motion equivalents, while the third has
+# a pronounced rearrangement restricted to one deletion block.
+localized <- coords
+localized[17:20,2] <- localized[17:20,2]+12
+localized_set <- list(
+  "1ABC_1"=fixture("1ABC",coords),
+  "2XYZ_1"=fixture("2XYZ",rotated),
+  "3ABC_1"=fixture("3ABC",localized))
+sensitive <- ram_atlas_geometry_groups(localized_set,"P12345",
+  names(localized_set),cutoff=1.5)
+assert(sensitive$distance_matrix[1L,3L]>1.5 &&
+       length(unique(sensitive$assignment$geometric_group))==2L &&
+       any(!sensitive$robustness$replicates$baseline_partition_reproduced),
+  "A localized group-defining segment must be detected as position-sensitive.")
+# Malformed canonical input is rejected instead of guessed or recycled.
+fake <- lapply(seq_along(verified),function(i) matrix(1,40,3))
+assert(inherits(try(ram_atlas_cluster_robustness(fake,
+  names(verified),rev(positions),c(1L,1L,2L)),
+  silent=TRUE),"try-error"),
+  "Jackknife must reject unsorted canonical positions.")
 message("Experimental Atlas distance-map grouping tests passed.")

@@ -81,6 +81,9 @@ ${atoms}${component}
     await page.setViewport({width:1366,height:900});
     const requests = [];
     const errors = [];
+    // The connectivity diagnostic deliberately checks known-good 4AKE.
+    // Switch to missing exact SIFTS only in the later crash regression.
+    let simulateMissingExactSifts = false;
     page.on("pageerror", error => errors.push(String(error.message || error)));
     await page.setRequestInterception(true);
     page.on("request", request => {
@@ -118,7 +121,8 @@ ${atoms}${component}
       } else if (url === "https://www.ebi.ac.uk/pdbe/static/entry/4ake_updated.cif") {
         request.respond({status:200,
           headers:{...cors,"content-type":"text/plain"},
-          body:syntheticUpdatedCif(101,false).replace(/P00533/g,"P00000")});
+          body:syntheticUpdatedCif(101,false).replace(/P00533/g,
+             simulateMissingExactSifts ? "P00000" : "P69441")});
       } else if (url === "https://www.ebi.ac.uk/pdbe/static/entry/1crn_updated.cif") {
         const mockCif = syntheticUpdatedCif(101,false);
         request.respond({status:200,
@@ -444,6 +448,7 @@ ${atoms}${component}
     // An RCSB-linked polymer entity can have NO matching exact PDBe
     // SIFTS rows. Its card must explain the limitation without crashing
     // the Shiny observer, and a subsequent valid verification must work.
+    simulateMissingExactSifts = true;
     await page.setViewport({width:1366,height:900});
     await page.$eval("#atlasAccession",element=>{
       element.value="P69441";

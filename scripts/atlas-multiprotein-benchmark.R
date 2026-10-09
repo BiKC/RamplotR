@@ -262,7 +262,7 @@ summary <- c(
   "",
   "## Per-protein contrast versus strongest available control",
   "",
-  paste(capture.output(print(case_summary,row.names=FALSE)),collapse="\\n"),
+  paste(capture.output(print(case_summary,row.names=FALSE)),collapse="\n"),
   "",
   "Control differences and larger/smaller flags are descriptive; these",
   "are not hypothesis-test results or holdout validation statistics.",

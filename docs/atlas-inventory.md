@@ -57,10 +57,11 @@ of positions used is always displayed.
 
 RamplotR calculates the root mean squared difference between intrachain
 C-alpha distance maps (distance-map RMSD, Å). This captures internal
-geometry changes without needing a rigid-body superposition. Average-linkage
-hierarchical clustering and the visible 1.5 Å default cutoff provide
-**exploratory geometric groups**, with one representative experimental entity
-per group selected as a distance medoid.
+geometry changes without needing a rigid-body superposition. Average-linkage hierarchical clustering provides **exploratory geometric groups**,
+with one medoid per suggested group. Automatic clustering is the default and
+may suggest a single group when the available structures do not support a
+clear split. The manual distance cutoff remains available (initially 1.5 Å).
+Neither mode assigns functional-state labels.
 
 These groups must not be presented as functional states, experimental
 populations, independent structural observations, ligand-caused transitions,
@@ -87,7 +88,7 @@ canonical positions above threshold are grouped into *candidate change
 segments*, with isolated residues reported separately as one-position
 segments. The plot and residue CSV retain missing-comparison positions.
 
-The first version compares just two representative experimental structures,
+The local inspection can compare any two explicitly selected verified experimental structures, including when Atlas suggests only one geometric cluster. The group representatives are used as defaults when more than one cluster exists. This local inspection still compares only two structures,
 **not** all structures within each group, and does not perform a statistical
 group test. A difference in φ/ψ does not prove a biological functional
 transition, ligand effect, protein-block assignment, or error in either
@@ -118,7 +119,7 @@ as unavailable.
 - When entity metadata is unavailable, a disclosure lists the affected
   PDB/entity identifiers so researchers can distinguish a failed enrichment
   from an absent experimental structure.
-- State clustering and representative-state selection are not yet computed.
+- Geometric clustering and medoid selection are implemented, but these are not validated biological-state assignments.
 - Exact residue mapping is now available on demand for selected entities.
   Full cohort-scale mapping, isoform equivalence and consistent coverage
   filtering before state clustering remain future work.

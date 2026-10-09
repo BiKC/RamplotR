@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 "use strict";
-// Reproducible, opt-in three-protein live-archive benchmark dataset builder.
+// Reproducible, opt-in multi-fold live-archive benchmark dataset builder.
 // Downloads PDBe *updated* mmCIF files and uses exactly the browser's SIFTS
 // and atom-site parsers. No inferred numbering or silent fallbacks.
 const https = require("node:https");
@@ -75,7 +75,8 @@ function fetchText(url,redirects=0) {
       "Conformational labels originate from literature, not the algorithm",
       "No universal state classifier has been calibrated"
     ],
-    curated_cases:config.proteins.map(p=>({id:p.id,uniprot:p.uniprot})),
+    curated_cases:config.proteins.map(p=>({id:p.id,uniprot:p.uniprot,
+      fold_family:p.fold_family})),
     entries:[]
   };
   for(const entry of entries) {

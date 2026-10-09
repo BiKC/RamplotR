@@ -103,7 +103,9 @@ ram_atlas_group_prepare <- function(verified,geometry,group_a,group_b,
   }))
   audit <- ram_atlas_construct_audit(verified,picked$accession,
                                     picked$selected,available)
+  ligand_context <- ram_atlas_observed_ligand_context(verified,geometry)
   list(comparison=comparison,fingerprint=fingerprint,members=metadata,
+    ligand_context=ligand_context,
     label_a=label_a,label_b=label_b,n_a=length(names_a),
     n_b=length(names_b),reference_chain="UniProt",
     source="atlas",accession=picked$accession,

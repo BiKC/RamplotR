@@ -178,8 +178,9 @@ ${atoms}
       el=>el.textContent);
     assert.match(probe,/Browser origin: http:\/\/127\.0\.0\.1:8765/);
     assert.match(probe,/PDBe updated mmCIF/);
-    assert.equal(await page.$eval(
-      ".ram-atlas-connectivity-list li",nodes=>nodes.length),3);
+    const displayedProbeCount=await page.evaluate(()=>
+      document.querySelectorAll(".ram-atlas-connectivity-list li").length);
+    assert.equal(displayedProbeCount,3);
     assert.equal(requests.length,0,
       "Connectivity test should not trigger a real Atlas cohort search.");
     await page.waitForSelector("#atlasAccession");

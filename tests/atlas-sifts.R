@@ -39,4 +39,35 @@ assert(inherits(try(ram_atlas_exact_sifts_map(wrong,"1ABC",1L,"P12345"),
 wrong <- payload;wrong$rows[[1L]]$uniprot_accession <- "Q99999"
 assert(inherits(try(ram_atlas_exact_sifts_map(wrong,"1ABC",1L,"P12345"),
                     silent=TRUE),"try-error"),"Wrong accession accepted.")
+# Real PDBe results can have an entity matching RCSB's UniProt reference
+# search but no exact _pdbx_sifts_xref_db rows for that accession.
+empty_payload <- payload
+empty_payload$rows <- list()
+empty_mapping <- ram_atlas_exact_sifts_map(empty_payload,"1ABC",1L,"P12345")
+assert(is.data.frame(empty_mapping) && nrow(empty_mapping)==0L &&
+       all(c("observed","label_seq_id","mon_id") %in% names(empty_mapping)),
+       "An empty exact mapping must retain its full typed Atlas schema.")
+empty_summary <- ram_atlas_sifts_summary(empty_mapping)
+assert(empty_summary$rows==0L && empty_summary$observed_residues==0L &&
+       empty_summary$conflicting_residues==0L,
+       "Empty exact SIFTS results should be safe to summarize.")
+unavailable <- tryCatch(ram_atlas_verified_sifts(
+  empty_payload,"1ABC",1L,"P12345"),error=function(e)e)
+assert(inherits(unavailable,"error") &&
+       grepl("No exact SIFTS residue mapping",conditionMessage(unavailable),
+             fixed=TRUE),
+       "An entity with no exact rows must be rejected with a useful message.")
+checked <- ram_atlas_verified_sifts(payload,"1ABC",1L,"P12345")
+assert(identical(checked$mapping,mapping) &&
+       identical(checked$summary,info),
+       "Successful exact mapping and summary must remain unchanged.")
+# Invalid records must stay rejected per entity without affecting a
+# subsequent valid verification in the same batch.
+bad <- payload; bad$rows <- list(list(uniprot_accession="P12345"))
+assert(inherits(try(ram_atlas_verified_sifts(
+  bad,"1ABC",1L,"P12345"),silent=TRUE),"try-error"),
+  "Malformed exact mapping must fail in the guarded verifier.")
+again <- ram_atlas_verified_sifts(payload,"1ABC",1L,"P12345")
+assert(again$summary$observed_residues==2L,
+       "A rejected PDB entity must not affect the next valid entry.")
 message("Exact PDBe SIFTS residue mapping tests passed.")

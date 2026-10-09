@@ -16,3 +16,5 @@ Choose a guide by the research task you want to perform. The [main README](../RE
 ## Development records
 
 [Implementation and verification history](development/README.md) is kept separately from the user guides. Its historical notes describe what changed during development, not different current application modes.
+
+- [Atlas cluster sensitivity](atlas-cluster-robustness.md): deterministic position-deletion checks, shared-PDB warnings, CSV evidence and interpretation limits.

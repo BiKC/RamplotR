@@ -96,6 +96,12 @@ After PR #56, the active follow-up branch adds a dedicated Atlas-to-Compare acti
 
 The post-PR #57 work changes the Atlas-to-Compare matching method. Both verified structures are now paired using **shared observed exact SIFTS UniProt positions**, including PDB insertion codes and explicit asym/author chains. Normal sequence alignment remains available for other comparisons and as a user-chosen fallback. The Atlas mode reports matched and excluded residue denominators instead of treating unverified positions as structure deletions. Residue substitutions remain visible but require biological interpretation; sharing a UniProt coordinate is not proof of construct or state equivalence.
 
+## Construct and chemistry audit (October 9, 2026)
+
+The exploratory Atlas now checks **all pairs** among the selected verified experimental polymer entities before geometry grouping. The audit joins the selected first-model observed C-alpha coordinates to the precise PDBe SIFTS UniProt residue and `_pdbx_poly_seq_scheme.mon_id`. It reports shared observed positions, asymmetric coverage, paired monomer chemistry, explicit differing positions (including modifications such as MSE versus MET), and unknown residue chemistry. Conflicting or one-to-many exact mappings are excluded rather than resolved by sequence interpolation.
+
+Confirmed chemistry differences require explicit acknowledgement before geometry grouping. A downloadable CSV preserves the comparison denominators and positional evidence. Unknown chemistry remains visibly unresolved, not assumed identical. The gate is a **review safeguard**, not evidence that matching monomer chemistry means matching constructs, experimental conditions, isoforms or biological states. Distinct isoform accessions may not be mixed by a single UniProt-cohort query. No functional-state labels or universal thresholds are inferred.
+
 ## Scientific principles
 
 1. Keep evidence types separate. Rama8000 validation, native RamplotR density,

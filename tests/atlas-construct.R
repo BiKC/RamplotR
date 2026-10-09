@@ -64,8 +64,9 @@ conflicted[["2XYZ_1"]]$mapping <- rbind(
   transform(conflicted[["2XYZ_1"]]$mapping[12L,,drop=FALSE],
     uniprot_resi=12L,mon_id="MSE"))
 unresolved <- ram_atlas_construct_audit(conflicted,"P12345",ids)
-assert(!unresolved$differs && unresolved$pairs$chemistry_unknown==1L,
-  "Contradictory monomer records should be unresolved, not selected arbitrarily.")
+assert(!unresolved$differs && unresolved$pairs$common_observed==39L &&
+       unresolved$pairs$unmatched_a==1L && unresolved$incomplete,
+  "Contradictory exact mapping must exclude the residue, not choose a monomer arbitrarily.")
 
 isoform <- verified
 isoform[["2XYZ_1"]]$mapping$uniprot_accession <- "P12345-2"

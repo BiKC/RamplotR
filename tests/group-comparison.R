@@ -121,6 +121,36 @@ assert(all(single_cmp$evidence_profile==
   !any(single_cmp$high_support_shift),
   "One-versus-one comparisons must be explicitly labelled unreplicated.")
 
+# Counterexample: phi and psi exist in different members, but only
+# the third member contributes a real angle pair. Group means must agree
+# with the paired observations shown in the fingerprint plot.
+mix_a1 <- make_chain("A",c(179,-60,-60),c(NA,-40,-40))
+mix_a2 <- make_chain("A",c(NA,-60,-60),c(170,-40,-40))
+mix_a3 <- make_chain("A",c(-60,-60,-60),c(-40,-40,-40))
+mix_b <- list(make_chain("A",c(-63,-60,-60),c(-43,-40,-40)),
+              make_chain("A",c(-62,-60,-60),c(-42,-40,-40)))
+paired_only <- ram_group_conformation_compare(reference,
+  list(mix_a1,mix_a2,mix_a3),mix_b,"A","B")
+position <- paired_only[paired_only$resi==1L,,drop=FALSE]
+assert(position$a_phi_models==2L && position$a_psi_models==2L &&
+       position$a_paired_angle_models==1L &&
+       abs(position$a_phi_mean+60)<1e-8 &&
+       abs(position$a_psi_mean+40)<1e-8,
+  "A group centroid must use complete angle pairs rather than mixed members.")
+assert(!isTRUE(position$high_support_shift) &&
+       identical(as.character(position$evidence_profile),
+                 "Unreplicated structural difference"),
+  "One paired observation does not establish replicated group support.")
+none <- ram_group_conformation_compare(reference,
+  list(mix_a1,mix_a2),mix_b,"A","B")
+none_position <- none[none$resi==1L,,drop=FALSE]
+assert(none_position$a_paired_angle_models==0L &&
+       is.na(none_position$a_phi_mean) &&
+       is.na(none_position$a_psi_mean) &&
+       is.na(none_position$angular_displacement) &&
+       identical(as.character(none_position$evidence_profile),"Unavailable"),
+  "Marginal angles with zero complete pairs must not produce an invented shift.")
+
 bad <- with_decoy(make_chain("Y",c(0,0,0),c(0,0,0),"Favored"))
 bad$resn[bad$chain=="Y"] <- c("GLY","GLY","GLY")
 assert(inherits(try(ram_best_chain_match(reference,bad,

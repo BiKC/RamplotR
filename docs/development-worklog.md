@@ -354,3 +354,16 @@ Old feature/fix/chore branches are retained in GitHub but are **not active work*
 The only long-lived non-main branch intentionally kept for active content is
 `arxiv-preprint` / PR #20. Start any new work from current `main`, update **Active work** with the actual
 branch, and do not reuse historical feature branches.
+
+## October 9: paired-only backbone group centroids
+
+- Correct group circular means and SDs to use the **same complete phi/psi
+  observations in each model** for both angles. Marginal phi/psi model counts
+  remain available separately for audit.
+- Avoid fabricated centroid coordinates when phi comes from one model and psi
+  from another, including the zero-complete-pair case.
+- The new local group fingerprint and existing numerical group comparison now
+  use the same paired-observation definition. Synthetic tests include
+  mismatched missing-angle patterns and complete absence of paired residues.
+- This is a scientific correctness fix, not a classifier or new validation
+  threshold. CI runs only when the pull request becomes ready for review.

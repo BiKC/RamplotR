@@ -376,7 +376,7 @@ ${atoms}${component}
       const panel=document.querySelector(".ram-group-ligand-evidence");
       return panel && panel.textContent.includes(
         "Deposited component proximity at this UniProt position") &&
-        panel.textContent.includes("no apo state");
+        panel.textContent.includes("does not establish an apo state");
     },{timeout:15000});
     assert.ok(await page.$("#downloadGroupFingerprintLigand"));
     await page.waitForFunction(() => !!document.querySelector(

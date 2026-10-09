@@ -50,6 +50,20 @@ backbone_shift = sqrt(delta_phi^2 + delta_psi^2)
 
 Wrapping is performed independently across the -180/180-degree boundary.
 
+Click a residue in the between-group track or results table to open its
+**local conformational fingerprint**. The overlay contains one measured φ/ψ
+point per group member with a complete angle pair. The member table preserves
+missing angles rather than treating them as zero; where available, the actual
+residue identity in the candidate structure is retained independently from
+the reference residue used for sequence alignment.
+
+The inspector reports complete-pair support and coarse backbone-state consensus
+separately for both groups. Crosses mark circular group means. The overlay
+does not estimate biological populations, conformational transition
+probabilities or statistical significance. For Atlas-derived groups the
+source is the cached exact UniProt-mapped first-model backbone evidence,
+without an additional upload.
+
 The combined backbone shift is a **navigation effect size**, not a statistical
 significance score and not a Cartesian distance.
 
@@ -116,7 +130,8 @@ The group comparison can export:
 
 - one residue-level CSV containing circular means, SDs, wrapped differences,
   combined displacement, backbone-state changes and Rama8000 mode changes;
-- one member CSV recording each structure label, selected chain, identity,
+- one long-format fingerprint CSV containing per-model phi/psi angles,
+  residue identity, complete-pair flags and coarse backbone states;\n- one member CSV recording each structure label, selected chain, identity,
   reference coverage, candidate coverage and aligned residue count.
 
 ## Testing

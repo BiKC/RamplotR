@@ -134,8 +134,10 @@ ram_guide_ui <- function() {
           "The loaded structure can count as a Group A member. Upload additional Group A structures if needed, and upload at least one Group B structure. Label each condition clearly."),
         step(4, "Click Analyse groups",
           "Each uploaded file contributes model 1, with its best-matching protein chain. RamplotR reports which uploaded structures were matched or omitted."),
-        step(5, "Review support, dispersion and exports",
-          "Inspect group-level circular φ/ψ summaries, changed-residue evidence and the matched-members table. Export residue-level and matched-chain CSVs after a successful run.")
+        step(5, "Inspect a local conformational fingerprint",
+          "Select a residue in the group track or results table. The fingerprint shows every member’s observed φ/ψ pair, each group’s circular mean and backbone-state consensus. Missing angles and substitutions remain visible, and a single observation is never treated as within-group replication."),
+        step(6, "Export evidence",
+          "Export the residue-level group contrast, matched structures and complete per-member fingerprint CSVs. Atlas groups use exact verified UniProt positions without uploading PDB files again.")
       ),
       tags$p("Alternatively, use verified Atlas groups directly: after calculating experimental geometry, select disjoint Group A and Group B members in Atlas and send them to Compare Groups. The exact observed UniProt backbone cache is reused without uploads. Classification metrics are unavailable in this mode. A single member per condition is a comparison, not a distribution; treat support and dispersion cautiously."),
       jump("guideGoGroups", "Open group comparison")

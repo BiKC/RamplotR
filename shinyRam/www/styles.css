@@ -1738,3 +1738,13 @@ body > .container-fluid { max-width: none; padding: 0; }
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Residue-first distributions for experimental and uploaded group models. */
+.ram-group-fingerprint-grid { display: grid;
+  grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.06fr);
+  gap: 14px; align-items: start; }
+.ram-group-fingerprint-grid > div { min-width: 0; }
+.ram-group-fingerprint-panel h4 { margin-top: 0; }
+@media(max-width: 900px) {
+  .ram-group-fingerprint-grid { grid-template-columns: minmax(0, 1fr); }
+}

@@ -69,6 +69,9 @@ ram_atlas_group_prepare <- function(verified,geometry,group_a,group_b,
       insertion_code="",resn=unname(chemistry[
         as.character(tbl$uniprot_resi)]),
       phi=as.numeric(tbl$phi),psi=as.numeric(tbl$psi),
+      source_resn=unname(profiles[[match(id,picked$selected)]]$chemistry[
+        match(tbl$uniprot_resi,
+          profiles[[match(id,picked$selected)]]$positions)]),
       region=NA_character_,rama8000_region=NA_character_,
       stringsAsFactors=FALSE)
   })
@@ -82,6 +85,8 @@ ram_atlas_group_prepare <- function(verified,geometry,group_a,group_b,
   comparison <- ram_group_conformation_compare(
     models[[names_a[[1L]]]],models[names_a],models[names_b],
     label_a,label_b)
+  fingerprint <- ram_group_fingerprint(models[names_a],models[names_b],
+                                        label_a,label_b)
   metadata <- do.call(rbind,lapply(picked$selected,function(id) {
     entity <- available[[id]]
     table <- models[[id]]
@@ -98,7 +103,7 @@ ram_atlas_group_prepare <- function(verified,geometry,group_a,group_b,
   }))
   audit <- ram_atlas_construct_audit(verified,picked$accession,
                                     picked$selected,available)
-  list(comparison=comparison,members=metadata,
+  list(comparison=comparison,fingerprint=fingerprint,members=metadata,
     label_a=label_a,label_b=label_b,n_a=length(names_a),
     n_b=length(names_b),reference_chain="UniProt",
     source="atlas",accession=picked$accession,

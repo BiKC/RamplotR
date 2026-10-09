@@ -43,6 +43,7 @@ source(file.path("R", "geometry.R"), local = TRUE)
 source(file.path("R", "experimental.R"), local = TRUE)
 source(file.path("R", "ensemble.R"), local = TRUE)
 source(file.path("R", "group-comparison.R"), local = TRUE)
+source(file.path("R", "group-fingerprint.R"), local = TRUE)
 source(file.path("R", "atlas-group-handoff.R"), local = TRUE)
 source(file.path("R", "guide.R"), local = TRUE)
 
@@ -665,6 +666,7 @@ ui <- fluidPage(
                   uiOutput("groupComparisonSummary"),
                   uiOutput("groupComparisonTrack"),
                   uiOutput("groupComparisonSelectionInfo"),
+                  uiOutput("groupFingerprintPanel"),
                   tags$div(class="ram-residue-table",
                     DT::DTOutput("groupComparisonRows")),
                   uiOutput("groupComparisonExports")
@@ -3626,6 +3628,11 @@ server <- function(input, output, session) {
     label_b <- trimws(input$groupBLabel)
     if (!nzchar(label_a)) label_a <- "Group A"
     if (!nzchar(label_b)) label_b <- "Group B"
+    if(identical(label_a,label_b)) {
+      showNotification("Give Group A and Group B distinct labels.",
+        type="warning",duration=12)
+      return()
+    }
     min_identity <- suppressWarnings(as.numeric(input$groupMinIdentity)/100)
     min_coverage <- suppressWarnings(as.numeric(input$groupMinCoverage)/100)
     if (!is.finite(min_identity)) min_identity <- 0.70
@@ -3721,8 +3728,10 @@ server <- function(input, output, session) {
         transform(prepared_a$model_summary,group=label_a),
         transform(prepared_b$model_summary,group=label_b)
       )
+      fingerprint <- ram_group_fingerprint(
+        prepared_a$models,prepared_b$models,label_a,label_b)
       result <- list(
-        comparison=comparison,members=members,
+        comparison=comparison,fingerprint=fingerprint,members=members,
         label_a=label_a,label_b=label_b,
         n_a=length(prepared_a$models),n_b=length(prepared_b$models),
         reference_chain=ref_chain
@@ -3914,6 +3923,85 @@ server <- function(input, output, session) {
     )
   })
 
+  group_fingerprint_selected <- reactive({
+    result <- group_comparison_matches()
+    if(is.null(result) || is.null(result$fingerprint) ||
+       !nrow(result$comparison)) return(NULL)
+    comparison <- result$comparison
+    selection <- selected_residue()
+    index <- integer()
+    if(!is.null(selection) && length(selection$resi)==1L) {
+      ins <- if(is.null(selection$insertion_code) ||
+                is.na(selection$insertion_code)) "" else
+        as.character(selection$insertion_code)
+      index <- which(as.character(comparison$chain)==as.character(selection$chain) &
+        comparison$resi==as.integer(selection$resi) &
+        ifelse(is.na(comparison$insertion_code),"",
+               as.character(comparison$insertion_code))==ins)
+    }
+    if(length(index)!=1L) {
+      index <- which(is.finite(comparison$angular_displacement))
+      if(!length(index)) index <- seq_len(nrow(comparison))
+    }
+    row <- comparison[index[[1L]],,drop=FALSE]
+    selected <- ram_group_fingerprint_at(result$fingerprint,
+      row$chain[[1L]],row$resi[[1L]],
+      if(is.na(row$insertion_code[[1L]])) "" else row$insertion_code[[1L]])
+    list(row=row,records=selected)
+  })
+  output$groupFingerprintPanel <- renderUI({
+    result <- group_comparison_matches()
+    selected <- group_fingerprint_selected()
+    if(is.null(result) || is.null(selected) || !nrow(selected$records))
+      return(NULL)
+    row <- selected$row
+    group_names <- c(result$label_a,result$label_b)
+    summary <- ram_group_fingerprint_summary(selected$records,
+      group_names,c(result$n_a,result$n_b))
+    info <- vapply(seq_len(2L),function(i) {
+      state <- if(is.na(summary$modal_state[[i]])) "no complete pair"
+        else sprintf("%s (%.0f%% of classified pairs)",
+          summary$modal_state[[i]],100*summary$consensus[[i]])
+      sprintf("%s: %d/%d complete pairs; %s",group_names[[i]],
+        summary$complete_pairs[[i]],summary$members[[i]],state)
+    },character(1L))
+    tags$section(class="ram-panel ram-group-fingerprint-panel",
+      tags$h4(sprintf("Local conformational fingerprint · %s %s:%d%s",
+        row$resn[[1L]],row$chain[[1L]],row$resi[[1L]],
+        if(is.na(row$insertion_code[[1L]])) "" else
+          row$insertion_code[[1L]])),
+      tags$p(class="ram-field-hint",
+        "One point per measured structure, using complete paired φ/ψ angles. Crosses mark circular means. Choose another residue in the track or table to update this view."),
+      tags$div(class="ram-group-fingerprint-grid",
+        plotOutput("groupFingerprintPlot",height="310px"),
+        tags$div(
+          tags$p(class="ram-field-hint",info[[1L]]),
+          tags$p(class="ram-field-hint",info[[2L]]),
+          DT::DTOutput("groupFingerprintMembers"))),
+      tags$p(class="ram-field-hint",
+        "These are measured structural observations, not independent biological replicates or conformational-state probabilities. Missing angles remain missing; neither RamplotR density nor Rama8000 categories are inferred from Atlas backbone-only records.")
+    )
+  })
+  output$groupFingerprintPlot <- renderPlot({
+    selected <- req(group_fingerprint_selected())
+    result <- req(group_comparison_matches())
+    ram_group_fingerprint_plot(selected$records,
+      c(result$label_a,result$label_b))
+  })
+  output$groupFingerprintMembers <- DT::renderDT({
+    selected <- req(group_fingerprint_selected())
+    records <- selected$records
+    req(nrow(records)>0L)
+    shown <- records[,c("group","member","amino_acid","phi",
+      "psi","paired","backbone_state"),drop=FALSE]
+    shown$phi <- round(shown$phi,1)
+    shown$psi <- round(shown$psi,1)
+    DT::datatable(shown,rownames=FALSE,
+      colnames=c("Group","Structure","AA","φ","ψ","Complete pair","Backbone state"),
+      options=list(dom="tip",pageLength=8,scrollX=TRUE),
+      class="compact stripe")
+  },server=FALSE)
+
   output$groupComparisonRows <- DT::renderDT({
     result <- group_comparison_matches()
     req(result)
@@ -3985,7 +4073,9 @@ server <- function(input, output, session) {
       downloadButton("downloadGroupComparison",
         "Export residue comparison CSV"),
       downloadButton("downloadGroupMembers",
-        "Export matched structure/chain CSV")
+        "Export matched structure/chain CSV"),
+      downloadButton("downloadGroupFingerprint",
+        "Export per-model fingerprint CSV")
     )
   })
 
@@ -3993,6 +4083,12 @@ server <- function(input, output, session) {
     filename=function() safe_filename("group-conformation-comparison.csv"),
     content=function(file) utils::write.csv(
       req(group_comparison_matches())$comparison,
+      file,row.names=FALSE,na="")
+  )
+  output$downloadGroupFingerprint <- downloadHandler(
+    filename=function() safe_filename("group-conformational-fingerprints.csv"),
+    content=function(file) utils::write.csv(
+      req(group_comparison_matches())$fingerprint,
       file,row.names=FALSE,na="")
   )
   output$downloadGroupMembers <- downloadHandler(

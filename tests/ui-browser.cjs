@@ -1030,6 +1030,11 @@ const assert = require("node:assert/strict");
       "Identical structure groups should stay entirely in the Small shift band.");
     assert.ok(groupState.summary.includes("0 high-support shifts"),
       "Self-group comparison must not invent a high-support between-group shift.");
+    await page.waitForFunction(() => {
+      const panel=document.querySelector(".ram-group-fingerprint-panel");
+      return panel && panel.textContent.includes("complete pairs") &&
+        document.querySelector("#downloadGroupFingerprint");
+    },{timeout:12000});
     await page.click(".ram-group-cell");
     await page.waitForFunction(() =>
       document.querySelector("#selectedResidueInfo strong") &&

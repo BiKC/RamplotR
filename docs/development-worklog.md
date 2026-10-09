@@ -387,3 +387,21 @@ branch, and do not reuse historical feature branches.
 - Added collapsed Atlas UI, three CSV exports, help text, scientific tests,
   and browser smoke coverage. CI runs when a new PR becomes ready, not on
   every commit. Keep this feature on its own PR until validation is green.
+
+## October 9: experimental-condition context (active feature)
+
+- Branch `feature/atlas-experimental-context` created from `main` at
+  `519c9257063ca33a0f1e391e8f84af4a79af3805`; kept separate from
+  PR #68 cluster robustness. The latter merges before app integration.
+- Reuse RCSB discovery method, resolution, release date and polymer
+  description without extra requests. Join by exact validated PDB/entity IDs,
+  not discovery page order.
+- Combine with existing PDBe SIFTS exact observed residue chemistry and
+  pairwise construct audits. Explicitly flag same-deposition polymer entities,
+  unknown metadata and different experimental methods; export evidence.
+- Ligand occupancy is **not verified** by current archive inputs. Never infer
+  apo/holo status, functional-state association or independent experiments from
+  these metadata.
+- New pure scientific regression exercises missing/duplicate records,
+  cross-cohort rejection, method/chemistry divergence and shared PDB IDs.
+  Add interface and browser tests only after #68 merges.

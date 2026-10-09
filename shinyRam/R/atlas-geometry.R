@@ -94,8 +94,95 @@ ram_atlas_geometry_entities <- function(verified,accession) {
   entities
 }
 
+# A conservative *exploratory* automatic cut of the SAME canonical-core
+# dRMSD matrix already used by the manual dendrogram. Average silhouette
+# measures geometric cohesion/separation, not biological state validity.
+ram_atlas_auto_clusters <- function(distance_matrix,hc,
+  min_silhouette=0.50,min_separation=0.35,max_groups=4L) {
+  D <- as.matrix(distance_matrix)
+  n <- nrow(D)
+  if(n<2L || n!=ncol(D) || any(!is.finite(D)) ||
+     any(D < -1e-9) || any(abs(D-t(D))>1e-8) ||
+     any(abs(diag(D))>1e-8) || !inherits(hc,"hclust"))
+    stop("Invalid canonical-core distance matrix for automatic grouping.",
+      call.=FALSE)
+  groups <- rep(1L,n)
+  names(groups) <- rownames(D)
+  candidate <- data.frame(k=integer(),silhouette=numeric(),
+    separation_A=numeric(),singleton_groups=integer(),
+    stringsAsFactors=FALSE)
+  reason <- "Fewer than three structures; no automatic split recommended."
+  if(n>=3L) {
+    for(k in seq.int(2L,min(max_groups,n-1L))) {
+      labels <- stats::cutree(hc,k=k)
+      memberships <- split(seq_len(n),labels)
+      singleton <- sum(lengths(memberships)==1L)
+      scores <- numeric(n)
+      inside <- numeric()
+      outside <- numeric()
+      for(i in seq_len(n)) {
+        own <- which(labels==labels[[i]] & seq_len(n)!=i)
+        other <- which(labels!=labels[[i]])
+        if(length(own)) {
+          a <- mean(D[i,own])
+          nearest <- min(vapply(split(other,labels[other]),
+            function(index) mean(D[i,index]),numeric(1L)))
+          scores[[i]] <- if(max(a,nearest)>0)
+            (nearest-a)/max(a,nearest) else 0
+        } else scores[[i]] <- 0 # Singleton silhouette is not 1.
+      }
+      for(j in seq_len(n-1L)) for(i in seq.int(j+1L,n)) {
+        if(labels[[i]]==labels[[j]])
+          inside <- c(inside,D[i,j])
+        else outside <- c(outside,D[i,j])
+      }
+      separation <- if(length(inside) && length(outside))
+        stats::median(outside)-stats::median(inside)
+      else 0
+      candidate <- rbind(candidate,data.frame(k=as.integer(k),
+        silhouette=round(mean(scores),4),
+        separation_A=round(separation,4),
+        singleton_groups=as.integer(singleton)))
+    }
+    accepted <- which(candidate$silhouette>=min_silhouette &
+      candidate$separation_A>=min_separation)
+    if(length(accepted)) {
+      # A small complexity penalty avoids gratuitous subdivision when
+      # silhouette scores are close. Exact ties favor fewer groups.
+      rank <- candidate$silhouette[accepted] -
+        0.02*(candidate$k[accepted]-2L)
+      chosen <- accepted[[which.max(rank)]]
+      groups <- stats::cutree(hc,k=candidate$k[[chosen]])
+      reason <- sprintf(paste0(
+        "Suggested %d geometric groups (mean silhouette %.2f; ",
+        "median between-minus-within distance %.2f Å)."),
+        candidate$k[[chosen]],candidate$silhouette[[chosen]],
+        candidate$separation_A[[chosen]])
+      if(candidate$singleton_groups[[chosen]]>0)
+        reason <- paste0(reason,
+          " Some groups are singletons; within-group consistency cannot be assessed.")
+    } else reason <- paste0(
+      "No sufficiently separated grouping at the exploratory safeguards ",
+      sprintf("(mean silhouette ≥%.2f and median distance gap ≥%.2f Å). ",
+        min_silhouette,min_separation),
+      "Treat the cohort as one geometric group or choose a manual cutoff.")
+  }
+  k <- length(unique(groups))
+  heights <- hc$height
+  cutoff <- if(k==1L) max(heights)+max(0.01,0.02*max(heights)) else {
+    bottom <- heights[[n-k]]
+    top <- heights[[n-k+1L]]
+    if(top>bottom) (bottom+top)/2 else top
+  }
+  list(assignment=as.integer(groups),k=k,cutoff=as.numeric(cutoff),
+    reason=reason,candidates=candidate,mode="automatic",
+    min_silhouette=min_silhouette,min_separation_A=min_separation)
+}
+
 ram_atlas_geometry_groups <- function(verified,accession,selected,
-  min_core=30L,min_fraction=0.6,cutoff=1.5,max_core=300L) {
+  min_core=30L,min_fraction=0.6,cutoff=1.5,max_core=300L,
+  cluster_mode=c("manual","automatic")) {
+  cluster_mode <- match.arg(cluster_mode)
   ids <- unique(as.character(selected))
   if(length(ids)<2L || length(ids)>12L ||
      anyNA(ids) || any(!nzchar(ids)))
@@ -143,7 +230,12 @@ ram_atlas_geometry_groups <- function(verified,accession,selected,
     for(j in seq.int(i+1L,n))
       D[i,j] <- D[j,i] <- sqrt(mean((dists[[i]]-dists[[j]])^2))
   hc <- stats::hclust(stats::as.dist(D),method="average")
-  labels <- stats::cutree(hc,h=cutoff)
+  automatic <- if(identical(cluster_mode,"automatic"))
+    ram_atlas_auto_clusters(D,hc) else NULL
+  if(!is.null(automatic)) {
+    labels <- stats::setNames(automatic$assignment,ids)
+    cutoff <- automatic$cutoff
+  } else labels <- stats::cutree(hc,h=cutoff)
   groups <- split(ids,labels)
   representatives <- vapply(groups,function(members) {
     idx <- match(members,ids)
@@ -161,6 +253,7 @@ ram_atlas_geometry_groups <- function(verified,accession,selected,
       geometric_group=as.integer(labels[ids]),
       stringsAsFactors=FALSE),
     representatives=representatives,cutoff=cutoff,
+    cluster_mode=cluster_mode,auto_cluster=automatic,
     distance_method="C-alpha intrachain distance-map RMSD (Å), common canonical UniProt positions; average-linkage hierarchical clustering")
 }
 

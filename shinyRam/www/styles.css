@@ -1691,3 +1691,33 @@ body > .container-fluid { max-width: none; padding: 0; }
 }
 
 .ram-atlas-inspection-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0}.ram-atlas-inspection-pair>div{min-width:0;padding:12px;border:1px solid #dbe6e8;border-radius:10px;background:#f7fafb}.ram-atlas-inspection-pair p{margin:6px 0;overflow-wrap:anywhere}@media(max-width:600px){.ram-atlas-inspection-pair{grid-template-columns:minmax(0,1fr)}}
+
+
+/* Atlas network diagnostics: subdued, readable and wrapped on small screens. */
+.ram-atlas-network-check { margin: 12px 0 16px; }
+.ram-atlas-network-check > .ram-field-hint { margin: 10px 0; }
+.ram-atlas-network-check .btn { margin: 4px 0 8px; }
+.ram-atlas-connectivity-results { margin: 10px 0 12px; }
+.ram-atlas-connectivity-list {
+  list-style: none;
+  margin: 7px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.ram-atlas-connectivity-list li {
+  border-left: 3px solid #c7d1d4;
+  padding: 7px 10px;
+  background: rgba(105, 140, 146, .055);
+  border-radius: 3px 7px 7px 3px;
+  overflow-wrap: anywhere;
+  font-size: .9em;
+  line-height: 1.45;
+}
+.ram-atlas-connectivity-list li.ram-atlas-probe-failed {
+  border-left-color: #b06b56;
+}
+.ram-atlas-connectivity-list li.ram-atlas-probe-ok {
+  border-left-color: #468d87;
+}
+.ram-atlas-connectivity-list li strong { display: block; margin-bottom: 2px; }

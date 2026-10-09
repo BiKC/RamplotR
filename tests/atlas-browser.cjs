@@ -91,12 +91,28 @@ ${atoms}
           return;
         }
         const submitted=JSON.parse(request.postData() || "{}");
+        if(submitted.query?.parameters?.value==="P69441") {
+          request.respond({status:200,headers:cors,
+            body:JSON.stringify({total_count:1,
+              result_set:[{identifier:"4AKE_1"}]})});
+          return;
+        }
         requests.push(submitted);
         const offset=submitted.request_options.paginate.start;
         request.respond({status:200,headers:cors,body:JSON.stringify({
           total_count:73,
           result_set:[{identifier:offset===0 ? "1CRN_1" : "1UBQ_1"}]
         })});
+      } else if (url === "https://data.rcsb.org/rest/v1/core/polymer_entity/4AKE/1") {
+        request.respond({status:200,headers:cors,body:JSON.stringify({
+          rcsb_polymer_entity_container_identifiers:{
+            entry_id:"4AKE",entity_id:"1",auth_asym_ids:["A"]
+          }
+        })});
+      } else if (url === "https://www.ebi.ac.uk/pdbe/static/entry/4ake_updated.cif") {
+        request.respond({status:200,
+          headers:{...cors,"content-type":"text/plain"},
+          body:syntheticUpdatedCif(101,false).replace(/P00533/g,"P69441")});
       } else if (url === "https://www.ebi.ac.uk/pdbe/static/entry/1crn_updated.cif") {
         const mockCif = syntheticUpdatedCif(101,false);
         request.respond({status:200,
@@ -150,6 +166,23 @@ ${atoms}
       waitUntil:"networkidle2",timeout:60000
     });
     await page.click('.nav-tabs a[data-value="atlas"]');
+    // The network diagnostic runs only when explicitly opened/clicked and
+    // must not mutate or trigger the Atlas search itself.
+    await page.click(".ram-atlas-network-check > summary");
+    await page.click("#atlasConnectivityRun");
+    await page.waitForFunction(()=>{
+      const panel=document.querySelector("#atlasConnectivityStatus");
+      return panel && panel.textContent.includes("All 3 endpoints passed");
+    },{timeout:25000});
+    const probe=await page.$eval("#atlasConnectivityStatus",
+      el=>el.textContent);
+    assert.match(probe,/Browser origin: http:\/\/127\.0\.0\.1:8765/);
+    assert.match(probe,/PDBe updated mmCIF/);
+    const displayedProbeCount=await page.evaluate(()=>
+      document.querySelectorAll(".ram-atlas-connectivity-list li").length);
+    assert.equal(displayedProbeCount,3);
+    assert.equal(requests.length,0,
+      "Connectivity test should not trigger a real Atlas cohort search.");
     await page.waitForSelector("#atlasAccession");
     await page.type("#atlasAccession","P00533");
     await page.click("#atlasDiscover");

@@ -1,0 +1,31 @@
+name: Public Shinylive origin archive connectivity
+
+# This is a real cross-origin check from bikc.be in Chromium, not from Node or
+# the R runner. Run once when a PR becomes ready; not on commits or pushes.
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-browser-origin:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Chromium browser controller
+        run: npm install --no-save --no-package-lock puppeteer-core@24
+      - name: Check real public browser-origin archive access
+        run: node tests/atlas-live-origin-browser.cjs
+      - name: Save exact endpoint and browser-origin diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ramplotr-public-browser-archive-check
+          path: benchmarks/output/atlas-live-browser-origin/
+          retention-days: 14
+          if-no-files-found: warn

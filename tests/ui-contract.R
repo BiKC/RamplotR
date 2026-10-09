@@ -15,6 +15,7 @@ required <- c(
   "comparePlot", "compareSwap", "NGLCompare",
   "regionselect", "regions", "summary",
   "atlasAccession", "atlasDiscover", "atlasStatus", "atlasResults",
+  "atlasConnectivityRun", "atlasConnectivityStatus",
   "openGuide", "groupGuide", "atlasGuide", "groupComparisonExports"
 )
 missing <- required[!vapply(required, function(id) {
@@ -30,6 +31,7 @@ stopifnot(
   grepl('src = "custom.js"', ui, fixed = TRUE),
   grepl('src = "canonical-mapping.js"', ui, fixed = TRUE),
   grepl('src = "atlas-discovery.js"', ui, fixed = TRUE),
+  grepl('src = "atlas-connectivity.js"', ui, fixed = TRUE),
   grepl('src = "atlas-sifts-exact.js"', ui, fixed = TRUE),
   grepl('src = "experimental-search.js"', ui, fixed = TRUE),
   grepl('class = "ram-workspace"', ui, fixed = TRUE),

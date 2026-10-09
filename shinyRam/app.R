@@ -673,6 +673,18 @@ ui <- fluidPage(
                   actionLink("atlasGuide","Read the experimental Atlas walkthrough"),
                   tags$p(class="ram-field-hint",
                     "Searches public RCSB PDB by UniProt cross-reference, restricted to experimental entries. Results are candidate polymer entities, not distinct conformational states."),
+                  tags$details(class="ram-details ram-atlas-network-check",
+                    tags$summary("Check browser access to RCSB and PDBe"),
+                    tags$p(class="ram-field-hint",
+                      "Run an on-demand connectivity check from this browser. It tests a known experimental protein through RCSB Search, RCSB metadata and PDBe updated mmCIF with exact SIFTS mapping. No loaded structures or analyses are modified."),
+                    actionButton("atlasConnectivityRun","Test archive connections",
+                      class="btn-default btn-sm"),
+                    uiOutput("atlasConnectivityStatus"),
+                    tags$p(class="ram-field-hint",
+                      "The check runs from your browser, not a GitHub Actions server. A successful check does not guarantee every other archive entry will download."),
+                    tags$a("Troubleshooting and source endpoints",
+                      href="https://github.com/BiKC/RamplotR/blob/main/docs/atlas-browser-connectivity.md",
+                      target="_blank",rel="noopener noreferrer")),
                   tags$div(class="ram-atlas-controls",
                     textInput("atlasAccession","UniProt accession",
                       placeholder="e.g. P00533"),
@@ -735,6 +747,7 @@ ui <- fluidPage(
   tags$script(src = "canonical-mapping.js"),
   tags$script(src = "atlas-sifts-exact.js"),
   tags$script(src = "atlas-discovery.js"),
+  tags$script(src = "atlas-connectivity.js"),
   tags$script(src = "experimental-search.js"),
   tags$script(src = "compare.js"),
   tags$script(src = "prediction.js"),
@@ -773,6 +786,8 @@ server <- function(input, output, session) {
   atlas_request <- reactiveVal(0L)
   atlas_payload <- reactiveVal(NULL)
   atlas_status <- reactiveVal(NULL)
+  atlas_connectivity_request <- reactiveVal(0L)
+  atlas_connectivity_status <- reactiveVal(NULL)
   atlas_exact_request <- reactiveVal(0L)
   atlas_exact_selected <- reactiveVal(NULL)
   atlas_exact_results <- reactiveVal(list())
@@ -1832,6 +1847,74 @@ server <- function(input, output, session) {
           class = "ram-confidence-warning",
           paste(prediction$notes, collapse = " "))
       )
+    )
+  })
+
+  # On-demand checks are executed from the visitor's browser origin;
+  # this never mutates any scientific result or loaded structure.
+  observeEvent(input$atlasConnectivityRun, {
+    id <- isolate(atlas_connectivity_request())+1L
+    atlas_connectivity_request(id)
+    atlas_connectivity_status(list(state="running",passed=0L,total=3L,
+      checks=list()))
+    session$sendCustomMessage("ram-atlas-connectivity",
+      list(request_id=as.character(id)))
+  },ignoreInit=TRUE)
+  observeEvent(input$ramAtlasConnectivity, {
+    value <- input$ramAtlasConnectivity
+    if(!is.list(value) ||
+       !identical(as.character(value$request_id),
+                  as.character(isolate(atlas_connectivity_request()))))
+      return()
+    atlas_connectivity_status(value)
+  },ignoreInit=TRUE)
+  output$atlasConnectivityStatus <- renderUI({
+    status <- atlas_connectivity_status()
+    if(is.null(status)) return(NULL)
+    checks <- status$checks
+    if(!is.list(checks)) checks <- list()
+    state <- as.character(status$state)
+    if(identical(state,"error"))
+      return(tags$p(class="ram-confidence-warning",
+        if(!is.null(status$message)) as.character(status$message)
+        else "The browser diagnostic could not run."))
+    if(!state %in% c("ok","partial_failure","running"))
+      return(NULL)
+    passed <- suppressWarnings(as.integer(status$passed))
+    total <- suppressWarnings(as.integer(status$total))
+    if(length(passed)!=1L || is.na(passed)) passed <- 0L
+    if(length(total)!=1L || is.na(total)) total <- 3L
+    tags$div(class="ram-atlas-connectivity-results",
+      tags$p(class=if(identical(state,"partial_failure"))
+          "ram-confidence-warning" else "ram-field-hint",
+        if(identical(state,"running"))
+          sprintf("Checking archive connections: %d/%d passed so far...",
+            passed,total)
+        else if(identical(state,"ok"))
+          sprintf("All %d endpoints passed in this browser.",total)
+        else sprintf("%d/%d endpoints passed. Check failures below.",
+          passed,total)),
+      if(!is.null(status$tested_origin))
+        tags$p(class="ram-field-hint",
+          paste("Browser origin:",as.character(status$tested_origin))),
+      tags$ul(class="ram-atlas-connectivity-list",
+        lapply(checks,function(check) {
+          if(!is.list(check)) return(NULL)
+          good <- identical(check$state,"ok")
+          name <- as.character(check$name)
+          value <- if(good && !is.null(check$summary))
+            as.character(check$summary)
+          else if(!is.null(check$detail)) as.character(check$detail)
+          else "Result unavailable."
+          reason <- if(!good && !is.null(check$reason))
+            paste0(" [",as.character(check$reason),"]") else ""
+          duration <- if(!is.null(check$elapsed_ms))
+            sprintf(" (%d ms)",as.integer(check$elapsed_ms)) else ""
+          tags$li(class=if(good) "ram-atlas-probe-ok"
+              else "ram-atlas-probe-failed",
+            tags$strong(paste0(if(good) "Passed: " else "Failed: ",name)),
+            tags$span(paste0(" — ",value,reason,duration)))
+        }))
     )
   })
 

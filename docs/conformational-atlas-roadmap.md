@@ -110,6 +110,14 @@ A fourth protein, *Sus scrofa* citrate synthase P00889 (1CTS open, 2CTS closed, 
 
 Atlas now offers an opt-in in-browser diagnostic for the **real** RCSB experimental search, RCSB polymer metadata and PDBe updated mmCIF/SIFTS archive connections. A separately configured Chromium PR-ready check visits the public `bikc.be` Shinylive **origin** and exercises the current PR's parsers from that origin. This closes the gap between successful Node/localhost tests and actual browser CORS/network restrictions, without confusing archive reachability with biological validity or claiming that the unpublished UI is already deployed. Endpoint failures remain explicit; no insecure transparent proxy or guessed residue mapping is introduced. See `docs/atlas-browser-connectivity.md`.
 
+## Direct verified Atlas → Compare Groups workflow (October 9, 2026)
+
+The Atlas geometry analysis now allows scientists to select **any two disjoint groups of verified experimental polymer entities** and transfer them into the existing Compare Groups view. Geometry clusters are suggested as initial memberships, not automatically interpreted as biological functional states. Group names remain researcher controlled. Each entity contributes its cached first-model exact SIFTS-mapped N/CA/C backbone torsions using the verified common UniProt positions, without uploading structure files or fetching them a second time.
+
+The existing circular phi/psi dispersion and group contrast calculations are reused, with per-member exact-coordinate counts and group coverage. A position's amino-acid identity is shown only when all selected experimental monomer identities agree; otherwise it is explicitly `UNK`. Native RamplotR/Rama8000 classifications are **not inferred** from the sparse archive cache. This is a deliberate limitation, not a zero-outlier result. Same-crystal chain copies, different ligands, constructs or crystal conditions do not count as independent biological replication by default.
+
+Uploaded-file Group Compare remains a separate unchanged mode. Exact SIFTS positions replace heuristic chain sequence alignment only in Atlas mode, with experimental identity and residue support preserved in CSV exports.
+
 ## Scientific principles
 
 1. Keep evidence types separate. Rama8000 validation, native RamplotR density,

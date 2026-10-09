@@ -2266,10 +2266,10 @@ server <- function(input, output, session) {
        length(geometry$selected)<2L) return(NULL)
     members <- split(as.character(geometry$assignment$entity),
       geometry$assignment$geometric_group)
-    default_a <- if(length(members)>0L) members[[1L]][[1L]]
+    default_a <- if(length(members)>0L) members[[1L]]
       else geometry$selected[[1L]]
-    default_b <- if(length(members)>1L) members[[2L]][[1L]]
-      else geometry$selected[[2L]]
+    default_b <- if(length(members)>1L) members[[2L]]
+      else setdiff(geometry$selected,default_a)[[1L]]
     tags$section(class="ram-atlas-group-handoff",
       tags$h4("Compare Atlas structures as groups"),
       tags$p(class="ram-field-hint",

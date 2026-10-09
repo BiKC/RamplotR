@@ -13,9 +13,9 @@ permissions:
 jobs:
   multiprotein-case-study:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    name: Live ADK, maltose-binding and ribose-binding protein cases
+    name: Live multi-fold experimental comparisons (including citrate synthase)
     runs-on: ubuntu-latest
-    timeout-minutes: 22
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: r-lib/actions/setup-r@v2
@@ -27,7 +27,7 @@ jobs:
           Rscript -e 'parse(file="scripts/atlas-multiprotein-benchmark.R")'
       - name: Install JSON reader
         run: Rscript -e 'install.packages("jsonlite")'
-      - name: Fetch seven current experimental PDBe structures
+      - name: Fetch curated experimental PDBe structures across distinct folds
         run: node scripts/atlas-multiprotein-fetch.cjs benchmarks/output/atlas-multiprotein
       - name: Evaluate canonical overlap, torsion and controls
         run: Rscript scripts/atlas-multiprotein-benchmark.R benchmarks/output/atlas-multiprotein

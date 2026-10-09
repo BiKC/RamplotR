@@ -12,9 +12,13 @@ conf <- jsonlite::fromJSON("benchmarks/atlas-multiprotein-cases.json",
                            simplifyVector=FALSE)
 manifest <- jsonlite::fromJSON(file.path(dest,"manifest.json"),
                                 simplifyVector=FALSE)
-if(!identical(conf$schema_version,1L) || length(conf$proteins)<3L)
+if(!identical(conf$schema_version,1L) || length(conf$proteins)<4L)
   stop("Missing curated multi-protein benchmark configuration.")
-if(length(manifest$entries)<7L) stop("Incomplete live benchmark archive.")
+expected_entries <- sum(vapply(conf$proteins,function(protein)
+  length(protein$entries),integer(1L)))
+if(length(manifest$entries)!=expected_entries)
+  stop(sprintf("Expected %d exact live benchmark entries; found %d.",
+    expected_entries,length(manifest$entries)))
 cache <- list()
 for(protein in conf$proteins) for(entry in protein$entries) {
   id <- paste0(entry$pdb,"_",entry$entity)
@@ -170,6 +174,13 @@ for(protein in conf$proteins) {
                                 "identity_zero_control")
 }
 results <- do.call(rbind,all)
+fold_by_protein <- stats::setNames(
+  vapply(conf$proteins,function(p) as.character(p$fold_family),
+    character(1L)),
+  vapply(conf$proteins,function(p) as.character(p$id),character(1L)))
+results$fold_family <- unname(fold_by_protein[results$protein])
+if(anyNA(results$fold_family))
+  stop("A benchmark protein lacks an explicit structural fold-family identifier.")
 zero <- results$comparison=="identity_zero_control"
 if(sum(zero)!=length(conf$proteins) ||
    any(results$drmsd_A[zero]!=0) ||
@@ -198,31 +209,76 @@ mismatched <- try(pair("synthetic_wrong_construct","1URP_1","2DRI_1",
 cache[["2DRI_1"]] <- saved
 if(!inherits(mismatched,"try-error"))
   stop("Construct/sequence mismatch control incorrectly accepted.")
+# Per-protein control comparisons are descriptive. A single
+# documented contrast and a non-independent crystal-chain control must not
+# become a claim of classifier accuracy or a statistical replicate.
+case_summaries <- lapply(conf$proteins,function(protein) {
+  rows <- results[results$protein==protein$id,,drop=FALSE]
+  positive <- rows[rows$comparison=="documented_open_closed",,drop=FALSE]
+  controls <- rows[rows$comparison %in% c("within_crystal",
+    "separate_crystal_open_control"),,drop=FALSE]
+  independent <- controls[
+    controls$comparison=="separate_crystal_open_control",,drop=FALSE]
+  if(nrow(positive)!=1L || !nrow(controls))
+    stop("Benchmark case must include one documented contrast and an observed control.")
+  worst <- max(controls$drmsd_A)
+  data.frame(protein=protein$id,fold_family=protein$fold_family,
+    documented_comparisons=1L,observed_controls=nrow(controls),
+    separate_crystal_controls=nrow(independent),
+    within_crystal_controls=sum(controls$comparison=="within_crystal"),
+    contrast_drmsd_A=positive$drmsd_A,
+    largest_control_drmsd_A=worst,
+    contrast_minus_control_A=round(positive$drmsd_A-worst,4),
+    contrast_larger_than_all_controls=positive$drmsd_A>worst,
+    contrast_local_change_fraction=positive$change_fraction,
+    largest_control_local_fraction=max(controls$change_fraction),
+    contrast_minus_control_local_fraction=round(
+      positive$change_fraction-max(controls$change_fraction),4),
+    stringsAsFactors=FALSE)
+})
+case_summary <- do.call(rbind,case_summaries)
+rownames(case_summary) <- NULL
+utils::write.csv(case_summary,file.path(dest,"per-protein-control-contrasts.csv"),
+                 row.names=FALSE)
 utils::write.csv(results,file.path(dest,"multiprotein-summary.csv"),
                  row.names=FALSE)
 # Contrast report is descriptive. One comparison per protein is not enough to
 # learn or evaluate a state classifier or general cutoff.
 summary <- c(
-  "# Three-protein experimental conformational comparison",
+  sprintf("# Experimental conformational comparison across %d protein families",
+    length(conf$proteins)),
   "",
   "All coordinates are model-1 PDBe updated-mmCIF observations mapped by exact",
   "SIFTS. Sources are hashed and audited in manifest.json.",
   "Labels refer to known experimental forms, not an inferred classifier.",
-  "Controls comprise same-crystal chain copies, a separate-crystal",
-  "open-state pair and exact identity checks, as available.",
+  "Controls include same-crystal chain copies, separate-crystal open",
+  "comparisons and exact identity checks, where documented and available.",
+  sprintf("Protein families: %d; fold-family labels: %d.",
+    length(conf$proteins),length(unique(case_summary$fold_family))),
   "",
   "## Per-comparison measurements",
   "",
   paste(capture.output(print(results,row.names=FALSE)),collapse="\n"),
   "",
+  "## Per-protein contrast versus strongest available control",
+  "",
+  paste(capture.output(print(case_summary,row.names=FALSE)),collapse="\n"),
+  "",
+  "Control differences and larger/smaller flags are descriptive; these",
+  "are not hypothesis-test results or holdout validation statistics.",
+  "",
   "## Scientific limits",
   "",
   "No statistical claim of sensitivity, specificity or general cutoff.",
-  "Within-crystal chains are non-independent; periplasmic binding proteins",
-  "share related architectures, so the proteins are not a broad fold sample.",
+  "Within-crystal chains are non-independent; two periplasmic proteins",
+  "remain members of a related fold family. The citrate synthase case",
+  "adds a distinct all-alpha architecture but not a representative",
+  "random sample of folds or independent biological replicates.",
   "Residue-name mismatches and missing coverage must be inspected,",
   "and ligand association here does not establish causality.",
   "Angle changes over 30 degrees are exploratory, not an error or state label.",
+  "The citrate synthase open control 3ENJ has covalent cystamine",
+  "modification context; chemistry controls cannot eliminate all confounds.",
   ""
 )
 writeLines(summary,file.path(dest,"multiprotein-report.md"))

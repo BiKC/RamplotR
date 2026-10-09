@@ -5,13 +5,16 @@ const conf=JSON.parse(fs.readFileSync(
   path.join(__dirname,"../benchmarks/atlas-multiprotein-cases.json"),
   "utf8"));
 assert.equal(conf.schema_version,1);
-assert.ok(conf.proteins.length>=3);
+assert.ok(conf.proteins.length>=4);
 const proteinIds=new Set();
+const foldFamilies=new Set();
 const fullIds=new Set();
 for(const protein of conf.proteins) {
   assert.match(protein.uniprot,/^[A-Z0-9]{6,12}(?:-[1-9]\d*)?$/);
   assert.ok(!proteinIds.has(protein.id),"Duplicate protein benchmark case.");
   proteinIds.add(protein.id);
+  assert.match(protein.fold_family,/^[a-z][a-z0-9_]+$/);
+  foldFamilies.add(protein.fold_family);
   const entries=new Set();
   for(const e of protein.entries) {
     assert.match(e.pdb,/^[A-Z0-9]{4}$/);
@@ -51,5 +54,12 @@ for(const protein of conf.proteins) {
   assert.equal(positive,1,"Exactly one documented contrast per protein.");
   assert.ok(control>=1,"Explicit negative/same-state control required.");
 }
+assert.ok(foldFamilies.size>=3,
+  "Benchmark must span at least three distinct structural fold families.");
+const citrate=conf.proteins.find(x=>x.id==="pig_citrate_synthase");
+assert.deepEqual(citrate.entries.map(e=>e.pdb),["1CTS","2CTS","3ENJ"]);
+assert.equal(citrate.uniprot,"P00889");
+assert.ok(citrate.comparisons.some(x=>x.left==="1CTS" && x.right==="3ENJ" &&
+  x.class==="separate_crystal_open_control"));
 console.log("Curated Atlas benchmark manifest checks passed ("+
   conf.proteins.length+" proteins, "+fullIds.size+" PDB entities).");

@@ -34,6 +34,7 @@ source(file.path("R", "atlas-cohort.R"), local = TRUE)
 source(file.path("R", "atlas-geometry.R"), local = TRUE)
 source(file.path("R", "atlas-robustness.R"), local = TRUE)
 source(file.path("R", "atlas-construct.R"), local = TRUE)
+source(file.path("R", "atlas-experimental-context.R"), local = TRUE)
 source(file.path("R", "atlas-switch.R"), local = TRUE)
 source(file.path("R", "atlas.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
@@ -2265,6 +2266,7 @@ server <- function(input, output, session) {
       uiOutput("atlasGeometrySummary"),
       plotOutput("atlasGeometryPlot",height="260px"),
       tableOutput("atlasGeometryTable"),
+      uiOutput("atlasExperimentalContextPanel"),
       uiOutput("atlasAutoQuality"),
       uiOutput("atlasRobustnessPanel"),
       uiOutput("atlasGroupsHandoffPanel"))
@@ -2442,6 +2444,8 @@ server <- function(input, output, session) {
         cutoff=isolate(input$atlasGeometryCutoff),max_core=300L,
         cluster_mode=isolate(input$atlasClusterMode))
       geometry$construct_audit <- audit
+      geometry$experimental_context <- ram_atlas_experimental_context(
+        cohort,geometry,audit)
       geometry
     },error=function(e) list(error=conditionMessage(e)))
     atlas_geometry_result(output)
@@ -2469,6 +2473,84 @@ server <- function(input, output, session) {
       tags$p(paste("Group representatives:",
         paste(unname(result$representatives),collapse=", "))))
   })
+  output$atlasExperimentalContextPanel <- renderUI({
+    result <- atlas_geometry_result()
+    if(is.null(result) || !is.null(result$error) ||
+       is.null(result$experimental_context)) return(NULL)
+    evidence <- result$experimental_context
+    tags$details(class="ram-details ram-atlas-context",
+      tags$summary("Experimental method, construct and deposition context"),
+      tags$p(class="ram-field-hint",sprintf(paste0(
+        "%d selected PDB entities; %d missing method(s), %d missing ",
+        "resolution(s), %d same-deposition pair(s)."),
+        nrow(evidence$entries),evidence$missing_methods,
+        evidence$missing_resolution,evidence$shared_pdb_pairs)),
+      if(evidence$shared_pdb_pairs>0L)
+        tags$p(class="ram-confidence-warning",
+          "Some selected entities belong to the same PDB entry. Multiple chains from one deposition are not independent experimental measurements."),
+      if(evidence$differing_chemistry_pairs>0L)
+        tags$p(class="ram-confidence-warning",
+          sprintf("%d pair(s) contain documented monomer-chemistry differences. Modified residues can differ without a gene mutation.",evidence$differing_chemistry_pairs)),
+      tags$p(class="ram-field-hint",evidence$ligand_status),
+      tags$p(class="ram-field-hint",
+        "Experimental method, resolution and release date are from RCSB discovery. Exact observed residue chemistry and coverage are from the verified SIFTS/mmCIF audit. Different methods or resolution do not establish functional states."),
+      tags$h5("Selected experimental entries"),
+      DT::DTOutput("atlasContextEntries"),
+      tags$h5("Pairwise metadata and construct caveats"),
+      DT::DTOutput("atlasContextPairs"),
+      tags$div(class="ram-ensemble-actions",
+        downloadButton("downloadAtlasContextEntries",
+          "Export experimental entries CSV"),
+        downloadButton("downloadAtlasContextPairs",
+          "Export experimental pair evidence CSV"))
+    )
+  })
+  output$atlasContextEntries <- DT::renderDT({
+    result <- req(atlas_geometry_result())
+    req(is.null(result$error),!is.null(result$experimental_context))
+    shown <- result$experimental_context$entries[,
+      c("entity","group","method","resolution_A","initial_release_date",
+        "observed_canonical_coverage","monomer_known","monomer_observed"),
+      drop=FALSE]
+    shown$resolution_A <- round(shown$resolution_A,2L)
+    shown$observed_canonical_coverage <-
+      round(100*shown$observed_canonical_coverage,1L)
+    DT::datatable(shown,rownames=FALSE,
+      colnames=c("PDB entity","Geometry group","Method","Resolution (Å)",
+        "Released","Canonical core (%)","Monomers known",
+        "Monomers observed"),
+      options=list(pageLength=8,scrollX=TRUE,dom="ftip"),
+      class="compact stripe")
+  },server=FALSE)
+  output$atlasContextPairs <- DT::renderDT({
+    result <- req(atlas_geometry_result())
+    req(is.null(result$error),!is.null(result$experimental_context))
+    evidence <- result$experimental_context$pairs
+    shown <- evidence[,c("entity_a","entity_b","same_geometric_group",
+      "same_pdb_entry","method_a","method_b","chemistry_differences",
+      "chemistry_unknown","unmatched_a","unmatched_b",
+      "context_warning"),drop=FALSE]
+    shown$same_geometric_group <- ifelse(shown$same_geometric_group,
+      "Yes","No")
+    shown$same_pdb_entry <- ifelse(shown$same_pdb_entry,"Yes","No")
+    DT::datatable(shown,rownames=FALSE,
+      colnames=c("PDB A","PDB B","Same group","Same deposition",
+        "Method A","Method B","Chemistry differences",
+        "Unknown chemistry","Unmatched A","Unmatched B","Caveats"),
+      options=list(pageLength=8,scrollX=TRUE,dom="ftip"),
+      class="compact stripe")
+  },server=FALSE)
+  output$downloadAtlasContextEntries <- downloadHandler(
+    filename=function() "ramplotr_atlas_experimental_entries.csv",
+    content=function(file) utils::write.csv(
+      req(atlas_geometry_result())$experimental_context$entries,
+      file,row.names=FALSE,na=""))
+  output$downloadAtlasContextPairs <- downloadHandler(
+    filename=function() "ramplotr_atlas_experimental_pairs.csv",
+    content=function(file) utils::write.csv(
+      req(atlas_geometry_result())$experimental_context$pairs,
+      file,row.names=FALSE,na=""))
+
   output$atlasAutoQuality <- renderUI({
     result <- atlas_geometry_result()
     if(is.null(result) || !is.null(result$error) ||

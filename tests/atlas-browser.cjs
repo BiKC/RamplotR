@@ -274,6 +274,14 @@ ${atoms}
       return notice && notice.textContent.includes(
         "two experimental structures cannot provide a meaningful sensitivity estimate");
     }, {timeout:12000});
+    await page.waitForFunction(() => {
+      const context = document.querySelector("#atlasExperimentalContextPanel");
+      return context && context.textContent.includes(
+        "Experimental method, construct and deposition context") &&
+        context.textContent.includes("Ligand/cofactor occupancy has not been verified");
+    }, {timeout:15000});
+    assert.ok(await page.$("#downloadAtlasContextEntries"));
+    assert.ok(await page.$("#downloadAtlasContextPairs"));
     const geometryTable=await page.$eval("#atlasGeometryTable",
       el=>el.textContent);
     assert.match(geometryTable,/1CRN_1/);

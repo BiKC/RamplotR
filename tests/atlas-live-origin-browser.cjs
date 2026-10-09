@@ -22,9 +22,16 @@ const puppeteer=require("puppeteer-core");
     page.setDefaultTimeout(45000);
     const errors=[];
     page.on("pageerror",e=>errors.push(String(e.message||e).slice(0,250)));
+    // The currently deployed Shinylive bootloader may navigate the outer
+    // frame asynchronously. Load only its document first, without allowing
+    // old deployment scripts to navigate during this source-revision test.
+    // We then re-enable JavaScript and execute this PR's own parsers from
+    // exactly the same live https://bikc.be origin.
+    await page.setJavaScriptEnabled(false);
     const response=await page.goto("https://bikc.be/RamplotR/",{
       waitUntil:"domcontentloaded",timeout:60000
     });
+    await page.setJavaScriptEnabled(true);
     const origin=await page.evaluate(()=>window.location.origin);
     assert.equal(origin,"https://bikc.be",
       "Deployed browser origin is not https://bikc.be.");

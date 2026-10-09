@@ -4267,7 +4267,8 @@ server <- function(input, output, session) {
     selected <- req(group_fingerprint_selected())
     result <- req(group_comparison_matches())
     ram_group_fingerprint_plot(selected$records,
-      c(result$label_a,result$label_b))
+      c(result$label_a,result$label_b),
+      contacts=atlas_fingerprint_contacts())
   })
   output$groupFingerprintMembers <- DT::renderDT({
     selected <- req(group_fingerprint_selected())

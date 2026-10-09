@@ -75,6 +75,12 @@ first-model non-water nonpolymer HETATM components that have heavy atoms within
 are retained, even if a different residue is the component's closest atom
 contact. Distances belong to the selected residue, not the entire component.
 
+An additional outline around an individual φ/ψ point indicates that
+its structure has a measured deposited component within 4.5 Å of that
+selected residue. Point colour and shape still identify the original
+researcher-defined group. The outline is proximity evidence, not a
+biological ligand classification.
+
 The table distinguishes observed nearby components, completed contact
 extraction without a reported local component, incomplete nearest-only legacy
 evidence, and unavailable contact evidence. Backbone φ/ψ completeness is shown

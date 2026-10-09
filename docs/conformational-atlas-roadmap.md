@@ -118,6 +118,31 @@ The existing circular phi/psi dispersion and group contrast calculations are reu
 
 Uploaded-file Group Compare remains a separate unchanged mode. Exact SIFTS positions replace heuristic chain sequence alignment only in Atlas mode, with experimental identity and residue support preserved in CSV exports.
 
+## October 9 automatic geometric-cluster suggestions
+
+Atlas can now recommend coherent groupings directly from its existing
+fixed-common-core, exact SIFTS/UniProt C-alpha distance-map RMSD matrix.
+The **automatic** mode evaluates average-linkage cuts into 2–4 groups
+(up to the number of available structures), using mean silhouette and a
+median between-minus-within distance gap. Conservative exploratory
+safeguards (silhouette at least 0.50, distance gap at least 0.35 Å) can
+recommend **one group** rather than manufacture a separation. Two
+experimental structures alone have no within-cluster replication and
+are not automatically split. Singleton suggestions are flagged.
+
+Manual distance-map RMSD height cutting remains available (initial
+manual default 1.5 Å), and the displayed dendrogram and cluster
+quality scores explain the choice. These safeguards are engineering
+heuristics chosen for cautious navigation, **not** empirically calibrated
+protein-state boundaries or evidence for biological independence.
+
+The already-merged direct Atlas-to-Compare Groups handoff (PR #62)
+consumes these proposed memberships as *editable defaults*. In the
+no-split case it offers two disjoint single-entry defaults for a
+researcher-initiated comparison, with an explicit warning. No group is
+automatically named open, closed, active or inactive. Classification
+requires independent ligand/condition and construct evidence.
+
 ## Scientific principles
 
 1. Keep evidence types separate. Rama8000 validation, native RamplotR density,

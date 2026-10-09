@@ -20,3 +20,5 @@ Choose a guide by the research task you want to perform. The [main README](../RE
 - [Atlas cluster sensitivity](atlas-cluster-robustness.md): deterministic position-deletion checks, shared-PDB warnings, CSV evidence and interpretation limits.
 
 - [Atlas experimental context](atlas-experimental-context.md): recorded method, resolution, chemistry and same-PDB caveats without invented ligand or functional states.
+
+- [Deposited component proximity](atlas-ligand-context.md): exact mapped first-model non-water HETATM observations with distances, uncertainty and export guidance.

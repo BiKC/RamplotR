@@ -285,6 +285,15 @@
           result.ca_points = [];
           result.ca_warning = err && err.message ? err.message : String(err);
         }
+        // Ligand context is independent of canonical SIFTS verification:
+        // failures remain visible but never invalidate sequence mapping.
+        try {
+          result.ligand_contacts = root.RamplotRAtlasLigands.extract(
+            cif,result,4.5);
+        } catch (err) {
+          result.ligand_contacts = {status:"unavailable",sites:[],
+            warning:err && err.message ? err.message : String(err)};
+        }
         if (root.Shiny && root.Shiny.setInputValue)
           root.Shiny.setInputValue("ramAtlasSiftsExact", {
             request_id: requestId, state: "ok", endpoint: url, ...result

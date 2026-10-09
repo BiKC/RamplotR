@@ -161,7 +161,8 @@
     const unique = new Map();
     for (const row of mapped) {
       const key = [row.chain, row.resi, row.insertion_code,
-        row.uniprot_accession, row.uniprot_resi, row.struct_asym_id].join("|");
+        row.uniprot_accession, row.uniprot_resi, row.struct_asym_id,
+        row.label_seq_id, row.mon_id || ""].join("|");
       if (!unique.has(key)) unique.set(key, row);
     }
     return {

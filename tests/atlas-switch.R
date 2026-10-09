@@ -114,6 +114,25 @@ invalid <- try(ram_atlas_group_switches(verified,geometry,30,
   representative_ids=c("1ABC_1","1ABC_1")),silent=TRUE)
 assert(inherits(invalid,"try-error"),
   "The same group representative must not be selected twice.")
+# A one-cluster geometry result must still allow a direct, explicitly
+# selected verified structure pair for local torsion inspection.
+one_cluster <- geometry
+one_cluster$selected <- c("1ABC_1","2XYZ_1")
+one_cluster$representatives <- c("1"="1ABC_1")
+no_split_report <- ram_atlas_group_switches(verified,one_cluster,30,
+  representative_ids=c("1ABC_1","2XYZ_1"))
+assert(no_split_report$comparable==report$comparable &&
+       any(no_split_report$residues$candidate),
+       "No-split Atlas cohorts must still permit direct pair inspection.")
+one_cluster_default <- ram_atlas_group_switches(verified,one_cluster,30)
+assert(identical(one_cluster_default$representatives,
+  c("1ABC_1","2XYZ_1")),
+  "Default pair for one cluster should use distinct verified structures.")
+invalid_outside <- try(ram_atlas_group_switches(verified,one_cluster,30,
+  representative_ids=c("1ABC_1","3BAD_1")),silent=TRUE)
+assert(inherits(invalid_outside,"try-error"),
+  "Pair inspection must reject structures outside the verified cohort.")
+
 # Atlas-linked Compare focus must use both exact PDB author positions,
 # not the UniProt number or the first sequence-alignment candidate.
 aligned <- data.frame(chain_a=c("A","A","A"),residue_a=c(102L,103L,103L),

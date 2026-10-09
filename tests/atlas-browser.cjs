@@ -208,15 +208,16 @@ ${atoms}${component}
     assert.deepEqual(requests[0].request_options.paginate,{start:0,rows:50});
     assert.deepEqual(requests[0].request_options.sort,
       [{sort_by:"rcsb_id",direction:"asc"}]);
-    // A selected experimental entity can verify exact SIFTS positions
-    // without guessing interior numbering or losing insertion codes.
-    await page.click(".ram-atlas-verify");
+    // Results must be directly selectable BEFORE SIFTS verification.
+    await page.waitForSelector(".ram-atlas-pick");
+    assert.equal(await page.$(".ram-atlas-pick").then(x=>x.length),1);
+    await page.click(".ram-atlas-pick");
     await page.waitForFunction(() => {
-      const results=document.querySelector("#atlasResults");
-      return results && results.textContent.includes("Verified exact SIFTS:") &&
-        results.textContent.includes("40 distinct PDB residues") &&
-        results.textContent.includes("40 observed");
-    },{timeout:25000});
+      const bar=document.querySelector(".ram-atlas-selection-toolbar");
+      const card=document.querySelector(".ram-counterpart-card.is-selected");
+      return bar && bar.textContent.includes("1 selected for analysis") &&
+        card && card.querySelector(".ram-atlas-pick").checked;
+    },{timeout:12000});
     await page.click("#atlasLoadMore");
     await page.waitForFunction(() => {
       const results=document.querySelector("#atlasResults");
@@ -228,15 +229,35 @@ ${atoms}${component}
     const afterPaging=await page.$eval("#atlasResults",el=>el.textContent);
     assert.match(afterPaging,/2 enriched polymer entities in 2 PDB entries/);
     assert.match(afterPaging,/55.0% UniProt sequence coverage/);
-    const verifier=await page.$$(".ram-atlas-verify");
+    // Paginating must preserve the first selected card, including the
+    // checked state. A second card can then be added to a batch.
+    const verifier=await page.$(".ram-atlas-verify");
     assert.equal(verifier.length,2,"Expected one verifier per experimental entity.");
-    await verifier[1].click();
+    assert.equal(await page.$(".ram-atlas-pick:checked").then(x=>x.length),1);
+    await page.click('.ram-atlas-pick[data-key="1UBQ_1"]');
+    await page.waitForFunction(() => {
+      const selected=document.querySelectorAll(".ram-atlas-pick:checked");
+      const bar=document.querySelector(".ram-atlas-selection-toolbar");
+      return selected.length===2 && bar &&
+        bar.textContent.includes("2 selected for analysis");
+    },{timeout:12000});
+    // Deselecting and selecting again must update both card and server state.
+    await page.click('.ram-atlas-pick[data-key="1UBQ_1"]');
+    await page.waitForFunction(() =>
+      document.querySelectorAll(".ram-atlas-pick:checked").length===1,
+      {timeout:12000});
+    await page.click('.ram-atlas-pick[data-key="1UBQ_1"]');
+    await page.waitForFunction(() =>
+      document.querySelectorAll(".ram-atlas-pick:checked").length===2,
+      {timeout:12000});
+    await page.click("#atlasVerifySelection");
     await page.waitForFunction(() => {
       const text=document.querySelector("#atlasResults")?.textContent || "";
       return text.includes("2 verified experimental entities") &&
         text.includes("40 distinct observed UniProt positions") &&
-        text.includes("Export verified residue mapping CSV");
-    },{timeout:25000});
+        text.includes("Export verified residue mapping CSV") &&
+        document.querySelectorAll(".ram-atlas-pick:checked").length===2;
+    },{timeout:45000});
     assert.ok(await page.$("#downloadAtlasCanonical"));
     assert.ok(await page.$("#downloadAtlasSupport"));
     await page.waitForSelector("#atlasGeometryEntities",{timeout:15000});

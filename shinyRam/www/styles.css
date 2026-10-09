@@ -1751,7 +1751,7 @@ body > .container-fluid { max-width: none; padding: 0; }
 
 /* Atlas search cards are directly selectable before downloading a PDB file. */
 .ram-atlas-selection-toolbar {
-  position:sticky; top:0; z-index:2; display:flex; flex-wrap:wrap;
+  position:relative; display:flex; flex-wrap:wrap;
   align-items:center; gap:8px 12px; padding:10px 12px;
   border:1px solid #c5dcd9; border-radius:9px;
   background:#f2f8f6; color:#24535b;

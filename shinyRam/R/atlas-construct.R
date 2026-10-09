@@ -25,15 +25,18 @@ ram_atlas_construct_profile <- function(record, entity, accession) {
       is.finite(map$uniprot_resi)
     sub <- map[relevant,,drop=FALSE]
     if(nrow(sub)) {
+      # Index once rather than scanning the full mapped chain per position.
+      indices <- split(seq_len(nrow(sub)),as.character(sub$uniprot_resi))
       for(i in seq_along(positions)) {
-        codes <- unique(as.character(sub$mon_id[
-          sub$uniprot_resi==positions[[i]]]))
-        codes <- codes[!is.na(codes) & nzchar(codes) &
-          !codes %in% c("UNK","UNL","X")]
-        # Conflicting / multiple identities are unknown, never first-wins.
-        if(length(codes)==1L &&
-           !any(is.na(sub$mon_id[sub$uniprot_resi==positions[[i]]])))
-          chemicals[[i]] <- toupper(codes[[1L]])
+        idx <- indices[[as.character(positions[[i]])]]
+        if(!length(idx)) next
+        raw <- toupper(as.character(sub$mon_id[idx]))
+        known <- !is.na(raw) & nzchar(raw) &
+          !raw %in% c("UNK","UNL","X")
+        codes <- unique(raw[known])
+        # Mixed known/unknown, contradictory or duplicate assignments
+        # cannot establish identity.
+        if(length(codes)==1L && all(known)) chemicals[[i]] <- codes[[1L]]
       }
     }
   }

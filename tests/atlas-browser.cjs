@@ -244,13 +244,19 @@ ${atoms}${component}
     },{timeout:12000});
     // Deselecting and selecting again must update both card and server state.
     await page.click('.ram-atlas-pick[data-key="1UBQ_1"]');
-    await page.waitForFunction(() =>
-      document.querySelectorAll(".ram-atlas-pick:checked").length===1,
-      {timeout:12000});
+    await page.waitForFunction(() => {
+      const toolbar=document.querySelector(".ram-atlas-selection-toolbar");
+      return document.querySelectorAll(".ram-atlas-pick:checked").length===1 &&
+        toolbar && toolbar.textContent.includes("1 selected for analysis");
+    },{timeout:12000});
     await page.click('.ram-atlas-pick[data-key="1UBQ_1"]');
-    await page.waitForFunction(() =>
-      document.querySelectorAll(".ram-atlas-pick:checked").length===2,
-      {timeout:12000});
+    await page.waitForFunction(() => {
+      const toolbar=document.querySelector(".ram-atlas-selection-toolbar");
+      return document.querySelectorAll(".ram-atlas-pick:checked").length===2 &&
+        toolbar && toolbar.textContent.includes("2 selected for analysis");
+    },{timeout:12000});
+    await page.$eval("#atlasVerifySelection",button=>
+      button.scrollIntoView({block:"center",inline:"nearest"}));
     await page.click("#atlasVerifySelection");
     await page.waitForFunction(() => {
       const text=document.querySelector("#atlasResults")?.textContent || "";

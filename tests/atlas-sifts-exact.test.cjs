@@ -52,10 +52,9 @@ const duplicate = mmcif.replace("1 X 2 P12345 21 1",
   "1 X 2 P12345 21 1\n1 X 2 P12345 21 1");
 assert.equal(sifts.exactRows(duplicate,"1abc","1","P12345").rows.length,3);
 // Unknown monomer metadata is never inferred from the UniProt accession.
-const noMon = mmcif.replace("_pdbx_poly_seq_scheme.mon_id", "")
-  .replace(/(X 1 [123] A 10[13] 10[13] [A.]|Y 2 1 B 201 201 \.)(?: MET| GLY| SER| ALA)/g,"$1");
-const codeMissing = noMon.replace(/ (MET|GLY|SER|ALA)(?=\n)/g, "");
-assert.equal(sifts.exactRows(codeMissing,"1abc","1","P12345")
+const noMon = mmcif.replace("_pdbx_poly_seq_scheme.mon_id\n","")
+  .replace(/ (MET|GLY|SER|ALA)(?=\n)/g, "");
+assert.equal(sifts.exactRows(noMon,"1abc","1","P12345")
   .rows[0].mon_id,null,
   "Missing monomer fields must be unknown, not guessed.");
 // No interpolated 102: the PDB-author 101A and 103 identifiers are literal.

@@ -328,6 +328,16 @@
       entity_id: button.dataset.entity
     }, {priority: "event"});
   });
+  if (root.document) root.document.addEventListener("change", e => {
+    const checkbox=e.target && e.target.closest &&
+      e.target.closest(".ram-atlas-pick");
+    if (!checkbox || !root.Shiny || !root.Shiny.setInputValue) return;
+    root.Shiny.setInputValue("ramAtlasCandidatePick", {
+      key: checkbox.dataset.key,
+      accession: checkbox.dataset.accession,
+      selected: checkbox.checked
+    }, {priority: "event"});
+  });
   const api = {tokenize, parseLoops, exactRows, extractMappedAtoms,
     extractMappedCA, extractMappedBackbone, validate};
   root.RamplotRExactSifts = api;

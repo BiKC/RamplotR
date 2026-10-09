@@ -2274,14 +2274,23 @@ server <- function(input, output, session) {
        length(geometry$selected)<2L) return(NULL)
     members <- split(as.character(geometry$assignment$entity),
       geometry$assignment$geometric_group)
-    default_a <- if(length(members)>0L) members[[1L]]
+    # A one-group automatic suggestion must not select the entire cohort
+    # as Group A and leave Group B empty. Offer an explicit editable pair.
+    default_a <- if(length(members)>1L) members[[1L]]
       else geometry$selected[[1L]]
     default_b <- if(length(members)>1L) members[[2L]]
-      else setdiff(geometry$selected,default_a)[[1L]]
+      else geometry$selected[[2L]]
     tags$section(class="ram-atlas-group-handoff",
       tags$h4("Compare Atlas structures as groups"),
       tags$p(class="ram-field-hint",
-        "Choose which verified experimental structures belong to each condition. Geometry clusters can suggest a starting point, but group names and biological interpretations are yours. The analysis reuses exact SIFTS-mapped backbone atoms without reuploading files."),
+        "Review the suggested clusters, then freely edit Group A and Group B. Geometric grouping is not a functional-state label. The analysis reuses exact SIFTS-mapped backbone atoms without reuploading files."),
+      if(length(members)<2L)
+        tags$p(class="ram-confidence-warning",
+          "Atlas did not identify two well-separated clusters. These default single-entry groups are only a starting point for an explicitly researcher-defined comparison."),
+      if(length(members)>2L)
+        tags$p(class="ram-field-hint",
+          sprintf("%d geometric clusters found. Group Compare accepts two sets: select which clusters or individual structures to compare.",
+            length(members))),
       tags$div(class="ram-atlas-group-handoff-grid",
         selectInput("atlasGroupAEntities","Group A experimental entries",
           choices=geometry$selected,selected=default_a,multiple=TRUE),
@@ -2490,7 +2499,7 @@ server <- function(input, output, session) {
     table <- result$assignment
     names(table) <- c("PDB entity","Chain","Mapped C-alpha",
       "Common core fraction","Geometry group")
-    group_counts <- table(table[["Geometry group"]])
+    group_counts <- base::table(table[["Geometry group"]])
     table[["Group size"]] <- as.integer(group_counts[
       as.character(table[["Geometry group"]])])
     table

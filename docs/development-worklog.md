@@ -241,6 +241,15 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 - New R tests `tests/atlas-construct.R` cover shifted PDB numbering, amino acid modifications, partial constructs, conflicting maps, unknown chemistry, different isoform accession, and full three-entity pairwise checks. CI Ubuntu/Windows scientific job runs it. mmCIF parser and browser smoke tests expanded.
 - The next verification is to mark the feature PR Ready for review, inspect all seven check results and fix failures before merging. Separately confirm actual deployed-browser PDBe/RCSB CORS and expand cross-fold experimental biological controls.
 
+## October 9 verification and merge: PR #59
+
+- PR #59 [Experimental construct and residue-chemistry audit](https://github.com/BiKC/RamplotR/pull/59) merged to `main` as `ccf7482adc553079026121ff3d66687461445703`.
+- **All seven PR-ready CI workflows succeeded** on feature head `924591019375b27b2717884b66c7a5d62b7e95c0`: scientific regression on Ubuntu and Windows (including new construct tests), browser preview including Atlas, independent wwPDB, structure validation, large-structure scaling and both experimental Atlas benchmarks.
+- The Atlas now reviews every selected pair's exact observed common UniProt core, experimental polymer residue chemistry and known/unknown differences before geometric grouping. Confirmed differences require explicit acknowledgment; the selected-cohort acknowledgment resets when verification/selection changes.
+- The in-app Guide, verified residue CSV, exportable pairwise audit and biological interpretation cautions were updated. No automatic biological-state or mutation claims.
+- Current `main` is the authoritative merged baseline. Future branch work should start there; do not reuse `feature/atlas-construct-compatibility`.
+- Next scientific milestone: **broader experimental controls across independent folds, different constructs, changed/nonchanged ligand conditions and isoforms**, with honest denominators. Separately verify PDBe/RCSB CORS on the actual static Shinylive deployment.
+
 ## Next implementation steps
 
 1. Verify **deployed-browser** PDBe and RCSB CORS in RamplotR's actual

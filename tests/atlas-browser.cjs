@@ -210,7 +210,7 @@ ${atoms}${component}
       [{sort_by:"rcsb_id",direction:"asc"}]);
     // Results must be directly selectable BEFORE SIFTS verification.
     await page.waitForSelector(".ram-atlas-pick");
-    assert.equal(await page.$(".ram-atlas-pick").then(x=>x.length),1);
+    assert.equal(await page.evaluate(() => document.querySelectorAll(".ram-atlas-pick").length),1);
     await page.click(".ram-atlas-pick");
     await page.waitForFunction(() => {
       const bar=document.querySelector(".ram-atlas-selection-toolbar");
@@ -233,7 +233,7 @@ ${atoms}${component}
     // checked state. A second card can then be added to a batch.
     const verifier=await page.$(".ram-atlas-verify");
     assert.equal(verifier.length,2,"Expected one verifier per experimental entity.");
-    assert.equal(await page.$(".ram-atlas-pick:checked").then(x=>x.length),1);
+    assert.equal(await page.evaluate(() => document.querySelectorAll(".ram-atlas-pick:checked").length),1);
     await page.click('.ram-atlas-pick[data-key="1UBQ_1"]');
     await page.waitForFunction(() => {
       const selected=document.querySelectorAll(".ram-atlas-pick:checked");

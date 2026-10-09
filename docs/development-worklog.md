@@ -259,6 +259,16 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 - Extended manifest validation to assert an independent third fold and known open/closed/control PDBs. Live case checks still require PR-ready Actions with fresh updated-mmCIF downloads.
 - Next: once PR is ready, inspect live checks, archive source SHA256s and measured control margins before merging. Continue with additional independent experimental folds, condition metadata and construct controls after verification.
 
+## October 9: expanded live Atlas benchmark merged (PR #60)
+
+- PR #60 [four-protein, three-fold experimental benchmark](https://github.com/BiKC/RamplotR/pull/60) merged to `main` at `5bc76a060b36d8637e552c5665f6eb45686359f6`.
+- All **seven** PR checks passed on final feature head `33bd84cb68afb6f04d924ac759f8f5f0204ba832`, including scientific Ubuntu/Windows, browser smoke, wwPDB validation, structure validation, scaling, legacy ADK and expanded *live PDBe* experimental cases.
+- Curated fourth family: *Sus scrofa* citrate synthase P00889. Exact updated-mmCIF/model-1 SIFTS comparison of 1CTS open/2CTS closed: **437 shared canonical Cα positions, dRMSD 1.6241 Å, 91/435 ≥30° angle candidates**, one differing deposited monomer identity. Independent open-like crystal 1CTS/3ENJ: **437 shared positions, dRMSD 0.6962 Å, 103/435 ≥30° angle candidates**. 3ENJ contains documented cystamine-related Cys184 covalent modification.
+- This is a useful negative control for simplistic local-angle classification: the open-like control has **more** local-angle candidates than the documented open/closed comparison, although the global distance-map contrast is larger. 30° remains a navigation threshold, not a functional-state classifier.
+- New `per-protein-control-contrasts.csv` reports control provenance/independence type, strongest available control dRMSD and local-angle fractions for each of four proteins (three explicitly tagged structural fold families). All original source SHA256s and per-position measurements are included in GitHub Actions artifacts, see `docs/atlas-multiprotein-benchmark.md`.
+- No source-code branches are actively unmerged from this milestone; paper PR #20 remains intentionally separate. Start future development from updated `main`.
+- Next: introduce more independent fold/control pairs and metadata for construct, ligand or isoform controls, and verify live deployed-browser PDBe/RCSB CORS. Do not infer classifier sensitivity from four proteins.
+
 ## Next implementation steps
 
 1. Verify **deployed-browser** PDBe and RCSB CORS in RamplotR's actual

@@ -60,7 +60,7 @@ separate. Every residue reports:
 
 - the combined wrapped backbone shift;
 - the maximum within-group circular SD across phi and psi;
-- the fraction of structures in each group contributing both phi and psi;
+- the fraction of structures in each group contributing a **complete phi/psi pair in the same model**;
 - the minimum within-group Rama8000 modal-category consistency;
 - an evidence profile.
 
@@ -70,11 +70,10 @@ The evidence profile is deliberately descriptive:
 - **Moderate shift**: 15--30 degrees;
 - **Large but variable**: >=30 degrees without low within-group dispersion;
 - **Low-dispersion shift**: >=30 degrees with maximum within-group SD <=15 degrees;
-- **Sparse coverage**: fewer than 75% of structures in either group contribute
-  both angles;
+- **Unreplicated structural difference**: fewer than two members in either group have a complete angle pair;\n- **Sparse coverage**: fewer than 75% of structures in either group contribute\n  a complete angle pair, when both groups have at least two paired observations;
 - **Unavailable**: no comparable finite group means.
 
-A residue receives the stronger **high-support shift** marker only when it is
+A residue receives the stronger **high-support shift** marker only when at least two members in each group provide complete phi/psi pairs and it is
 a low-dispersion shift, both groups have at least 75% residue coverage, and
 the Rama8000 modal category is at least 75% consistent within each group when
 that information is available.

@@ -97,11 +97,6 @@ ram_atlas_observed_ligand_context <- function(verified,geometry) {
         residue_site_rows <- c(residue_site_rows,validated)
       }
     }
-    if(length(residue_site_rows) && identical(status,"measured"))
-      residue_contacts[[length(residue_contacts)+1L]] <-
-        do.call(rbind,residue_site_rows)
-    if(length(parsed) && identical(status,"measured"))
-      contacts[[length(contacts)+1L]] <- do.call(rbind,parsed)
     reported <- if(status=="measured") length(parsed) else NA_integer_
     total <- if(status=="measured" && !is.null(raw$total_nonwater_sites))
       suppressWarnings(as.integer(raw$total_nonwater_sites)) else NA_integer_
@@ -109,11 +104,13 @@ ram_atlas_observed_ligand_context <- function(verified,geometry) {
       if(status=="measured") {
         status <- "unavailable";reported <- NA_integer_
         warning <- "Invalid deposited nonpolymer component count."
-        if(length(parsed) && length(contacts)) contacts[[length(contacts)]]<-NULL
-        if(length(residue_site_rows) && length(residue_contacts))
-          residue_contacts[[length(residue_contacts)]]<-NULL
       }
       total <- NA_integer_
+    }
+    if(identical(status,"measured") && length(parsed)) {
+      contacts[[length(contacts)+1L]] <- do.call(rbind,parsed)
+      residue_contacts[[length(residue_contacts)+1L]] <-
+        do.call(rbind,residue_site_rows)
     }
     rows[[length(rows)+1L]] <- data.frame(
       entity=id,geometry_group=as.character(

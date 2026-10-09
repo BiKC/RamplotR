@@ -15,6 +15,13 @@ verified <- list("1ABC_1"=make(1L,c(40L,41L,43L)),
                  "2XYZ_1"=make(1L,c(41L,43L,44L)),
                  "3ABC_1"=list(state="error",message="Unavailable"))
 cohort <- ram_atlas_cohort_table(verified,"P12345")
+assert("mon_id" %in% names(cohort) && all(is.na(cohort$mon_id)),
+  "Legacy exact mapping without polymer chemistry must export unknown, not invent an identity.")
+verified_with_chemistry <- verified
+verified_with_chemistry[["1ABC_1"]]$mapping$mon_id <- c("MET","MSE","GLY")
+with_chemistry <- ram_atlas_cohort_table(verified_with_chemistry,"P12345")
+assert(identical(with_chemistry$mon_id[1:3],c("MET","MSE","GLY")),
+  "Canonical CSV export must retain experimental modified residue chemistry.")
 assert(nrow(cohort)==6L && length(unique(cohort$pdb_id))==2L,
        "Cohort should include only successfully verified entities.")
 summary <- ram_atlas_cohort_summary(verified,"P12345")

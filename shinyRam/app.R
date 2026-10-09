@@ -36,6 +36,7 @@ source(file.path("R", "atlas-robustness.R"), local = TRUE)
 source(file.path("R", "atlas-construct.R"), local = TRUE)
 source(file.path("R", "atlas-experimental-context.R"), local = TRUE)
 source(file.path("R", "atlas-ligand-evidence.R"), local = TRUE)
+source(file.path("R", "atlas-group-ligand.R"), local = TRUE)
 source(file.path("R", "atlas-switch.R"), local = TRUE)
 source(file.path("R", "atlas.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
@@ -4209,10 +4210,59 @@ server <- function(input, output, session) {
           tags$p(class="ram-field-hint",info[[1L]]),
           tags$p(class="ram-field-hint",info[[2L]]),
           DT::DTOutput("groupFingerprintMembers"))),
+      uiOutput("groupFingerprintLigandPanel"),
       tags$p(class="ram-field-hint",
         "These are measured structural observations, not independent biological replicates or conformational-state probabilities. Missing angles remain missing; neither RamplotR density nor Rama8000 categories are inferred from Atlas backbone-only records.")
     )
   })
+  atlas_fingerprint_contacts <- reactive({
+    result <- group_comparison_matches()
+    selected <- group_fingerprint_selected()
+    if(is.null(result) || !identical(result$source,"atlas") ||
+       is.null(result$ligand_context) || is.null(selected))
+      return(NULL)
+    ram_atlas_group_ligand_at(result,selected$row$resi[[1L]])
+  })
+  output$groupFingerprintLigandPanel <- renderUI({
+    rows <- atlas_fingerprint_contacts()
+    if(is.null(rows)) return(NULL)
+    labels <- unique(rows$group)
+    stats <- lapply(labels,function(label) {
+      sub <- rows[rows$group==label,,drop=FALSE]
+      sprintf("%s: %d nearby / %d examined / %d unavailable or limited",
+        label,sum(sub$evidence=="Deposited proximity observed"),
+        sum(sub$evidence %in% c("Deposited proximity observed",
+                               "No deposited proximity reported")),
+        sum(sub$evidence %in% c("Evidence unavailable",
+                               "Incomplete nearest-only evidence")))
+    })
+    tags$div(class="ram-group-ligand-evidence",
+      tags$h5("Deposited component proximity at this UniProt position"),
+      tags$p(class="ram-field-hint",
+        paste(unlist(stats),collapse=" · ")),
+      tags$p(class="ram-field-hint",
+        "4.5 Å heavy-atom proximity from model-1 deposited coordinates. A nearby component does not demonstrate functional binding. An absent or unverified record does not establish an apo state. Multiple entities in the same PDB entry are not independent experiments."),
+      DT::DTOutput("groupFingerprintLigandMembers"),
+      downloadButton("downloadGroupFingerprintLigand",
+        "Export residue contact evidence CSV"))
+  })
+  output$groupFingerprintLigandMembers <- DT::renderDT({
+    rows <- req(atlas_fingerprint_contacts())
+    shown <- rows[,c("group","member","complete_backbone_pair",
+      "evidence","component_codes","minimum_distance_A","scope"),
+      drop=FALSE]
+    shown$minimum_distance_A <- round(shown$minimum_distance_A,2L)
+    DT::datatable(shown,rownames=FALSE,
+      colnames=c("Group","PDB entity","Complete φ/ψ",
+        "Deposited evidence","Components","Min distance (Å)","Coverage"),
+      options=list(dom="tip",pageLength=8,scrollX=TRUE),
+      class="compact stripe")
+  },server=FALSE)
+  output$downloadGroupFingerprintLigand <- downloadHandler(
+    filename=function() "ramplotr_selected_residue_component_evidence.csv",
+    content=function(file) utils::write.csv(
+      req(atlas_fingerprint_contacts()),file,row.names=FALSE,na=""))
+
   output$groupFingerprintPlot <- renderPlot({
     selected <- req(group_fingerprint_selected())
     result <- req(group_comparison_matches())

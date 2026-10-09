@@ -315,6 +315,16 @@
   function register() {
     if (!root.Shiny || !root.Shiny.addCustomMessageHandler) return false;
     root.Shiny.addCustomMessageHandler("ram-atlas-sifts-exact", fetchExact);
+    root.Shiny.addCustomMessageHandler("ram-atlas-set-selection", payload => {
+      const selected=new Set(payload && Array.isArray(payload.ids) ?
+        payload.ids : []);
+      root.document.querySelectorAll(".ram-atlas-pick").forEach(box => {
+        const checked=selected.has(box.dataset.key);
+        box.checked=checked;
+        box.closest(".ram-counterpart-card")?.classList
+          .toggle("is-selected",checked);
+      });
+    });
     return true;
   }
   if (!register() && root.document)
@@ -332,6 +342,8 @@
     const checkbox=e.target && e.target.closest &&
       e.target.closest(".ram-atlas-pick");
     if (!checkbox || !root.Shiny || !root.Shiny.setInputValue) return;
+    checkbox.closest(".ram-counterpart-card")?.classList
+      .toggle("is-selected",checkbox.checked);
     root.Shiny.setInputValue("ramAtlasCandidatePick", {
       key: checkbox.dataset.key,
       accession: checkbox.dataset.accession,

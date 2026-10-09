@@ -65,6 +65,25 @@ probabilities or statistical significance. For Atlas-derived groups the
 source is the cached exact UniProt-mapped first-model backbone evidence,
 without an additional upload.
 
+### Linking experimental contacts to selected residues
+
+When the selected groups originate in verified Atlas, the local fingerprint
+also shows a **Deposited component proximity** table for every selected
+experimental member. It joins the current exact UniProt residue to all
+first-model non-water nonpolymer HETATM components that have heavy atoms within
+4.5 Å of the mapped protein residue. All mapped residues within the cutoff
+are retained, even if a different residue is the component's closest atom
+contact. Distances belong to the selected residue, not the entire component.
+
+The table distinguishes observed nearby components, completed contact
+extraction without a reported local component, incomplete nearest-only legacy
+evidence, and unavailable contact evidence. Backbone φ/ψ completeness is shown
+separately. It never treats an absent deposited component as a ligand-free
+state, makes no causal or statistical claim and does not equate multiple
+polymer entities with independent experiments. Download a CSV of the selected
+residue's per-member observations for reproducibility. Uploaded structure
+group comparisons do not display Atlas-only metadata.
+
 The combined backbone shift is a **navigation effect size**, not a statistical
 significance score and not a Cartesian distance.
 

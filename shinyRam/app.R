@@ -2516,24 +2516,24 @@ server <- function(input, output, session) {
   output$atlasSwitchPanel <- renderUI({
     geometry <- atlas_geometry_result()
     if(is.null(geometry) || !is.null(geometry$error)) return(NULL)
-    if(length(geometry$representatives)<2L)
-      return(tags$p(class="ram-field-hint",
-        "One geometry group at this cutoff. There is no between-group representative backbone comparison."))
+    available <- as.character(geometry$selected)
+    if(length(available)<2L) return(NULL)
+    defaults <- unname(geometry$representatives)
+    if(length(defaults)<2L) defaults <- available[1:2]
     tags$div(class="ram-panel",
       tags$h4("Local backbone-change candidates"),
       tags$p(class="ram-field-hint",
-        paste("Compare backbone φ/ψ between any two selected geometric-group",
-        "representatives. Exact SIFTS positions, complete N/CA/C atoms and",
-        "continuous peptide bonds are required. These are exploratory",
-        "change candidates, not DSSP classes or validated functional states.")),
-      selectInput("atlasSwitchRepresentativeA","Reference geometry group",
-        choices=stats::setNames(unname(geometry$representatives),
-          paste("Group",names(geometry$representatives),unname(geometry$representatives))),
-        selected=unname(geometry$representatives)[[1L]]),
-      selectInput("atlasSwitchRepresentativeB","Other geometry group",
-        choices=stats::setNames(unname(geometry$representatives),
-          paste("Group",names(geometry$representatives),unname(geometry$representatives))),
-        selected=unname(geometry$representatives)[[2L]]),
+        paste("Compare backbone φ/ψ between any two verified experimental",
+        "structures, even when automatic clustering suggests one group.",
+        "Exact SIFTS positions, complete N/CA/C atoms and continuous peptide",
+        "bonds are required. These are exploratory changes, not validated functional states.")),
+      if(length(geometry$representatives)<2L)
+        tags$p(class="ram-confidence-warning",
+          "No convincing geometric split was suggested. You can inspect two selected structures, but do not treat them as separate structural states."),
+      selectInput("atlasSwitchRepresentativeA","Reference experimental structure",
+        choices=available,selected=defaults[[1L]]),
+      selectInput("atlasSwitchRepresentativeB","Other experimental structure",
+        choices=available,selected=defaults[[2L]]),
       numericInput("atlasSwitchThreshold",
         "Combined circular φ/ψ change threshold (degrees)",
         value=30,min=5,max=180,step=5),

@@ -299,6 +299,16 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 - Current `main` is authoritative. Do not reuse this merged feature branch; manuscript PR #20 is separate.
 - Next priorities: enable better Atlas group membership revision / multi-cohort metadata filters, and collect independent true same-state biological controls and construct/ligand conditions for evidence-based group labels. Do not infer biological state from geometric grouping.
 
+## October 9: automatic Atlas cluster suggestions (active branch)
+
+- New branch `feature/atlas-auto-clusters-and-group-handoff` from merged `main` `29022953883ba1c9707b1c81461597868088a8f4`, after PR #62 merged and all eight checks green. No duplicate Atlas-to-Groups implementation.
+- `R/atlas-geometry.R` now offers *automatic* silhouette-plus-distance-gap clustering on **exactly the same full selected-cohort canonical C-alpha matrix** used by existing exploratory dendrograms. It evaluates average-linkage cuts for k=2..4, singleton silhouette=0, preserves deterministic labels, and may recommend one cluster when structural evidence is weak.
+- UI defaults to auto mode. Manual 1.5 Å distance-map cutoff remains available; user sees number/size of clusters, medoids, reason, candidate k/silhouette/gap/singleton quality details and retains the ability to edit Group A/B selection before passing to the already-merged verified Atlas-to-Compare Groups workflow.
+- The n=2 case is intentionally conservative (no automatic split). Handoff creates disjoint one-member **user-editable** Group A/B defaults and warns that geometry does not support a state assignment.
+- `tests/atlas-geometry.R` expanded with rigid-motion-invariant automatic split, equidistant/near-identical no-split, two-entry no-split, deterministic two-pair clustering and invalid matrix tests. `tests/atlas-browser.cjs` checks the default no-split and manual override of two real mock entities.
+- No statistical biological-state label or diagnostic accuracy is inferred. Mean silhouette >=0.50 / median gap >=0.35 Å are explicit exploratory safeguards, not scientific calibration.
+- Next: run PR-ready CI, inspect all eight workflows, fix regressions and merge only when green. Live Shinylive site publication is separate.
+
 ## Next implementation steps
 
 1. Verify **deployed-browser** PDBe and RCSB CORS in RamplotR's actual

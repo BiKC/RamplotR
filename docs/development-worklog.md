@@ -405,3 +405,22 @@ branch, and do not reuse historical feature branches.
 - New pure scientific regression exercises missing/duplicate records,
   cross-cohort rejection, method/chemistry divergence and shared PDB IDs.
   Add interface and browser tests only after #68 merges.
+
+## October 9: deposited non-water HETATM proximity in Atlas
+
+- Active branch `feature/atlas-observed-ligand-proximity` starts from merged
+  `main` `576340faf301add13d3e0c9cd79b5dc7daf9f032`; PR #20 is
+  separate. PR #69 has merged.
+- Reuse the exact PDBe updated mmCIF already downloaded for verification;
+  inspect first-model non-water nonpolymer HETATM heavy atoms near verified
+  SIFTS-mapped protein heavy atoms. Apply 4.5 Å grid-neighborhood search.
+- Reject waters, hydrogen/deuterium, alternate B positions and polymer
+  modifications with numbered polymer label_seq_id. Do not silently infer
+  apo/holo when no nearby deposition components are found.
+- Store source-dependent measured/unavailable status per PDB polymer entity.
+  Keep structural mapping valid when proximity extraction fails.
+- Show a collapsible evidence panel with minimum heavy-atom distances and
+  nearest exact UniProt residues. Export per-entry status and observed sites.
+  No extra network request or database needed.
+- Validate positive/negative cases in Node parser tests, R adapter tests and
+  the existing end-to-end mock browser Atlas flow. PR-ready CI only.

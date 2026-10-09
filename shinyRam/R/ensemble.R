@@ -104,7 +104,7 @@ ram_ensemble_summary <- function(models) {
   if(!n) {
     empty <- data.frame(chain=character(),resi=integer(),
       insertion_code=character(),resn=character(),models_present=integer(),
-      phi_models=integer(),psi_models=integer(),
+      phi_models=integer(),psi_models=integer(),paired_angle_models=integer(),
       phi_mean=numeric(),phi_sd=numeric(),psi_mean=numeric(),psi_sd=numeric(),
       classified_models=integer(),class_consistency=numeric(),
       region_mode=character(),changes_class=logical(),
@@ -183,6 +183,7 @@ ram_ensemble_summary <- function(models) {
     models_present=as.integer(rowSums(membership)),
     phi_models=as.integer(rowSums(is.finite(phi))),
     psi_models=as.integer(rowSums(is.finite(psi))),
+    paired_angle_models=as.integer(rowSums(is.finite(phi) & is.finite(psi))),
     phi_mean=ph[,"mean"],phi_sd=ph[,"sd"],
     psi_mean=ps[,"mean"],psi_sd=ps[,"sd"],
     classified_models=native$count,

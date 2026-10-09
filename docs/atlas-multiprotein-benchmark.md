@@ -1,4 +1,4 @@
-# Atlas experimental benchmark across three proteins
+# Atlas experimental benchmark across four proteins and three fold families
 
 This benchmark tests whether RamplotR's global distance-map and local
 backbone-angle methods behave sensibly across several known experimental
@@ -12,13 +12,24 @@ classifier.**
 | *E. coli* adenylate kinase (P69441) | 4AKE, apo | 1AKE, Ap5A-inhibited | Chain copies within both crystals |
 | *E. coli* maltose-binding protein (P0AEX9) | 1OMP, apo | 1ANF, maltose-bound | 1OMP vs independent apo 1JW4 crystal |
 | *E. coli* ribose-binding protein (P02925) | 1URP, apo | 2DRI, ribose-bound | 1URP same-crystal chain copies |
+| Pig-heart citrate synthase (P00889) | 1CTS, open | 2CTS, product-bound closed | 1CTS vs 3ENJ, separate crystal open-like control; 3ENJ contains cystamine-related covalent chemistry |
 
 One exact self-comparison is added for every protein. It must have zero
 geometry difference and zero local-angle changes.
 
 Maltose-binding and ribose-binding protein are distinct proteins but belong
-to related periplasmic binding-protein structural families. This sample is
-not a representative collection of independent folds.
+to related periplasmic binding-protein structural families. The citrate
+synthase case adds a distinct all-alpha enzyme fold in addition to the
+kinase and periplasmic-binding families. Three fold-family groupings are
+still not a representative sample of structural diversity.
+
+The pig-heart citrate synthase case is supported by the
+[original open/closed structures](https://pdb101.rcsb.org/motm/93) and
+[3ENJ experimental paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC2675578/).
+This paper specifically identifies 1CTS and 3ENJ as open-like, and 2CTS
+as closed, while documenting the covalently modified Cys184 in 3ENJ.
+That modification and differences in experimental conditions are confounders,
+not a claim of identical constructs or ligand states.
 
 ## Method
 
@@ -53,6 +64,22 @@ The GitHub Actions workflow `Multi-protein experimental Atlas benchmark`
 runs these commands on a fresh environment. The artifact includes source
 manifest, coordinate records, per-residue data and a comparison report.
 
+## Expanded fourth-fold benchmark (2026-10-09)
+
+The curated manifest now includes 1CTS, 2CTS and 3ENJ and labels the fold
+family for all four proteins. This raises the benchmark to **ten experimental
+PDB entities, four proteins and three structural fold-family groupings**.
+
+The live workflow reports an additional `per-protein-control-contrasts.csv`
+with the documented contrast, strongest available measured control,
+separate-crystal versus same-crystal control counts, and both global
+distance-map and local φ/ψ difference margins. These are **descriptive
+measurements, not threshold-based accuracy or statistical validation**.
+
+The first three-protein run remains an immutable historical snapshot below.
+The new citrate synthase measurements are added by a separate, hash-recorded
+live run and must not be copied from older reports.
+
 ## First live-data results (2026-10-08)
 
 The [live workflow](https://github.com/BiKC/RamplotR/actions/runs/37775734519)
@@ -83,7 +110,7 @@ study. The observed-position overlap percentages are relative to the
 two **observed, successfully mapped chains**, not the full UniProt sequence
 or all crystallographically unresolved termini.
 
-Three known contrasts are larger than the chosen matched controls by global
+In the original three-protein set, three known contrasts were larger than the chosen matched controls by global
 dRMSD, but the local angle-change fraction depends strongly on the protein:
 ADK 37/212, MBP 23/368 and RBP 10/269. Same-state controls have 16/212
 and 10/212 (ADK), 13/368 (MBP), and 0/269 (RBP) local changes. Consequently,
@@ -115,8 +142,10 @@ separate observations.
 
 The 1.5 Å exploratory Atlas geometry-group cutoff and 30° local angular
 navigation threshold are **not tuned or evaluated as classifiers** here.
-This benchmark will be expanded with independent folds, construct controls
-and blind structure pairs before any calibration is justified.
+Additional independent-fold cases, construct/ligand controls and blinded
+structure pairs are still required before any calibration is justified.
+One new fold and one independent open-like control do not establish
+population-level sensitivity, specificity or a universal state threshold.
 
 ## Research sources
 
@@ -126,3 +155,6 @@ and blind structure pairs before any calibration is justified.
   and <https://www.rcsb.org/structure/1JW4>
 - Ribose-binding protein: <https://pmc.ncbi.nlm.nih.gov/articles/PMC8150535/>
   and <https://www.rcsb.org/structure/1URP>
+- Citrate synthase: <https://pmc.ncbi.nlm.nih.gov/articles/PMC2675578/>,
+  <https://pdb101.rcsb.org/motm/93>, and
+  <https://www.rcsb.org/structure/2CTS>

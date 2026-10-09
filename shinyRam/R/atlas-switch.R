@@ -192,7 +192,7 @@ ram_atlas_group_switches <- function(verified,geometry,threshold=30,
   list(representatives=ids,threshold=as.numeric(threshold),
     residues=diff,regions=ram_atlas_candidate_regions(diff),
     comparable=sum(diff$comparable),total_positions=nrow(diff),
-    method="Paired exact UniProt residue phi/psi, circular wrapped angle differences; peptide bond 1.0–1.9 Å; first model, two geometric group representatives")
+    method="Paired exact UniProt residue phi/psi, circular wrapped angle differences; peptide bond 1.0–1.9 Å; first model, two explicitly selected verified structures (not inferred functional states)")
 }
 
 # A conformational Atlas position may only select an existing pairwise

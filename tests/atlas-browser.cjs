@@ -231,8 +231,9 @@ ${atoms}${component}
     assert.match(afterPaging,/55.0% UniProt sequence coverage/);
     // Paginating must preserve the first selected card, including the
     // checked state. A second card can then be added to a batch.
-    const verifier=await page.$(".ram-atlas-verify");
-    assert.equal(verifier.length,2,"Expected one verifier per experimental entity.");
+    assert.equal(await page.evaluate(() =>
+      document.querySelectorAll(".ram-atlas-verify").length),
+      2,"Expected one verifier per experimental entity.");
     assert.equal(await page.evaluate(() => document.querySelectorAll(".ram-atlas-pick:checked").length),1);
     await page.click('.ram-atlas-pick[data-key="1UBQ_1"]');
     await page.waitForFunction(() => {

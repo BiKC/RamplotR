@@ -2048,6 +2048,8 @@ server <- function(input, output, session) {
       if(!key %in% selected && length(selected)>=12L) {
         showNotification("Atlas supports up to 12 selected entities per comparison.",
           type="warning",duration=10)
+        session$sendCustomMessage("ram-atlas-set-selection",
+          list(ids=selected))
         return()
       }
       selected <- unique(c(selected,key))
@@ -2058,6 +2060,8 @@ server <- function(input, output, session) {
     atlas_candidate_picks(character())
     atlas_verify_queue(character())
     atlas_verify_progress(NULL)
+    session$sendCustomMessage("ram-atlas-set-selection",
+      list(ids=character()))
   },ignoreInit=TRUE)
   observeEvent(atlas_candidate_picks(), {
     # A previous grouping must never be presented as if it reflects the
@@ -2203,13 +2207,30 @@ server <- function(input, output, session) {
       "ram-confidence-warning" else "ram-field-hint",item$message)
   })
 
+  output$atlasSelectionToolbar <- renderUI({
+    payload <- atlas_payload()
+    if(is.null(payload)) return(NULL)
+    chosen <- atlas_candidate_picks()
+    progress <- atlas_verify_progress()
+    tags$div(class="ram-atlas-selection-toolbar",
+      tags$strong(sprintf("%d selected for analysis (maximum 12)",
+        length(chosen))),
+      tags$span("Tick entries below, then verify the selected structures before clustering."),
+      actionButton("atlasVerifySelection",
+        sprintf("Verify %d selected structure%s",
+          length(chosen),if(length(chosen)==1L) "" else "s"),
+        class="btn-primary btn-sm"),
+      actionLink("atlasClearSelection","Clear selection"),
+      if(!is.null(progress)) tags$p(class="ram-field-hint",
+        sprintf("Verifying selection: %d/%d completed.",
+          progress$completed,progress$total)))
+  })
   output$atlasResults <- renderUI({
     payload <- atlas_payload()
     if(is.null(payload)) return(NULL)
     results <- payload$results
     exact <- atlas_exact_results()
-    chosen <- atlas_candidate_picks()
-    progress <- atlas_verify_progress()
+    chosen <- isolate(atlas_candidate_picks())
     verified <- ram_atlas_cohort_summary(exact,payload$accession)
     get <- function(item,key,default="") {
       value <- item[[key]]
@@ -2221,18 +2242,7 @@ server <- function(input, output, session) {
     returned <- suppressWarnings(as.integer(payload$returned_count))
     unresolved <- suppressWarnings(as.integer(payload$incomplete_metadata))
     tags$div(class="ram-atlas-inventory",
-      tags$div(class="ram-atlas-selection-toolbar",
-        tags$strong(sprintf("%d selected for analysis (maximum 12)",
-          length(chosen))),
-        tags$span("Select entries using the checkboxes below. Verify them before clustering."),
-        actionButton("atlasVerifySelection",
-          sprintf("Verify %d selected structure%s",
-            length(chosen),if(length(chosen)==1L) "" else "s"),
-          class="btn-primary btn-sm"),
-        actionLink("atlasClearSelection","Clear selection"),
-        if(!is.null(progress)) tags$p(class="ram-field-hint",
-          sprintf("Verifying selection: %d/%d finished.",
-            progress$completed,progress$total))),
+      uiOutput("atlasSelectionToolbar"),
       tags$p(class="ram-field-hint",
         sprintf("%d enriched polymer entities in %d PDB entries. RCSB reports %s matching entities%s.",
           length(results),length(pdbs),

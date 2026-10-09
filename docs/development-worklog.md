@@ -231,6 +231,16 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 - Exact SIFTS-linked UniProt positions now drive the Atlas comparison table, linked Ramachandran and 3D selection. Original PDB chain, residue and insertion IDs remain available. Unverified/absent positions are excluded rather than inferred as biological deletions; the UI reports mapping coverage. User-selected ordinary sequence alignment remains available.
 - Next priorities: live deployed-browser RCSB/PDBe CORS verification, harder construct/isoform controls, and independent-fold biological benchmarks. **Do not** claim geometric groups are validated functional states.
 
+## October 9, 2026: experimental construct-chemistry audit (active feature branch)
+
+- Branch `feature/atlas-construct-compatibility` started from current `main` `9d6684a00442b7ad6ea27afeabd6bc5ec8fe65ae`; PR #20 remains the separate manuscript.
+- Extend browser PDBe updated-mmCIF SIFTS verification with `_pdbx_poly_seq_scheme.mon_id`. Preserve experimental polymer monomer chemistry with each exact verified UniProt residue and export it in canonical cohort CSV. Missing/unknown codes remain NA, with no inferred identity.
+- New `R/atlas-construct.R` audits all selected pairs using their exact observed C-alpha common core: common residues, unmatched first-model positions per structure, monomer identity counts, missing chemistry, residue-chemistry differences and exact UniProt-position examples. Modified amino acid differences are **chemistry differences**, not automatically mutations.
+- Added selected-cohort review and CSV export in Atlas before exploratory geometry grouping. Known chemistry mismatches require an explicit checkbox acknowledgement scoped to the selected cohort; when selected entities or verified mappings change, the acknowledgement resets.
+- Existing geometric groups are still exploratory similarity groups, **not** biological state inference. Unavailable residue identities and unmatched observed regions remain unresolved; the UI never claims that same monomers prove construct/isoform/experimental equivalence.
+- New R tests `tests/atlas-construct.R` cover shifted PDB numbering, amino acid modifications, partial constructs, conflicting maps, unknown chemistry, different isoform accession, and full three-entity pairwise checks. CI Ubuntu/Windows scientific job runs it. mmCIF parser and browser smoke tests expanded.
+- The next verification is to mark the feature PR Ready for review, inspect all seven check results and fix failures before merging. Separately confirm actual deployed-browser PDBe/RCSB CORS and expand cross-fold experimental biological controls.
+
 ## Next implementation steps
 
 1. Verify **deployed-browser** PDBe and RCSB CORS in RamplotR's actual

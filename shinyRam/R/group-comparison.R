@@ -147,7 +147,7 @@ ram_group_conformation_compare <- function(reference, group_a, group_b,
     out
   }
   out <- ids
-  numeric_fields <- c("phi_models","psi_models","phi_mean","phi_sd",
+  numeric_fields <- c("phi_models","psi_models","paired_angle_models","phi_mean","phi_sd",
                       "psi_mean","psi_sd","rama8000_models",
                       "rama8000_consistency","basin_models","basin_consistency")
   char_fields <- c("rama8000_mode","basin_mode")
@@ -175,8 +175,8 @@ ram_group_conformation_compare <- function(reference, group_a, group_b,
     out$a_phi_sd,out$a_psi_sd,out$b_phi_sd,out$b_psi_sd)
   n_a <- length(group_a)
   n_b <- length(group_b)
-  out$a_coverage <- pmin(out$a_phi_models,out$a_psi_models) / max(1L,n_a)
-  out$b_coverage <- pmin(out$b_phi_models,out$b_psi_models) / max(1L,n_b)
+  out$a_coverage <- out$a_paired_angle_models / max(1L,n_a)
+  out$b_coverage <- out$b_paired_angle_models / max(1L,n_b)
   out$min_group_coverage <- pmin(out$a_coverage,out$b_coverage)
   out$min_rama8000_consistency <- pmin(
     out$a_rama8000_consistency,out$b_rama8000_consistency,na.rm=TRUE)
@@ -184,8 +184,7 @@ ram_group_conformation_compare <- function(reference, group_a, group_b,
     !is.finite(out$a_rama8000_consistency) |
     !is.finite(out$b_rama8000_consistency)] <- NA_real_
 
-  enough <- out$a_phi_models>=2 & out$a_psi_models>=2 &
-            out$b_phi_models>=2 & out$b_psi_models>=2
+  enough <- out$a_paired_angle_models>=2 & out$b_paired_angle_models>=2
   out$consistent_shift <- enough &
     is.finite(out$angular_displacement) &
     out$angular_displacement>=30 &
@@ -204,13 +203,15 @@ ram_group_conformation_compare <- function(reference, group_a, group_b,
 
   out$evidence_profile <- ifelse(
     !is.finite(out$angular_displacement),"Unavailable",
+    ifelse(out$a_paired_angle_models<2 | out$b_paired_angle_models<2,
+      "Unreplicated structural difference",
     ifelse(out$min_group_coverage<0.75,"Sparse coverage",
       ifelse(out$angular_displacement>=30 &
                is.finite(out$max_within_group_sd) &
                out$max_within_group_sd<=15,
              "Low-dispersion shift",
         ifelse(out$angular_displacement>=30,"Large but variable",
-          ifelse(out$angular_displacement>=15,"Moderate shift","Small shift")))))
+          ifelse(out$angular_displacement>=15,"Moderate shift","Small shift"))))))
   out$group_a <- label_a
   out$group_b <- label_b
   out[order(-as.integer(out$basin_mode_changed),

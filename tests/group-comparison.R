@@ -87,9 +87,39 @@ sparse_cmp <- ram_group_conformation_compare(
   reference,sparse_a,prepared_b$models,"apo","holo")
 sparse_r1 <- sparse_cmp[sparse_cmp$resi==1L,,drop=FALSE]
 assert(isTRUE(all.equal(sparse_r1$a_coverage,0.5)) &&
-       identical(as.character(sparse_r1$evidence_profile),"Sparse coverage") &&
+       identical(as.character(sparse_r1$evidence_profile),"Unreplicated structural difference") &&
        !isTRUE(sparse_r1$high_support_shift),
-       "Sparse group coverage must be explicit and must not be promoted as high support.")
+       "A residue with only one paired observation cannot count as replicated support.")
+
+# Separate phi and psi counts must never inflate complete-pair support.
+complement_a1 <- make_chain("A",c(-60,-60,-60),c(-40,-40,-40))
+complement_a2 <- complement_a1
+complement_a3 <- complement_a1
+complement_a4 <- complement_a1
+complement_a1$psi[1] <- NA_real_
+complement_a2$phi[1] <- NA_real_
+complement_a3$psi[1] <- NA_real_
+complement_b <- lapply(seq_len(4),function(i)
+  make_chain("A",c(-120,-60,-60),c(100,-40,-40)))
+paired_cmp <- ram_group_conformation_compare(reference,
+  list(complement_a1,complement_a2,complement_a3,complement_a4),
+  complement_b,"A","B")
+paired_r1 <- paired_cmp[paired_cmp$resi==1L,,drop=FALSE]
+assert(paired_r1$a_phi_models==3L && paired_r1$a_psi_models==2L &&
+       paired_r1$a_paired_angle_models==1L &&
+       isTRUE(all.equal(paired_r1$a_coverage,0.25)) &&
+       !isTRUE(paired_r1$high_support_shift),
+       "Phi/psi from different members must not count as paired support.")
+assert(identical(as.character(paired_r1$evidence_profile),
+  "Unreplicated structural difference"),
+  "Single paired observations cannot establish within-group consistency.")
+single_cmp <- ram_group_conformation_compare(reference,
+  list(make_chain("A",c(-60,-60,-60),c(-40,-40,-40))),
+  list(make_chain("A",c(-125,-60,-60),c(100,-40,-40))),"A","B")
+assert(all(single_cmp$evidence_profile==
+  "Unreplicated structural difference") &&
+  !any(single_cmp$high_support_shift),
+  "One-versus-one comparisons must be explicitly labelled unreplicated.")
 
 bad <- with_decoy(make_chain("Y",c(0,0,0),c(0,0,0),"Favored"))
 bad$resn[bad$chain=="Y"] <- c("GLY","GLY","GLY")

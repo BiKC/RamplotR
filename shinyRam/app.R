@@ -2222,6 +2222,9 @@ server <- function(input, output, session) {
   observeEvent(input$atlasGeometryEntities, {
     atlas_chemistry_acknowledged(NULL)
   },ignoreInit=TRUE)
+  observeEvent(atlas_exact_results(), {
+    atlas_chemistry_acknowledged(NULL)
+  },ignoreInit=TRUE)
   observeEvent(input$atlasConfirmDifferentChemistry, {
     ids <- isolate(input$atlasGeometryEntities)
     atlas_chemistry_acknowledged(

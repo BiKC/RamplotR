@@ -1721,3 +1721,20 @@ body > .container-fluid { max-width: none; padding: 0; }
   border-left-color: #468d87;
 }
 .ram-atlas-connectivity-list li strong { display: block; margin-bottom: 2px; }
+
+
+/* Verified experimental Atlas -> researcher-labelled Group Compare handoff. */
+.ram-atlas-group-handoff { margin-top: 15px; padding-top: 15px;
+  border-top: 1px solid rgba(100,130,139,.22); }
+.ram-atlas-group-handoff h4 { margin-top: 0; }
+.ram-atlas-group-handoff-grid, .ram-group-labels {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.ram-atlas-group-handoff-grid > div, .ram-group-labels > div { min-width: 0; }
+.ram-group-labels { margin: 6px 0 12px; }
+@media(max-width:620px) {
+  .ram-atlas-group-handoff-grid, .ram-group-labels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

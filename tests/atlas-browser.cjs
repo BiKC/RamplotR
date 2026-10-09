@@ -22,8 +22,10 @@ function syntheticUpdatedCif(pdbOffset,shifted) {
       C[1]-=0.3; C[2]+=0.3;
     }
     return [["N",N],["CA",p],["C",C]].map(([name,xyz])=>
-      "ATOM "+name+" X "+i+" "+xyz.map(x=>x.toFixed(4)).join(" ")+" 1 .");
+      "ATOM "+name+" X "+i+" ALA "+(name==="N"?"N":"C")+" "+xyz.map(x=>x.toFixed(4)).join(" ")+" 1 . "+(pdbOffset+i-1)+" .");
   }).join("\n");
+  const component = shifted ? "" :
+    "\nHETATM C1 L . ATP C 2.5 0.5 0.5 1 . 900 .";
   return `data_test
 #
 loop_
@@ -50,12 +52,16 @@ _atom_site.group_PDB
 _atom_site.label_atom_id
 _atom_site.label_asym_id
 _atom_site.label_seq_id
+_atom_site.label_comp_id
+_atom_site.type_symbol
 _atom_site.Cartn_x
 _atom_site.Cartn_y
 _atom_site.Cartn_z
 _atom_site.pdbx_PDB_model_num
 _atom_site.label_alt_id
-${atoms}
+_atom_site.auth_seq_id
+_atom_site.pdbx_PDB_ins_code
+${atoms}${component}
 #`;
 }
 (async function () {
@@ -282,6 +288,17 @@ ${atoms}
     }, {timeout:15000});
     assert.ok(await page.$("#downloadAtlasContextEntries"));
     assert.ok(await page.$("#downloadAtlasContextPairs"));
+    await page.waitForFunction(() => {
+      const panel=document.getElementById("atlasLigandContextPanel");
+      return panel && panel.textContent.includes(
+        "Observed non-water components near the protein") &&
+        panel.textContent.includes("Proximity extraction completed for 2 of 2");
+    }, {timeout:15000});
+    const ligandPanelText=await page.$eval("#atlasLigandContextPanel",
+      el=>el.textContent);
+    assert.match(ligandPanelText,/1 have one or more nearby non-water components/);
+    assert.ok(await page.$("#downloadAtlasLigandEntries"));
+    assert.ok(await page.$("#downloadAtlasLigandContacts"));
     const geometryTable=await page.$eval("#atlasGeometryTable",
       el=>el.textContent);
     assert.match(geometryTable,/1CRN_1/);

@@ -1748,3 +1748,33 @@ body > .container-fluid { max-width: none; padding: 0; }
 @media(max-width: 900px) {
   .ram-group-fingerprint-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Atlas search cards are directly selectable before downloading a PDB file. */
+.ram-atlas-selection-toolbar {
+  position:sticky; top:0; z-index:2; display:flex; flex-wrap:wrap;
+  align-items:center; gap:8px 12px; padding:10px 12px;
+  border:1px solid #c5dcd9; border-radius:9px;
+  background:#f2f8f6; color:#24535b;
+}
+.ram-atlas-selection-toolbar strong { font-size:12px; }
+.ram-atlas-selection-toolbar > span { flex:1 1 200px; font-size:11px; }
+.ram-atlas-selection-toolbar .ram-field-hint { flex-basis:100%; margin:0; }
+.ram-counterpart-card.is-selected {
+  border-color:#2f8188; background:#f2faf9;
+  box-shadow:inset 3px 0 0 #2f8188;
+}
+.ram-atlas-pick-control {
+  grid-column:1/-1; display:inline-flex; gap:8px; align-items:center;
+  width:max-content; max-width:100%; cursor:pointer;
+  font-size:11px; font-weight:700; color:#245963; margin:0 0 2px;
+}
+.ram-atlas-pick-control input[type="checkbox"] {
+  width:17px; height:17px; margin:0; accent-color:#267a84;
+  cursor:pointer;
+}
+.ram-atlas-pick-control:focus-within {
+  outline:2px solid #267a84; outline-offset:3px; border-radius:3px;
+}
+@media (max-width:760px) {
+  .ram-atlas-selection-toolbar { position:static; }
+}

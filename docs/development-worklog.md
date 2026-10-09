@@ -278,6 +278,16 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 - GitHub Actions triggers are `pull_request: opened/ready_for_review` plus explicit manual fallback, **not push/synchronize**. Run PR-ready CI once and inspect both browser-origin results and regression suites before merging.
 - Documentation: `docs/atlas-browser-connectivity.md`. Live archive availability is external and may fail independently of RamplotR; preserve observed failures transparently.
 
+## October 9: direct Atlas group selection workflow (active branch)
+
+- PR #61 was validated with **all eight green checks** and merged into `main` as `39744a977d6ff5c2d61204dc39f04910db9cfccc`. The additional public-origin Chromium check verified all three real RCSB/PDBe endpoints under the live `https://bikc.be` browser origin. This does not mean the new UI was deployed.
+- New branch `feature/atlas-group-handoff` starts from that merged commit. Manuscript PR #20 remains separate.
+- Added explicit selectable Atlas Group A/Group B sets of *already-verified* experimental entities, with optional cluster membership suggestions but no functional-state assignment. The action opens Compare Groups and switches its source to `Verified Atlas`; the existing upload-based workflow remains the default.
+- Added a pure direct-input group adapter using exact observed SIFTS UniProt coordinates and cached first-model N/CA/C torsions. It reuses circular group comparison and exports per-member provenance/coverage without downloading files, guessing sequence numbering, or requiring a separately loaded reference structure.
+- Residue chemistry is displayed only where all selected experimental monomer IDs agree. `UNK` marks ambiguous chemistry. RAMA8000/native classification cannot be reconstructed reliably from this reduced cache, so the Atlas group mode reports **torsion and coarse backbone-state evidence only**, visibly disclosing absent classification metrics.
+- Tests: `tests/atlas-group-handoff.R` checks disjoint selection, numbering shifts, incomplete torsions, grouping, residue-chemistry uncertainty and single-member support; browser smoke tests include the Atlas -> Compare Groups handoff without any file uploads or primary structure. CI is triggered on the PR when marked Ready for review, not on pushes.
+- Next check the CI results, amend any regressions before merging, and continue independent experimental cohorts without inferring biological state labels from clustering.
+
 ## Next implementation steps
 
 1. Verify **deployed-browser** PDBe and RCSB CORS in RamplotR's actual

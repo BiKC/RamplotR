@@ -43,6 +43,7 @@ source(file.path("R", "geometry.R"), local = TRUE)
 source(file.path("R", "experimental.R"), local = TRUE)
 source(file.path("R", "ensemble.R"), local = TRUE)
 source(file.path("R", "group-comparison.R"), local = TRUE)
+source(file.path("R", "atlas-group-handoff.R"), local = TRUE)
 source(file.path("R", "guide.R"), local = TRUE)
 
 # Chain colours and contour colours are designed together for a recognisable
@@ -605,9 +606,18 @@ ui <- fluidPage(
                   class="ram-details ram-group-comparison-panel",
                   tags$summary("Compare groups of structures"),
                   tags$div(class="ram-group-intro",
-                    tags$p("Compare experimental states, mutants or prediction sets after loading a reference structure. Each file contributes model 1 and the best-matching protein chain."),
+                    tags$p("Compare experimental states, mutants or prediction sets using uploaded structures or verified Atlas entries. You choose and label both groups; Atlas clusters are exploratory, not state assignments."),
                     actionLink("groupGuide","How do group comparisons work?")
                   ),
+                  radioButtons("groupInputMode","Structure source",
+                    choices=c("Upload structures"="uploads",
+                      "Use verified Atlas selection"="atlas"),
+                    selected="uploads",inline=TRUE),
+                  uiOutput("groupAtlasSelection"),
+                  tags$div(class="ram-group-labels",
+                    textInput("groupALabel","Group A label",value="Group A"),
+                    textInput("groupBLabel","Group B label",value="Group B")),
+                  conditionalPanel(condition="input.groupInputMode !== 'atlas'",
                   tags$div(class="ram-group-step-heading",
                     tags$span("1"), tags$strong("Choose a reference and chain-match criteria")),
                   tags$div(class="ram-group-compare-controls",
@@ -627,7 +637,6 @@ ui <- fluidPage(
                     tags$span("2"), tags$strong("Upload structures for both conditions")),
                   tags$div(class="ram-group-upload-grid",
                     tags$section(class="ram-group-upload-card",
-                      textInput("groupALabel","Group A label",value="Group A"),
                       checkboxInput("groupIncludeLoadedA",
                         "Include loaded structure in Group A",value=TRUE),
                       fileInput("groupAFiles","Additional Group A structures",
@@ -637,7 +646,6 @@ ui <- fluidPage(
                         "The structure loaded at the top of RamplotR can be your first Group A member.")
                     ),
                     tags$section(class="ram-group-upload-card",
-                      textInput("groupBLabel","Group B label",value="Group B"),
                       fileInput("groupBFiles","Group B structures",
                         multiple=TRUE,
                         accept=c(".pdb",".ent",".cif",".mmcif",".mcif")),
@@ -646,7 +654,7 @@ ui <- fluidPage(
                     )
                   ),
                   tags$p(class="ram-field-hint",
-                    "For meaningful within-group variation, add several independent structures per condition where possible. Members use their first model."),
+                    "For meaningful within-group variation, add several independent structures per condition where possible. Members use their first model.")),
                   tags$div(class="ram-group-step-heading",
                     tags$span("3"), tags$strong("Analyse and inspect residue-level differences")),
                   tags$div(class="ram-group-run-row",
@@ -796,6 +804,7 @@ server <- function(input, output, session) {
   atlas_selected_position <- reactiveVal(NULL)
   atlas_pair_handoff <- reactiveVal(NULL)
   atlas_alignment_context <- reactiveVal(NULL)
+  atlas_group_transfer <- reactiveVal(NULL)
   canonical_segments <- reactiveVal(ram_canonical_empty_segments())
   canonical_mapping <- reactiveVal(ram_canonical_empty_map())
   canonical_status <- reactiveVal(NULL)
@@ -2245,8 +2254,88 @@ server <- function(input, output, session) {
         class="btn-primary btn-sm"),
       uiOutput("atlasGeometrySummary"),
       plotOutput("atlasGeometryPlot",height="260px"),
-      tableOutput("atlasGeometryTable"))
+      tableOutput("atlasGeometryTable"),
+      uiOutput("atlasGroupsHandoffPanel"))
   })
+
+  # Researcher-assigned group labels; the optional geometric clusters are
+  # proposed starting points, never inferred functional-state assignments.
+  output$atlasGroupsHandoffPanel <- renderUI({
+    geometry <- atlas_geometry_result()
+    if(is.null(geometry) || !is.null(geometry$error) ||
+       length(geometry$selected)<2L) return(NULL)
+    members <- split(as.character(geometry$assignment$entity),
+      geometry$assignment$geometric_group)
+    default_a <- if(length(members)>0L) members[[1L]]
+      else geometry$selected[[1L]]
+    default_b <- if(length(members)>1L) members[[2L]]
+      else setdiff(geometry$selected,default_a)[[1L]]
+    tags$section(class="ram-atlas-group-handoff",
+      tags$h4("Compare Atlas structures as groups"),
+      tags$p(class="ram-field-hint",
+        "Choose which verified experimental structures belong to each condition. Geometry clusters can suggest a starting point, but group names and biological interpretations are yours. The analysis reuses exact SIFTS-mapped backbone atoms without reuploading files."),
+      tags$div(class="ram-atlas-group-handoff-grid",
+        selectInput("atlasGroupAEntities","Group A experimental entries",
+          choices=geometry$selected,selected=default_a,multiple=TRUE),
+        selectInput("atlasGroupBEntities","Group B experimental entries",
+          choices=geometry$selected,selected=default_b,multiple=TRUE)),
+      tags$p(class="ram-field-hint",
+        "Each entry contributes one verified first-model polymer chain. Same-crystal copies are not independent biological replicates. Residues with unknown or differing chemistry have no classification label."),
+      actionButton("atlasSendGroups","Use these entries in Compare Groups",
+        class="btn-primary btn-sm"),
+      uiOutput("atlasGroupHandoffStatus")
+    )
+  })
+  output$atlasGroupHandoffStatus <- renderUI({
+    current <- atlas_group_transfer()
+    if(is.null(current)) return(NULL)
+    tags$p(class="ram-field-hint",sprintf(
+      "Selected %d Group A and %d Group B entries. Open Compare Groups to analyse.",
+      length(current$group_a),length(current$group_b)))
+  })
+  observeEvent(atlas_geometry_result(), {
+    if(!is.null(isolate(atlas_group_transfer()))) {
+      atlas_group_transfer(NULL)
+      if(identical(isolate(group_comparison_results())$source,"atlas"))
+        group_comparison_results(NULL)
+    }
+  },ignoreInit=TRUE)
+  observeEvent(input$atlasSendGroups, {
+    geometry <- isolate(atlas_geometry_result())
+    picked <- tryCatch(ram_atlas_group_select(geometry,
+      isolate(input$atlasGroupAEntities),
+      isolate(input$atlasGroupBEntities)),error=function(e)e)
+    if(inherits(picked,"error")) {
+      showNotification(conditionMessage(picked),type="warning",duration=14)
+      return()
+    }
+    atlas_group_transfer(picked)
+    group_comparison_results(NULL)
+    updateRadioButtons(session,"groupInputMode",selected="atlas")
+    updateTabsetPanel(session,"analysisTabs",selected="compare")
+    session$sendCustomMessage("ram-open-group-panel",list())
+    showNotification(sprintf(
+      "Transferred %d + %d verified entries. Set group labels and choose Analyse groups.",
+      length(picked$group_a),length(picked$group_b)),
+      type="message",duration=12)
+  },ignoreInit=TRUE)
+  output$groupAtlasSelection <- renderUI({
+    if(!identical(input$groupInputMode,"atlas")) return(NULL)
+    picked <- atlas_group_transfer()
+    if(is.null(picked))
+      return(tags$p(class="ram-confidence-warning",
+        "Select structures in Atlas, then choose Use these entries in Compare Groups."))
+    tags$div(class="ram-panel",
+      tags$strong(sprintf("Verified Atlas cohort: %s",picked$accession)),
+      tags$p(paste0("Group A: ",paste(picked$group_a,collapse=", "))),
+      tags$p(paste0("Group B: ",paste(picked$group_b,collapse=", "))),
+      tags$p(class="ram-field-hint",
+        "Exact observed UniProt positions define residue correspondence. Uploaded-file chain identity thresholds are not applied. Rama8000 classification is unavailable in the Atlas-only group analysis."),
+      actionLink("groupBackToAtlas","Change group membership in Atlas"))
+  })
+  observeEvent(input$groupBackToAtlas, {
+    updateTabsetPanel(session,"analysisTabs",selected="atlas")
+  },ignoreInit=TRUE)
 
   atlas_construct_audit <- reactive({
     cohort <- req(atlas_payload())
@@ -3424,6 +3513,18 @@ server <- function(input, output, session) {
   group_comparison_matches <- reactive({
     value <- group_comparison_results()
     if (is.null(value)) return(NULL)
+    if(identical(value$source,"atlas")) {
+      if(!identical(input$groupInputMode,"atlas")) return(NULL)
+      geometry <- atlas_geometry_result()
+      picked <- atlas_group_transfer()
+      if(is.null(geometry) || !is.null(geometry$error) ||
+         is.null(picked) ||
+         !identical(value$selection,picked) ||
+         !identical(value$result$accession,geometry$accession))
+        return(NULL)
+      return(value$result)
+    }
+    if(identical(input$groupInputMode,"atlas")) return(NULL)
     structure <- req(loaded())
     if (!identical(value$key,structure$key) ||
         !identical(value$mode,input$validationMode) ||
@@ -3446,6 +3547,33 @@ server <- function(input, output, session) {
   },ignoreInit=TRUE)
 
   observeEvent(input$runGroupComparison, {
+    if(identical(input$groupInputMode,"atlas")) {
+      picked <- isolate(atlas_group_transfer())
+      geometry <- isolate(atlas_geometry_result())
+      if(is.null(picked) || is.null(geometry) ||
+         !is.null(geometry$error)) {
+        showNotification("Select both verified experimental groups in Atlas first.",
+          type="warning",duration=12)
+        return()
+      }
+      result <- tryCatch(withProgress(
+        message="Comparing exact UniProt-mapped Atlas groups",{
+          ram_atlas_group_prepare(isolate(atlas_exact_results()),geometry,
+            picked$group_a,picked$group_b,
+            input$groupALabel,input$groupBLabel)
+        }),error=function(e)e)
+      if(inherits(result,"error")) {
+        showNotification(conditionMessage(result),type="error",duration=16)
+        return()
+      }
+      group_comparison_results(list(
+        source="atlas",selection=picked,result=result))
+      showNotification(sprintf(
+        "Compared %d + %d verified structures over %d canonical positions.",
+        result$n_a,result$n_b,result$core_positions),
+        type="message",duration=10)
+      return()
+    }
     structure <- req(loaded())
     ref_chain <- req(input$groupReferenceChain)
     label_a <- trimws(input$groupALabel)
@@ -3569,6 +3697,19 @@ server <- function(input, output, session) {
     data <- result$comparison
     finite <- is.finite(data$angular_displacement)
     tags$div(
+      if(identical(result$source,"atlas"))
+        tags$div(class="ram-field-hint",
+          tags$strong("Verified Atlas group comparison · UniProt ",
+            result$accession),
+          tags$p(sprintf(paste0(
+            "%d exact shared observed canonical positions; ",
+            "%d positions lack agreement on experimental monomer identity. ",
+            "All structures were reused from the verified Atlas cohort."),
+            result$core_positions,result$unknown_chemistry_positions)),
+          if(isTRUE(result$known_chemistry_differences))
+            tags$p(class="ram-confidence-warning",
+              "Observed residue chemistry differs between selected structures. This is a potentially confounded structural comparison."),
+          tags$p("Rama8000/native RamplotR classifications are not inferred from the Atlas backbone-only cache; local circular φ/ψ and backbone-state summaries remain available. No geometric cluster is interpreted as a validated biological state.")),
       tags$div(class="ram-confidence-metrics",
         tags$span(class="ram-confidence-metric",
           sprintf("%s: %d structures",result$label_a,result$n_a)),

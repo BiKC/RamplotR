@@ -296,6 +296,36 @@ ${atoms}
     const switchText=await page.$eval("#atlasSwitchSummary",el=>el.textContent);
     assert.match(switchText,/1CRN_1 versus 1UBQ_1/);
     assert.ok(await page.$("#downloadAtlasSwitch"));
+    // Atlas-to-Groups workflow: explicit memberships and labels, no uploads
+    // and no preloaded reference structure. The synthetic archive is cached.
+    await page.waitForSelector("#atlasGroupAEntities");
+    await page.waitForSelector("#atlasGroupBEntities");
+    await page.click("#atlasSendGroups");
+    await page.waitForFunction(() => {
+      const tab=document.querySelector(".nav-tabs .active a");
+      const summary=document.querySelector("#groupAtlasSelection");
+      const panel=document.querySelector("#ram-group-comparison-panel");
+      return tab && tab.getAttribute("data-value")==="compare" &&
+        summary && summary.textContent.includes("1CRN_1") &&
+        summary.textContent.includes("1UBQ_1") &&
+        panel && panel.open;
+    },{timeout:15000});
+    await page.waitForSelector("#groupInputMode input[value='atlas']:checked");
+    await page.click("#runGroupComparison");
+    await page.waitForFunction(() => {
+      const summary=document.querySelector("#groupComparisonSummary");
+      return summary && summary.textContent.includes(
+        "Verified Atlas group comparison");
+    },{timeout:25000});
+    const groupText=await page.$eval("#groupComparisonSummary",
+      el=>el.textContent);
+    assert.match(groupText,/exact shared observed canonical positions/);
+    assert.match(groupText,/Rama8000\/native RamplotR classifications are not inferred/);
+    assert.ok(await page.$("#downloadGroupComparison"));
+    assert.ok(await page.$("#downloadGroupMembers"));
+    await page.click('.nav-tabs a[data-value="atlas"]');
+    await page.waitForFunction(()=>document.querySelector(
+      "#atlasSwitchPlot img")?.complete,{timeout:15000});
     await page.waitForFunction(() => {
       const plot=document.querySelector("#atlasSwitchPlot img");
       return plot && plot.complete && plot.naturalWidth>0;

@@ -137,7 +137,7 @@ ram_guide_ui <- function() {
         step(5, "Review support, dispersion and exports",
           "Inspect group-level circular φ/ψ summaries, changed-residue evidence and the matched-members table. Export residue-level and matched-chain CSVs after a successful run.")
       ),
-      tags$p("A single member per condition is a comparison, not a distribution. Treat support and dispersion cautiously when few independent experimental observations are available."),
+      tags$p("Alternatively, use verified Atlas groups directly: after calculating experimental geometry, select disjoint Group A and Group B members in Atlas and send them to Compare Groups. The exact observed UniProt backbone cache is reused without uploads. Classification metrics are unavailable in this mode. A single member per condition is a comparison, not a distribution; treat support and dispersion cautiously."),
       jump("guideGoGroups", "Open group comparison")
     ),
     section("ram-guide-atlas", "05 · Experimental Conformational Atlas",

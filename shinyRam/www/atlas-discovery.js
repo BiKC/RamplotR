@@ -177,6 +177,15 @@
     if (!root.Shiny || typeof root.Shiny.addCustomMessageHandler !== "function")
       return false;
     root.Shiny.addCustomMessageHandler("ram-atlas-discover", searchAtlas);
+    root.Shiny.addCustomMessageHandler("ram-open-group-panel", (payload) => {
+      const panel=root.document &&
+        root.document.getElementById("ram-group-comparison-panel");
+      if(panel) {
+        panel.open=true;
+        if(typeof panel.scrollIntoView==="function")
+          panel.scrollIntoView({behavior:"smooth",block:"start"});
+      }
+    });
     return true;
   }
   if (!setup() && root.document) root.document.addEventListener("shiny:connected",

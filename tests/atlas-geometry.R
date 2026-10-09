@@ -162,6 +162,21 @@ with_pdb_warning <- ram_atlas_geometry_groups(within_deposit,"P12345",
 assert(with_pdb_warning$robustness$shared_pdb_pairs==1L &&
        sum(with_pdb_warning$robustness$pairs$same_pdb_entry)==1L,
        "Same-deposition entities must be flagged regardless of geometry.")
+# A short, geometry-driving segment should reduce robustness when omitted.
+# The first two structures are rigid-motion equivalents, while the third has
+# a pronounced rearrangement restricted to one deletion block.
+localized <- coords
+localized[17:20,2] <- localized[17:20,2]+12
+localized_set <- list(
+  "1ABC_1"=fixture("1ABC",coords),
+  "2XYZ_1"=fixture("2XYZ",rotated),
+  "3ABC_1"=fixture("3ABC",localized))
+sensitive <- ram_atlas_geometry_groups(localized_set,"P12345",
+  names(localized_set),cutoff=1.5)
+assert(sensitive$distance_matrix[1L,3L]>1.5 &&
+       length(unique(sensitive$assignment$geometric_group))==2L &&
+       any(!sensitive$robustness$replicates$baseline_partition_reproduced),
+  "A localized group-defining segment must be detected as position-sensitive.")
 # Malformed canonical input is rejected instead of guessed or recycled.
 fake <- lapply(seq_along(verified),function(i) matrix(1,40,3))
 assert(inherits(try(ram_atlas_cluster_robustness(fake,

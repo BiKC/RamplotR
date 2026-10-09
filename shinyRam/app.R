@@ -2098,7 +2098,9 @@ server <- function(input, output, session) {
     cohort <- isolate(atlas_payload())
     if(is.null(cohort) || !is.list(pick)) return()
     if(length(isolate(atlas_verify_queue())) ||
-       !is.null(isolate(atlas_verify_progress()))) {
+       !is.null(isolate(atlas_verify_progress())) ||
+       any(vapply(isolate(atlas_exact_results()),function(item)
+         identical(item$state,"searching"),logical(1L)))) {
       showNotification("Selected-structure verification is in progress.",
         type="message",duration=6)
       return()
@@ -2110,7 +2112,13 @@ server <- function(input, output, session) {
     key <- paste0(pdb,"_",entity)
     if(!key %in% vapply(cohort$results,ram_atlas_record_key,character(1L)))
       return()
-    atlas_candidate_picks(unique(c(isolate(atlas_candidate_picks()),key)))
+    previous <- isolate(atlas_candidate_picks())
+    if(!key %in% previous && length(previous)>=12L) {
+      showNotification("The Atlas selection limit is 12 structures.",
+        type="warning",duration=9)
+      return()
+    }
+    atlas_candidate_picks(unique(c(previous,key)))
     start_atlas_verification(key,cohort)
   },ignoreInit=TRUE)
 
@@ -2123,7 +2131,13 @@ server <- function(input, output, session) {
         type="warning",duration=9)
       return()
     }
-    if(!is.null(isolate(atlas_verify_progress()))) return()
+    if(!is.null(isolate(atlas_verify_progress())) ||
+       any(vapply(isolate(atlas_exact_results()),function(item)
+         identical(item$state,"searching"),logical(1L)))) {
+      showNotification("A structure is still being verified. Finish that request before starting the batch.",
+        type="message",duration=9)
+      return()
+    }
     available <- vapply(cohort$results,ram_atlas_record_key,character(1L))
     selected <- intersect(selected,available)
     current <- isolate(atlas_exact_results())

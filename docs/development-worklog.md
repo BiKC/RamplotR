@@ -288,6 +288,17 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 - Tests: `tests/atlas-group-handoff.R` checks disjoint selection, numbering shifts, incomplete torsions, grouping, residue-chemistry uncertainty and single-member support; browser smoke tests include the Atlas -> Compare Groups handoff without any file uploads or primary structure. CI is triggered on the PR when marked Ready for review, not on pushes.
 - Next check the CI results, amend any regressions before merging, and continue independent experimental cohorts without inferring biological state labels from clustering.
 
+## October 9: verified Atlas groups now feed Compare Groups (PR #62 merged)
+
+- PR #62 [Use verified experimental Atlas structures directly in Compare Groups](https://github.com/BiKC/RamplotR/pull/62) merged to `main` as `467ff12048fdbe1bca601063e981db19ff279f84`.
+- **All eight** final-commit CI workflows passed for feature head `e68fd5a6bdf457c34678c0b9693adae3792a4ed6`: scientific Ubuntu/Windows, UI browser with Atlas-to-Group end-to-end, structure checks, independent wwPDB, live experimental benchmarks, large scaling, and real public Shinylive origin PDBe/RCSB connectivity.
+- Atlas users can choose their own Group A and B memberships from the verified selected experimental cohort, optionally starting from geometric cluster assignments. These clusters never automatically define functional states. Clicking **Use these entries in Compare Groups** opens the comparison source and passes cached exact-mapped first-model torsions with no file uploads and no separately loaded primary structure.
+- Each virtual comparison residue is keyed by the exact observed UniProt coordinate. Circular group means, dispersion, evidence/coverage and CSV exports use existing group-comparison calculations. Amino acid identity is displayed only for unanimously matching experimental monomer chemistry, otherwise `UNK`; no native/Rama8000 classification is fabricated from sparse Atlas input.
+- The original upload-based Group Compare remains the default and is kept separate from Atlas results. In-app Guide and scientific roadmap are updated.
+- The first browser CI run found an invalid Shiny message-handler signature, which was fixed before the passing final rerun. The final run also confirms Atlas-to-Group handoff and calculations without primary structure/upload files.
+- Current `main` is authoritative. Do not reuse this merged feature branch; manuscript PR #20 is separate.
+- Next priorities: enable better Atlas group membership revision / multi-cohort metadata filters, and collect independent true same-state biological controls and construct/ligand conditions for evidence-based group labels. Do not infer biological state from geometric grouping.
+
 ## Next implementation steps
 
 1. Verify **deployed-browser** PDBe and RCSB CORS in RamplotR's actual

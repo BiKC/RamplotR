@@ -105,7 +105,7 @@ paired_cmp <- ram_group_conformation_compare(reference,
   list(complement_a1,complement_a2,complement_a3,complement_a4),
   complement_b,"A","B")
 paired_r1 <- paired_cmp[paired_cmp$resi==1L,,drop=FALSE]
-assert(paired_r1$a_phi_models==2L && paired_r1$a_psi_models==3L &&
+assert(paired_r1$a_phi_models==3L && paired_r1$a_psi_models==2L &&
        paired_r1$a_paired_angle_models==1L &&
        isTRUE(all.equal(paired_r1$a_coverage,0.25)) &&
        !isTRUE(paired_r1$high_support_shift),

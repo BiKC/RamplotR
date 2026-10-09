@@ -43,6 +43,7 @@ source(file.path("R", "geometry.R"), local = TRUE)
 source(file.path("R", "experimental.R"), local = TRUE)
 source(file.path("R", "ensemble.R"), local = TRUE)
 source(file.path("R", "group-comparison.R"), local = TRUE)
+source(file.path("R", "atlas-group-handoff.R"), local = TRUE)
 source(file.path("R", "guide.R"), local = TRUE)
 
 # Chain colours and contour colours are designed together for a recognisable
@@ -605,9 +606,15 @@ ui <- fluidPage(
                   class="ram-details ram-group-comparison-panel",
                   tags$summary("Compare groups of structures"),
                   tags$div(class="ram-group-intro",
-                    tags$p("Compare experimental states, mutants or prediction sets after loading a reference structure. Each file contributes model 1 and the best-matching protein chain."),
+                    tags$p("Compare experimental states, mutants or prediction sets using uploaded structures or verified Atlas entries. You choose and label both groups; Atlas clusters are exploratory, not state assignments."),
                     actionLink("groupGuide","How do group comparisons work?")
                   ),
+                  radioButtons("groupInputMode","Structure source",
+                    choices=c("Upload structures"="uploads",
+                      "Use verified Atlas selection"="atlas"),
+                    selected="uploads",inline=TRUE),
+                  uiOutput("groupAtlasSelection"),
+                  conditionalPanel(condition="input.groupInputMode !== 'atlas'",
                   tags$div(class="ram-group-step-heading",
                     tags$span("1"), tags$strong("Choose a reference and chain-match criteria")),
                   tags$div(class="ram-group-compare-controls",
@@ -646,7 +653,7 @@ ui <- fluidPage(
                     )
                   ),
                   tags$p(class="ram-field-hint",
-                    "For meaningful within-group variation, add several independent structures per condition where possible. Members use their first model."),
+                    "For meaningful within-group variation, add several independent structures per condition where possible. Members use their first model.")),
                   tags$div(class="ram-group-step-heading",
                     tags$span("3"), tags$strong("Analyse and inspect residue-level differences")),
                   tags$div(class="ram-group-run-row",
@@ -796,6 +803,7 @@ server <- function(input, output, session) {
   atlas_selected_position <- reactiveVal(NULL)
   atlas_pair_handoff <- reactiveVal(NULL)
   atlas_alignment_context <- reactiveVal(NULL)
+  atlas_group_transfer <- reactiveVal(NULL)
   canonical_segments <- reactiveVal(ram_canonical_empty_segments())
   canonical_mapping <- reactiveVal(ram_canonical_empty_map())
   canonical_status <- reactiveVal(NULL)
@@ -2245,7 +2253,8 @@ server <- function(input, output, session) {
         class="btn-primary btn-sm"),
       uiOutput("atlasGeometrySummary"),
       plotOutput("atlasGeometryPlot",height="260px"),
-      tableOutput("atlasGeometryTable"))
+      tableOutput("atlasGeometryTable"),
+      uiOutput("atlasGroupsHandoffPanel"))
   })
 
   atlas_construct_audit <- reactive({

@@ -77,8 +77,37 @@ distance-map and local φ/ψ difference margins. These are **descriptive
 measurements, not threshold-based accuracy or statistical validation**.
 
 The first three-protein run remains an immutable historical snapshot below.
-The new citrate synthase measurements are added by a separate, hash-recorded
-live run and must not be copied from older reports.
+The fourth-family extension completed its
+[live PDBe CI run](https://github.com/BiKC/RamplotR/actions/runs/37909618876)
+on October 9, 2026. The immutable run artifact contains exact SIFTS
+records, model-1 coordinates, per-residue torsion/geometry readouts and
+full PDB source-file SHA256 values.
+
+| Citrate synthase comparison | Shared exact UniProt positions | Cα dRMSD (Å) | Complete φ/ψ pairs | ≥30° candidates | Deposited monomer-identity differences |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1CTS A (open) / 2CTS A (closed) | 437 | 1.6241 | 435 | 91 | 1/437 |
+| 1CTS A (open) / 3ENJ A (independent open-like) | 437 | 0.6962 | 435 | 103 | 0/437 |
+
+**Important counterexample:** despite the greater global dRMSD in the
+documented open/closed comparison, the independently crystallized open-like
+control shows **more** ≥30° local angular changes (103 versus 91).
+This directly contradicts treating the local angle threshold as a
+general functional-state discriminator. The one differing experimental
+monomer in 1CTS/2CTS and the covalent Cys184 chemistry of 3ENJ must not
+be treated as proven irrelevant to the conformational observations.
+
+The report intentionally records a *descriptive* global distance-map
+contrast margin (1.6241 − 0.6962 = 0.9279 Å) and a negative local
+candidate-fraction contrast (91/435 versus 103/435). These are not effect
+sizes with inferential uncertainty or generalizable classifier outcomes.
+
+**New updated-mmCIF SHA256 provenance:**
+
+| PDB | Source SHA256 |
+| --- | --- |
+| 1CTS | `10886ce9eb0597314aa9211c0771dd0a9a20eb9c848cbf5a28bfd42bb0160ab3` |
+| 2CTS | `a4620d15d23b22554a6fd42a9ff395c8df0e8de54f00555feb37f08a843e9120` |
+| 3ENJ | `5265b3083f1c765f74fab80531d6687a8fcafd8408fc7660ab88795edc985a02` |
 
 ## First live-data results (2026-10-08)
 

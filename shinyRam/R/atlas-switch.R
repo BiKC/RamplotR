@@ -170,17 +170,19 @@ ram_atlas_group_switches <- function(verified,geometry,threshold=30,
     stop("Run an Atlas experimental geometry comparison first.",
          call.=FALSE)
   representatives <- unname(geometry$representatives)
-  if(length(representatives)<2L)
-    stop("Only one geometric group; no between-group representative comparison.",
-         call.=FALSE)
-  # Any two distinct geometric-group medoids may be compared, without
-  # silently treating them as independent biological states.
-  ids <- if(is.null(representative_ids)) representatives[1:2] else
-    as.character(representative_ids)
-  if(length(ids)!=2L || anyNA(ids) || any(!ids %in% representatives) ||
+  eligible <- if(!is.null(geometry$selected))
+    unique(as.character(geometry$selected)) else representatives
+  if(length(eligible)<2L)
+    stop("Choose at least two verified experimental structures.",call.=FALSE)
+  # Manual inspection is allowed even when all entries form one
+  # geometric group. Do not infer distinct biological states.
+  ids <- if(is.null(representative_ids)) {
+    if(length(representatives)>=2L) representatives[1:2]
+    else eligible[1:2]
+  } else as.character(representative_ids)
+  if(length(ids)!=2L || anyNA(ids) || any(!ids %in% eligible) ||
      identical(ids[[1L]],ids[[2L]]))
-    stop("Choose two distinct experimental geometry-group representatives.",
-         call.=FALSE)
+    stop("Choose two distinct verified experimental structures.",call.=FALSE)
   available <- ram_atlas_geometry_entities(verified,geometry$accession)
   tables <- lapply(ids,function(id) {
     structure <- available[[id]]
@@ -192,7 +194,7 @@ ram_atlas_group_switches <- function(verified,geometry,threshold=30,
   list(representatives=ids,threshold=as.numeric(threshold),
     residues=diff,regions=ram_atlas_candidate_regions(diff),
     comparable=sum(diff$comparable),total_positions=nrow(diff),
-    method="Paired exact UniProt residue phi/psi, circular wrapped angle differences; peptide bond 1.0–1.9 Å; first model, two geometric group representatives")
+    method="Paired exact UniProt residue phi/psi, circular wrapped angle differences; peptide bond 1.0–1.9 Å; first model, two explicitly selected verified structures (not inferred functional states)")
 }
 
 # A conformational Atlas position may only select an existing pairwise

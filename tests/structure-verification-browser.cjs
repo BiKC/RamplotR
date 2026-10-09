@@ -46,7 +46,9 @@ const puppeteer=require("puppeteer-core");
       return node&&node.querySelector("summary")&&
         node.textContent.includes("Extended structure verification");
     },{timeout:90000});
-    await page.click("#ram-geometry-panel summary");
+    // Opening a native details element directly avoids intermittent
+    // Chromium clickable-point failures after async Shiny layout changes.
+    await page.$eval("#ram-geometry-panel",node=>{ node.open=true; });
     await page.waitForSelector("#validationXml");
     await (await page.$("#validationXml")).uploadFile(xml);
     await new Promise(resolve=>setTimeout(resolve,1400));

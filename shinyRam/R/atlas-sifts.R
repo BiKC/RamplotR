@@ -20,7 +20,16 @@ ram_atlas_exact_sifts_map <- function(payload, pdb_id, entity_id, accession) {
   if(is.null(raw)) raw <- list()
   if(!is.list(raw) || length(raw)>50000L)
     stop("Invalid SIFTS residue mapping records.",call.=FALSE)
-  if(!length(raw)) return(ram_canonical_empty_map())
+  if(!length(raw)) {
+    # The generic empty canonical map lacks the Atlas-specific observed
+    # column. An empty exact SIFTS response must still have its full schema
+    # so it can be summarized safely and reported as unavailable.
+    empty <- ram_canonical_empty_map()
+    empty$label_seq_id <- integer()
+    empty$mon_id <- character()
+    empty$observed <- logical()
+    return(empty)
+  }
 
   clean <- function(value) {
     if(is.null(value) || length(value)!=1L || is.na(value))
@@ -84,4 +93,20 @@ ram_atlas_sifts_summary <- function(mapping) {
                                             mapping$observed])),
        conflicting_residues=sum(conflicts),
        chains=unique(as.character(mapping$chain)))
+}
+
+# One validated entry point for browser-retrieved verification. An empty
+# mapping is a legitimate archive result but cannot verify a structure.
+# Callers catch the error per entity and can continue a queued batch.
+ram_atlas_verified_sifts <- function(payload,pdb_id,entity_id,accession) {
+  mapping <- ram_atlas_exact_sifts_map(payload,pdb_id,entity_id,accession)
+  summary <- ram_atlas_sifts_summary(mapping)
+  if(!nrow(mapping))
+    stop(sprintf(paste0(
+      "No exact SIFTS residue mapping was found for PDB %s, entity %s, ",
+      "and UniProt %s. This entry cannot be used for Atlas clustering; ",
+      "try another experimental entry."),
+      toupper(as.character(pdb_id)),as.character(entity_id),
+      ram_uniprot_accession(accession)),call.=FALSE)
+  list(mapping=mapping,summary=summary)
 }

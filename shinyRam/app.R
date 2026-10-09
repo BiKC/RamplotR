@@ -806,6 +806,9 @@ server <- function(input, output, session) {
   atlas_exact_request <- reactiveVal(0L)
   atlas_exact_selected <- reactiveVal(NULL)
   atlas_exact_results <- reactiveVal(list())
+  atlas_candidate_picks <- reactiveVal(character())
+  atlas_verify_queue <- reactiveVal(character())
+  atlas_verify_progress <- reactiveVal(NULL)
   atlas_geometry_result <- reactiveVal(NULL)
   atlas_switch_result <- reactiveVal(NULL)
   atlas_selected_position <- reactiveVal(NULL)
@@ -1948,6 +1951,9 @@ server <- function(input, output, session) {
     atlas_status(NULL)
     atlas_exact_selected(NULL)
     atlas_exact_results(list())
+    atlas_candidate_picks(character())
+    atlas_verify_queue(character())
+    atlas_verify_progress(NULL)
     atlas_exact_request(isolate(atlas_exact_request())+1L)
   },ignoreInit=TRUE)
 
@@ -1965,6 +1971,9 @@ server <- function(input, output, session) {
     atlas_payload(NULL)
     atlas_exact_selected(NULL)
     atlas_exact_results(list())
+    atlas_candidate_picks(character())
+    atlas_verify_queue(character())
+    atlas_verify_progress(NULL)
     atlas_exact_request(isolate(atlas_exact_request())+1L)
     atlas_status(list(state="searching",
       message=paste("Searching experimental PDB entities for",accession,"...")))
@@ -2022,18 +2031,53 @@ server <- function(input, output, session) {
     }
   },ignoreInit=TRUE)
 
-  # Verify exact SIFTS only on user request, never for all archived PDBs.
-  observeEvent(input$ramAtlasVerifyPick, {
-    selected <- input$ramAtlasVerifyPick
+  # Select experimental entities directly from cards. The choice is
+  # deliberately separate from verification: no archive file is downloaded
+  # merely because a search card is selected.
+  observeEvent(input$ramAtlasCandidatePick, {
+    change <- input$ramAtlasCandidatePick
     cohort <- isolate(atlas_payload())
-    if(is.null(cohort) || !is.list(selected)) return()
-    pdb <- toupper(trimws(as.character(selected$pdb_id)))
-    entity <- as.character(selected$entity_id)
-    if(length(pdb)!=1L || !grepl("^[A-Z0-9]{4}$",pdb) ||
-       length(entity)!=1L || !grepl("^[1-9][0-9]*$",entity)) return()
-    ids <- vapply(cohort$results,ram_atlas_record_key,character(1L))
-    key <- paste0(pdb,"_",entity)
-    if(!key %in% ids) return()
+    if(is.null(cohort) || !is.list(change) ||
+       !identical(as.character(change$accession),cohort$accession))
+      return()
+    key <- as.character(change$key)
+    available <- vapply(cohort$results,ram_atlas_record_key,character(1L))
+    if(length(key)!=1L || is.na(key) || !key %in% available) return()
+    selected <- isolate(atlas_candidate_picks())
+    if(isTRUE(change$selected)) {
+      if(!key %in% selected && length(selected)>=12L) {
+        showNotification("Atlas supports up to 12 selected entities per comparison.",
+          type="warning",duration=10)
+        session$sendCustomMessage("ram-atlas-set-selection",
+          list(ids=selected))
+        return()
+      }
+      selected <- unique(c(selected,key))
+    } else selected <- setdiff(selected,key)
+    atlas_candidate_picks(selected)
+  },ignoreInit=TRUE)
+  observeEvent(input$atlasClearSelection, {
+    atlas_candidate_picks(character())
+    atlas_verify_queue(character())
+    atlas_verify_progress(NULL)
+    session$sendCustomMessage("ram-atlas-set-selection",
+      list(ids=character()))
+  },ignoreInit=TRUE)
+  observeEvent(atlas_candidate_picks(), {
+    # A previous grouping must never be presented as if it reflects the
+    # newly chosen experimental subset.
+    atlas_geometry_result(NULL)
+    atlas_switch_result(NULL)
+    atlas_group_transfer(NULL)
+  },ignoreInit=TRUE)
+
+  start_atlas_verification <- function(key,cohort) {
+    available <- vapply(cohort$results,ram_atlas_record_key,character(1L))
+    if(length(key)!=1L || is.na(key) || !key %in% available)
+      return(FALSE)
+    split <- strsplit(key,"_",fixed=TRUE)[[1L]]
+    if(length(split)!=2L || !grepl("^[A-Z0-9]{4}$",split[[1L]]) ||
+       !grepl("^[1-9][0-9]*$",split[[2L]])) return(FALSE)
     seq <- isolate(atlas_exact_request())+1L
     atlas_exact_request(seq)
     atlas_exact_selected(list(key=key,request_id=as.character(seq),
@@ -2042,8 +2086,72 @@ server <- function(input, output, session) {
     results[[key]] <- list(state="searching")
     atlas_exact_results(results)
     session$sendCustomMessage("ram-atlas-sifts-exact",list(
-      request_id=as.character(seq),pdb_id=pdb,entity_id=entity,
-      accession=cohort$accession))
+      request_id=as.character(seq),pdb_id=split[[1L]],
+      entity_id=split[[2L]],accession=cohort$accession))
+    TRUE
+  }
+
+  # Individual verification remains available. The sequential batch path
+  # avoids overlapping browser requests overwriting the request-id guard.
+  observeEvent(input$ramAtlasVerifyPick, {
+    pick <- input$ramAtlasVerifyPick
+    cohort <- isolate(atlas_payload())
+    if(is.null(cohort) || !is.list(pick)) return()
+    if(length(isolate(atlas_verify_queue())) ||
+       !is.null(isolate(atlas_verify_progress())) ||
+       any(vapply(isolate(atlas_exact_results()),function(item)
+         identical(item$state,"searching"),logical(1L)))) {
+      showNotification("Selected-structure verification is in progress.",
+        type="message",duration=6)
+      return()
+    }
+    pdb <- toupper(trimws(as.character(pick$pdb_id)))
+    entity <- as.character(pick$entity_id)
+    if(length(pdb)!=1L || length(entity)!=1L ||
+       is.na(pdb) || is.na(entity)) return()
+    key <- paste0(pdb,"_",entity)
+    if(!key %in% vapply(cohort$results,ram_atlas_record_key,character(1L)))
+      return()
+    previous <- isolate(atlas_candidate_picks())
+    if(!key %in% previous && length(previous)>=12L) {
+      showNotification("The Atlas selection limit is 12 structures.",
+        type="warning",duration=9)
+      return()
+    }
+    atlas_candidate_picks(unique(c(previous,key)))
+    start_atlas_verification(key,cohort)
+  },ignoreInit=TRUE)
+
+  observeEvent(input$atlasVerifySelection, {
+    cohort <- isolate(atlas_payload())
+    if(is.null(cohort)) return()
+    selected <- isolate(atlas_candidate_picks())
+    if(!length(selected)) {
+      showNotification("Select structures from the cards first.",
+        type="warning",duration=9)
+      return()
+    }
+    if(!is.null(isolate(atlas_verify_progress())) ||
+       any(vapply(isolate(atlas_exact_results()),function(item)
+         identical(item$state,"searching"),logical(1L)))) {
+      showNotification("A structure is still being verified. Finish that request before starting the batch.",
+        type="message",duration=9)
+      return()
+    }
+    available <- vapply(cohort$results,ram_atlas_record_key,character(1L))
+    selected <- intersect(selected,available)
+    current <- isolate(atlas_exact_results())
+    needed <- selected[!vapply(selected,function(key)
+      identical(current[[key]]$state,"mapped"),logical(1L))]
+    if(!length(needed)) {
+      showNotification("All selected structures are already verified.",
+        type="message",duration=8)
+      return()
+    }
+    atlas_verify_progress(list(total=length(needed),completed=0L,
+                               accession=cohort$accession))
+    atlas_verify_queue(tail(needed,-1L))
+    start_atlas_verification(needed[[1L]],cohort)
   },ignoreInit=TRUE)
 
   observeEvent(input$ramAtlasSiftsExact, {
@@ -2088,6 +2196,22 @@ server <- function(input, output, session) {
       }
     }
     atlas_exact_results(outcomes)
+    progress <- isolate(atlas_verify_progress())
+    if(!is.null(progress)) {
+      progress$completed <- progress$completed+1L
+      remaining <- isolate(atlas_verify_queue())
+      if(length(remaining) && identical(cohort$accession,progress$accession)) {
+        atlas_verify_queue(tail(remaining,-1L))
+        atlas_verify_progress(progress)
+        start_atlas_verification(remaining[[1L]],cohort)
+      } else {
+        atlas_verify_queue(character())
+        atlas_verify_progress(NULL)
+        showNotification(sprintf(
+          "Verified selection: %d completed. Choose at least two mapped structures to cluster.",
+          progress$completed),type="message",duration=10)
+      }
+    }
   },ignoreInit=TRUE)
 
   output$atlasStatus <- renderUI({
@@ -2097,11 +2221,30 @@ server <- function(input, output, session) {
       "ram-confidence-warning" else "ram-field-hint",item$message)
   })
 
+  output$atlasSelectionToolbar <- renderUI({
+    payload <- atlas_payload()
+    if(is.null(payload)) return(NULL)
+    chosen <- atlas_candidate_picks()
+    progress <- atlas_verify_progress()
+    tags$div(class="ram-atlas-selection-toolbar",
+      tags$strong(sprintf("%d selected for analysis (maximum 12)",
+        length(chosen))),
+      tags$span("Tick entries below, then verify the selected structures before clustering."),
+      actionButton("atlasVerifySelection",
+        sprintf("Verify %d selected structure%s",
+          length(chosen),if(length(chosen)==1L) "" else "s"),
+        class="btn-primary btn-sm"),
+      actionLink("atlasClearSelection","Clear selection"),
+      if(!is.null(progress)) tags$p(class="ram-field-hint",
+        sprintf("Verifying selection: %d/%d completed.",
+          progress$completed,progress$total)))
+  })
   output$atlasResults <- renderUI({
     payload <- atlas_payload()
     if(is.null(payload)) return(NULL)
     results <- payload$results
     exact <- atlas_exact_results()
+    chosen <- isolate(atlas_candidate_picks())
     verified <- ram_atlas_cohort_summary(exact,payload$accession)
     get <- function(item,key,default="") {
       value <- item[[key]]
@@ -2113,6 +2256,7 @@ server <- function(input, output, session) {
     returned <- suppressWarnings(as.integer(payload$returned_count))
     unresolved <- suppressWarnings(as.integer(payload$incomplete_metadata))
     tags$div(class="ram-atlas-inventory",
+      uiOutput("atlasSelectionToolbar"),
       tags$p(class="ram-field-hint",
         sprintf("%d enriched polymer entities in %d PDB entries. RCSB reports %s matching entities%s.",
           length(results),length(pdbs),
@@ -2161,8 +2305,15 @@ server <- function(input, output, session) {
             get(item,"reference_sequence_coverage",NA_character_)))
           entity_coverage <- suppressWarnings(as.numeric(
             get(item,"entity_sequence_coverage",NA_character_)))
-          tags$article(class="ram-counterpart-card",
+          tags$article(class=paste("ram-counterpart-card",
+              if(paste0(id,"_",entity) %in% chosen) "is-selected" else ""),
             tags$div(class="ram-counterpart-card-main",
+              tags$label(class="ram-atlas-pick-control",
+                tags$input(type="checkbox",class="ram-atlas-pick",
+                  "data-key"=paste0(id,"_",entity),
+                  "data-accession"=payload$accession,
+                  checked=if(paste0(id,"_",entity) %in% chosen) "checked" else NULL),
+                tags$span("Select for analysis")),
               tags$div(class="ram-counterpart-id",
                 tags$strong(id),
                 tags$span(paste("Entity",entity)),
@@ -2239,12 +2390,13 @@ server <- function(input, output, session) {
     candidates <- tryCatch(
       ram_atlas_geometry_entities(verified,cohort$accession),
       error=function(e) list())
-    eligible <- names(candidates)[vapply(candidates,function(x)
-      nrow(x$coordinates)>=30L,logical(1L))]
+    eligible <- intersect(atlas_candidate_picks(),
+      names(candidates)[vapply(candidates,function(x)
+        nrow(x$coordinates)>=30L,logical(1L))])
     if(length(eligible)<2L) {
-      if(length(verified)<2L) return(NULL)
+      if(!length(atlas_candidate_picks())) return(NULL)
       return(tags$p(class="ram-field-hint",
-        "Geometry comparison requires at least two verified entities with 30 observed, unambiguous C-alpha positions each."))
+        "Select and verify at least two experimental entities to enable clustering. Each needs 30 observed, unambiguous C-alpha positions."))
     }
     prior <- isolate(input$atlasGeometryEntities)
     prior <- intersect(prior,eligible)

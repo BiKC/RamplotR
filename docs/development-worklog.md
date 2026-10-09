@@ -442,3 +442,17 @@ branch, and do not reuse historical feature branches.
   R group-handoff and browser regression coverage. No new network requests.
 - Avoid automatic functional-ligand or apo/holo classification and treat
   structures from a single PDB deposition as non-independent observations.
+
+## October 9: selectable experimental Atlas search results
+
+- Add persistent native checkbox selection on RCSB search cards, capped at
+  12 selected polymer entities. Selected-card styling updates without
+  rebuilding the scrollable results list on every click.
+- Add **Verify selected structures** with sequential request-ID-checked
+  verification; retain individual verification and existing exact SIFTS
+  constraints. Keep selected entries across paginated search results.
+- Expose clustering only after two selected entries have enough verified
+  coordinates. Changing the cohort clears previous geometry and group
+  handoff. Batch verification does not implicitly fetch unselected PDBs.
+- Expand browser tests to select across pages, deselect/reselect and
+  verify a two-entry batch. Keep scientific comparison code unchanged.

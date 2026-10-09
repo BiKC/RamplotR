@@ -143,3 +143,24 @@ switch regions. See [the roadmap](conformational-atlas-roadmap.md).
   workflow.
 - `Rscript tests/atlas.R` checks page order, archive-total changes,
   deduplication and failure recovery in the pure-R cohort merge helper.
+
+## Selecting structures for analysis
+
+The result cards now include **Select for analysis** checkboxes. Select up to
+12 PDB polymer entities across the loaded result pages and click **Verify
+selected structures**. Atlas requests the PDBe updated mmCIF/SIFTS
+verification sequentially, so individual requests do not overwrite one
+another. The card selection remains intact when another search page loads.
+Individual **Verify SIFTS mapping** is still available and also selects
+that entity for subsequent analysis.
+
+After at least two selected entities have verified, unambiguous, observed
+C-alpha coordinates, the clustering panel becomes available. Its controls
+operate only on the checked cohort. Select entries first, verify them, review
+construct chemistry and then run **Cluster experimental structures**. The
+manual cutoff and editable Compare Groups handoff remain unchanged.
+
+Selection alone never triggers archive downloads. Clearing the selection
+clears a previously displayed grouping so old cluster results cannot be
+mistaken for the new cohort. The live Shinylive deployment must be
+re-exported separately from code changes on GitHub.

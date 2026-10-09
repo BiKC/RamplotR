@@ -35,6 +35,7 @@ source(file.path("R", "atlas-geometry.R"), local = TRUE)
 source(file.path("R", "atlas-robustness.R"), local = TRUE)
 source(file.path("R", "atlas-construct.R"), local = TRUE)
 source(file.path("R", "atlas-experimental-context.R"), local = TRUE)
+source(file.path("R", "atlas-ligand-evidence.R"), local = TRUE)
 source(file.path("R", "atlas-switch.R"), local = TRUE)
 source(file.path("R", "atlas.R"), local = TRUE)
 source(file.path("R", "io.R"), local = TRUE)
@@ -2271,6 +2272,7 @@ server <- function(input, output, session) {
       plotOutput("atlasGeometryPlot",height="260px"),
       tableOutput("atlasGeometryTable"),
       uiOutput("atlasExperimentalContextPanel"),
+      uiOutput("atlasLigandContextPanel"),
       uiOutput("atlasAutoQuality"),
       uiOutput("atlasRobustnessPanel"),
       uiOutput("atlasGroupsHandoffPanel"))
@@ -2450,6 +2452,8 @@ server <- function(input, output, session) {
       geometry$construct_audit <- audit
       geometry$experimental_context <- ram_atlas_experimental_context(
         cohort,geometry,audit)
+      geometry$ligand_context <- ram_atlas_observed_ligand_context(
+        verified,geometry)
       geometry
     },error=function(e) list(error=conditionMessage(e)))
     atlas_geometry_result(output)
@@ -2553,6 +2557,65 @@ server <- function(input, output, session) {
     filename=function() "ramplotr_atlas_experimental_pairs.csv",
     content=function(file) utils::write.csv(
       req(atlas_geometry_result())$experimental_context$pairs,
+      file,row.names=FALSE,na=""))
+
+  output$atlasLigandContextPanel <- renderUI({
+    result <- atlas_geometry_result()
+    if(is.null(result) || !is.null(result$error) ||
+       is.null(result$ligand_context)) return(NULL)
+    context <- result$ligand_context
+    tags$details(class="ram-details ram-atlas-ligand-context",
+      tags$summary("Observed non-water components near the protein"),
+      tags$p(class="ram-field-hint",sprintf(
+        "Proximity extraction completed for %d of %d verified structures; %d have one or more nearby non-water components.",
+        context$measured,nrow(context$entries),context$with_proximity)),
+      if(context$unavailable>0L) tags$p(class="ram-confidence-warning",
+        "Some structures have unavailable atom-level contact evidence. These are unknown, not ligand-free."),
+      tags$p(class="ram-field-hint",
+        "Reports first-model deposited non-water HETATM heavy atoms within 4.5 Å of the verified protein's mapped heavy atoms. Solvent waters and modified polymer residues are excluded. This is proximity, not proven binding, occupancy or an apo/holo classification."),
+      tags$h5("Per-structure contact availability"),
+      DT::DTOutput("atlasLigandEntries"),
+      if(nrow(context$contacts)) tags$h5("Nearby deposited components"),
+      if(nrow(context$contacts)) DT::DTOutput("atlasLigandContacts"),
+      tags$div(class="ram-ensemble-actions",
+        downloadButton("downloadAtlasLigandEntries",
+          "Export contact availability CSV"),
+        downloadButton("downloadAtlasLigandContacts",
+          "Export observed proximity CSV")),
+      tags$p(class="ram-field-hint",
+        "No detected component within this distance cutoff cannot prove an apo state. Bound molecules may be unmodelled, absent from the deposition, too distant from mapped residues, or represented by polymer components. Review the experimental publication before assigning a ligand state.")
+    )
+  })
+  output$atlasLigandEntries <- DT::renderDT({
+    result <- req(atlas_geometry_result())
+    req(is.null(result$error),!is.null(result$ligand_context))
+    shown <- result$ligand_context$entries
+    DT::datatable(shown,rownames=FALSE,
+      colnames=c("PDB entity","Geometry group","Extraction",
+        "Nearby components","Non-water sites","Radius (Å)","Caveat"),
+      options=list(pageLength=8,scrollX=TRUE,dom="ftip"),
+      class="compact stripe")
+  },server=FALSE)
+  output$atlasLigandContacts <- DT::renderDT({
+    result <- req(atlas_geometry_result())
+    req(is.null(result$error),!is.null(result$ligand_context))
+    shown <- result$ligand_context$contacts
+    DT::datatable(shown,rownames=FALSE,
+      colnames=c("PDB entity","Deposited code","Asym ID","Author position",
+        "Closest UniProt residue","Min heavy-atom distance (Å)",
+        "Component heavy atoms"),
+      options=list(pageLength=8,scrollX=TRUE,dom="ftip"),
+      class="compact stripe")
+  },server=FALSE)
+  output$downloadAtlasLigandEntries <- downloadHandler(
+    filename=function() "ramplotr_atlas_hetero_contact_availability.csv",
+    content=function(file) utils::write.csv(
+      req(atlas_geometry_result())$ligand_context$entries,
+      file,row.names=FALSE,na=""))
+  output$downloadAtlasLigandContacts <- downloadHandler(
+    filename=function() "ramplotr_atlas_observed_hetero_proximity.csv",
+    content=function(file) utils::write.csv(
+      req(atlas_geometry_result())$ligand_context$contacts,
       file,row.names=FALSE,na=""))
 
   output$atlasAutoQuality <- renderUI({

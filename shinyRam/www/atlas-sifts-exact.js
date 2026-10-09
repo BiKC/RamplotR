@@ -150,7 +150,11 @@
           insertion_code: present(s.pdb_ins_code) ? String(s.pdb_ins_code) : "",
           uniprot_accession: requested.uniprot, uniprot_resi: unp,
           entity_id: Number(requested.entity), struct_asym_id: row.asym_id,
-          label_seq_id: seq, observed
+          label_seq_id: seq,
+          // Sequence-scheme monomer identifies the experimental construct.
+          // Unavailable/unknown codes are left unknown, never inferred.
+          mon_id: present(s.mon_id) ? String(s.mon_id).toUpperCase() : null,
+          observed
         });
       }
     }

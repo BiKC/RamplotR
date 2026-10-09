@@ -269,6 +269,15 @@ PR #40 was rebuilt cleanly on current `main`; scientific, structure-validation a
 - No source-code branches are actively unmerged from this milestone; paper PR #20 remains intentionally separate. Start future development from updated `main`.
 - Next: introduce more independent fold/control pairs and metadata for construct, ligand or isoform controls, and verify live deployed-browser PDBe/RCSB CORS. Do not infer classifier sensitivity from four proteins.
 
+## October 9: browser-origin RCSB/PDBe archive diagnostics (active branch)
+
+- Branch `feature/atlas-browser-connectivity` starts from latest `main` `1213e215dc0ba4747a0ecfc5dc27f5f7191f40fb`, after green merged PR #60. Paper PR #20 remains separate.
+- Added an **opt-in Atlas network diagnostic** that executes three real archive requests from the visitor's browser: RCSB experimental polymer-entity POST search for P69441, RCSB 4AKE entity metadata, and PDBe 4AKE updated-mmCIF exact SIFTS first-model Cα extraction. Diagnostic checks never change a loaded structure or scientific analyses.
+- Each endpoint receives independent pass/fail, HTTP status, error category (timeout, network or CORS, invalid response), elapsed time and tested browser origin. Network errors are **not** claimed to prove CORS blockage, since TLS, extensions or offline mode can look the same.
+- Added deterministic JS error-state regression and existing mocked browser workflow coverage. Added a separate **real public-origin Chromium CI** workflow to load `https://bikc.be/RamplotR/` and inject the PR's source parsers to test genuine origin-bound archive access before deploying new Shinylive assets. This is distinct from the localhost mocks, and does not establish whether newly built UI was published.
+- GitHub Actions triggers are `pull_request: opened/ready_for_review` plus explicit manual fallback, **not push/synchronize**. Run PR-ready CI once and inspect both browser-origin results and regression suites before merging.
+- Documentation: `docs/atlas-browser-connectivity.md`. Live archive availability is external and may fail independently of RamplotR; preserve observed failures transparently.
+
 ## Next implementation steps
 
 1. Verify **deployed-browser** PDBe and RCSB CORS in RamplotR's actual

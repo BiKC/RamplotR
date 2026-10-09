@@ -177,7 +177,7 @@
     if (!root.Shiny || typeof root.Shiny.addCustomMessageHandler !== "function")
       return false;
     root.Shiny.addCustomMessageHandler("ram-atlas-discover", searchAtlas);
-    root.Shiny.addCustomMessageHandler("ram-open-group-panel", () => {
+    root.Shiny.addCustomMessageHandler("ram-open-group-panel", (payload) => {
       const panel=root.document &&
         root.document.getElementById("ram-group-comparison-panel");
       if(panel) {

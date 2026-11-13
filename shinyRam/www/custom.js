@@ -15,14 +15,307 @@
   let selectedResidue = null;
   let selectedCoordinates = new Map();
   let selectionTrace = -1;
+  let selectionMarker = null;
   let boundStage = null;
   let boundPickHandler = null;
+  let highlightedComponent = null;
+  let highlightedSelector = null;
   let focusedKey = "";
   let focusedStage = null;
   let deferredPlot = null;
   let plotLoadPending = false;
+  let densityFrame = null;
   let deferredComparison = null;
   let comparisonLoadPending = false;
+
+  // NGLVieweR's lookup helpers can throw before HTMLWidgets binds the stage.
+  function primaryStage() {
+    try { return window.getNGLStage ? window.getNGLStage("NGL") : null; }
+    catch (_) { return null; }
+  }
+  function primaryStructures() {
+    try { return window.getNGLStructure ? (window.getNGLStructure("NGL") || []) : []; }
+    catch (_) { return []; }
+  }
+  let visibleChains = null;
+  let chainStructure = null;
+  let desiredChainKey = null;
+  let acknowledgedChainKey = null;
+  let visibilityStage = null;
+  let visibilityRetry = null;
+  let visibilityAttempts = 0;
+  const visibilityComponents = new WeakSet();
+  function bindChainComponent(component) {
+    if (!component || visibilityComponents.has(component) ||
+        !component.signals || !component.signals.representationAdded) return;
+    visibilityComponents.add(component);
+    component.signals.representationAdded.add(function (representation) {
+      const prefix = "ram-chain-";
+      if (!visibleChains || !representation.name || !representation.name.startsWith(prefix)) return;
+      representation.setVisibility(visibleChains.selected.includes(representation.name.slice(prefix.length)));
+    });
+  }
+  function applyChainVisibility() {
+    const stage = window.getNGLStage && primaryStage();
+    if (!visibleChains) return;
+    if (!stage) {
+      // Widget creation may lag behind the picker. Retry only during this
+      // bounded startup window, then rely on the normal widget-ready event.
+      if (!visibilityRetry && visibilityAttempts++ < 600 && window.setTimeout) {
+        visibilityRetry = window.setTimeout(function () {
+          visibilityRetry = null; applyChainVisibility();
+        }, 50);
+      }
+      return;
+    }
+    visibilityAttempts = 0;
+    if (stage !== visibilityStage) {
+      visibilityStage = stage;
+      if (stage.signals && stage.signals.componentAdded)
+        stage.signals.componentAdded.add(bindChainComponent);
+    }
+    const components = window.getNGLStructure && primaryStructures();
+    if (components) components.forEach(bindChainComponent);
+    const chosen = new Set(visibleChains.selected);
+    visibleChains.chains.forEach(function (chain) {
+      stage.getRepresentationsByName("ram-chain-" + chain)
+        .setVisibility(chosen.has(chain));
+    });
+  }
+
+  // These controls must remain responsive while webR is calculating.
+  document.addEventListener("change", function (event) {
+    const target = event.target;
+    if (target.id !== "rocking" && target.id !== "spinning") return;
+    const stage = window.getNGLStage && primaryStage();
+    if (!stage) return;
+    if (target.id === "rocking") {
+      stage.setRock(target.checked);
+      if (target.checked) stage.setSpin(false);
+    } else {
+      stage.setSpin(target.checked);
+      if (target.checked) stage.setRock(false);
+    }
+  });
+
+  const busy = document.createElement("div");
+  busy.className = "ram-calculating";
+  busy.setAttribute("role", "status");
+  busy.setAttribute("aria-live", "polite");
+  busy.hidden = true;
+  document.body.appendChild(busy);
+  const progress = document.createElement("progress");
+  progress.className = "ram-calculation-progress";
+  progress.setAttribute("aria-label", "Updating structure analysis");
+  progress.hidden = true;
+  document.body.appendChild(progress);
+  let serverBusy = false;
+  let pendingChain = null;
+  let chainGeneration = 0;
+  let drawingPlot = false;
+  let tablePending = false;
+  let residuePending = false;
+  let stylePending = false;
+  let acknowledgedStyle = null;
+  let viewerSettings = null;
+  let layerComponent = null;
+  const layerCache = new Map();
+  const layerRequests = new Map();
+  let layerGeneration = 0;
+  let plotTitle = "";
+  const chainKey = values => JSON.stringify(array(values).map(String).sort());
+  function updateBusy() {
+    busy.textContent = layerRequests.size || stylePending ? "Updating 3D view…" :
+      pendingChain ? (pendingChain.painted && !pendingChain.ack && viewerSettings ? "Updating residue analysis…" : "Updating chains…") : tablePending ? "Loading residue list…" :
+      residuePending ? "Inspecting residue…" : "Calculating…";
+    busy.hidden = !(serverBusy || pendingChain || drawingPlot || layerRequests.size || tablePending || residuePending || stylePending);
+    progress.hidden = busy.hidden;
+  }
+  document.addEventListener("click", function (event) {
+    const target = event.target;
+    if (!target || !target.closest) return;
+    if (target.closest('a[data-value="residues"]') && plot && plot.data) {
+      const table = document.querySelector("#regions table");
+      const initialized = table && window.jQuery && window.jQuery.fn && window.jQuery.fn.dataTable &&
+        window.jQuery.fn.dataTable.isDataTable(table);
+      if (!initialized) { tablePending = true; updateBusy(); }
+    }
+    const row = target.closest("#regions tbody tr");
+    const sequence = target.closest(".ram-seq-res");
+    if ((row && !row.classList.contains("selected")) || (sequence && !sequence.disabled)) {
+      residuePending = true; updateBusy();
+    }
+  }, true);
+  function requestLayer(id, visible) {
+    if (!viewerSettings) return;
+    const structures = window.getNGLStructure && primaryStructures();
+    const component = structures && structures.find(item => item && item.structure);
+    if (!component) return;
+    if (component !== layerComponent) {
+      layerComponent = component; layerCache.clear(); layerRequests.clear();
+    }
+    const name = id === "ligands" ? "ligand" : id;
+    const suffix = viewerSettings.multipleModels ? " and /" + (viewerSettings.modelIndex - 1) : "";
+    const selection = name + suffix;
+    const cached = layerCache.get(id);
+    const pending = layerRequests.get(id);
+    if (pending && pending.visible === visible && pending.selection === selection) return;
+    if (!pending && cached && cached.visible === visible && cached.selection === selection) return;
+    if (!visible && !cached && !pending) return;
+    const job = { generation: ++layerGeneration, visible, selection };
+    layerRequests.set(id, job); updateBusy();
+    const frame = window.requestAnimationFrame || (callback => window.setTimeout(callback, 0));
+    frame(function () { frame(function () {
+      if (layerRequests.get(id) !== job || component !== layerComponent) return;
+      try {
+        let record = layerCache.get(id);
+        if (!record && visible) {
+          const representation = component.addRepresentation(id === "ligands" ? "ball+stick" : "cartoon", {
+            name, sele: selection, quality: viewerSettings.large ? "low" : "auto"
+          });
+          record = { representation, selection, visible: true };
+          layerCache.set(id, record);
+        } else if (record) {
+          if (visible && record.selection !== selection) {
+            record.representation.setSelection(selection); record.selection = selection;
+          }
+          record.representation.setVisibility(visible); record.visible = visible;
+        }
+        const stage = primaryStage();
+        const finish = function () { frame(function () {
+          if (layerRequests.get(id) === job) layerRequests.delete(id);
+          updateBusy();
+        }); };
+        if (stage && stage.tasks && stage.tasks.onZeroOnce) stage.tasks.onZeroOnce(finish);
+        else finish();
+      } catch (error) {
+        layerRequests.delete(id); updateBusy();
+        busy.textContent = "Could not update the 3D layer. Please try again.";
+        busy.hidden = false; console.error("RamplotR 3D layer:", error);
+      }
+    }); });
+  }
+  function syncLayers() {
+    if (!viewerSettings) return;
+    ["dna", "rna", "ligands"].forEach(function (id) {
+      const checkbox = document.getElementById(id);
+      requestLayer(id, checkbox ? checkbox.checked : !!(viewerSettings.layers || {})[id]);
+    });
+  }
+  document.addEventListener("change", function (event) {
+    if (["dna", "rna", "ligands"].includes(event.target.id))
+      requestLayer(event.target.id, event.target.checked);
+    if (event.target.name === "nglRepresentation" && event.target.checked) {
+      stylePending = event.target.value !== acknowledgedStyle; updateBusy();
+    }
+  }, true);
+  function applyChainSections() {
+    if (!visibleChains || !document.querySelectorAll) return;
+    const chosen = new Set(visibleChains.selected.map(String));
+    document.querySelectorAll("[data-ram-chain]").forEach(function (element) {
+      element.hidden = !chosen.has(element.getAttribute("data-ram-chain"));
+    });
+  }
+  function applyPlotVisibility() {
+    if (!plot || !plot.data || !window.Plotly) return Promise.resolve();
+    const chosen = visibleChains && new Set(visibleChains.selected.map(String));
+    const indices = [], values = [];
+    let count = 0;
+    plot.data.forEach(function (trace, index) {
+      if (!trace.meta || trace.meta.ramChain == null) return;
+      const visible = !chosen || chosen.has(trace.meta.ramChain);
+      if (visible) count += trace.x.length;
+      if ((trace.visible !== false) !== visible) {
+        indices.push(index); values.push(visible);
+      }
+    });
+    if (currentStructure) currentStructure.textContent = plotTitle +
+      count.toLocaleString() + " plotted residues";
+    // Restyle only visibility: never recalculate the scientific contours.
+    return indices.length ? Promise.resolve(window.Plotly.restyle(
+      plot, { visible: values }, indices)) : Promise.resolve();
+  }
+  function finishChain(generation) {
+    if (pendingChain && generation === pendingChain.generation &&
+        pendingChain.ack && pendingChain.painted) pendingChain = null;
+    updateBusy();
+  }
+  function paintChains(generation) {
+    applyChainVisibility();
+    applyChainSections();
+    return applyPlotVisibility().then(function () {
+      if (pendingChain && pendingChain.generation === generation) {
+        pendingChain.painted = true;
+        finishChain(generation);
+      }
+    }).catch(function (error) {
+      console.error("RamplotR chain visibility:", error);
+      busy.textContent = "Chain update failed. Please try again.";
+    });
+  }
+  function requestChains(values, picker) {
+    picker = picker || document.getElementById("chainselection");
+    const container = picker && picker.closest && picker.closest("[data-ram-structure]");
+    const scope = container && container.getAttribute("data-ram-structure");
+    const choices = picker && picker.options ? Array.from(picker.options, option => String(option.value)) : null;
+    if (scope && scope !== chainStructure) {
+      chainStructure = scope; desiredChainKey = null; acknowledgedChainKey = null; pendingChain = null;
+      visibleChains = { chains: choices || [], selected: [] };
+    } else if (choices && visibleChains) visibleChains.chains = choices;
+    const selected = array(values).map(String);
+    if (visibleChains && chainKey(selected) === chainKey(visibleChains.selected)) return;
+    const generation = ++chainGeneration;
+    desiredChainKey = chainKey(selected);
+    pendingChain = { generation: generation, key: desiredChainKey,
+                     ack: desiredChainKey === acknowledgedChainKey, painted: false };
+    if (visibleChains) visibleChains.selected = selected;
+    else visibleChains = { chains: choices || [], selected: selected };
+    updateBusy();
+    // Let the feedback paint before any NGL or Plotly work starts.
+    const frame = window.requestAnimationFrame || (callback => window.setTimeout(callback, 0));
+    frame(function () { frame(function () {
+      if (generation === chainGeneration) paintChains(generation);
+    }); });
+  }
+  function pickerChanged(event) {
+    const target = event.target;
+    if (!target || target.id !== "chainselection") return;
+    const values = target.selectedOptions
+      ? Array.from(target.selectedOptions, option => option.value)
+      : window.jQuery(target).val();
+    requestChains(values, target);
+  }
+  document.addEventListener("change", pickerChanged, true);
+  document.addEventListener("toggle", function (event) {
+    const panel = event.target;
+    if (!panel || panel.id !== "ram-sequence-panel" || !window.Shiny) return;
+    if (panel.open) { serverBusy = true; updateBusy(); }
+    window.Shiny.setInputValue("sequenceExpanded", panel.open, { priority: "event" });
+  }, true);
+  if (window.jQuery) {
+    window.jQuery(document).on("changed.bs.select", pickerChanged)
+      .on("shiny:inputchanged", function (event) {
+        const id = String(event.name).split(":")[0];
+        if (id === "chainselection") requestChains(event.value);
+        if (["dna", "rna", "ligands"].includes(id)) requestLayer(id, !!event.value);
+      }).on("shiny:busy", function () { serverBusy = true; updateBusy(); })
+      .on("shiny:idle", function () { serverBusy = false; updateBusy(); })
+      .on("shiny:disconnected", function () {
+        serverBusy = false; pendingChain = null; drawingPlot = false; tablePending = false; residuePending = false; stylePending = false; layerRequests.clear(); updateBusy();
+      }).on("draw.dt init.dt", function (event) {
+        if (event.target && event.target.closest && event.target.closest("#regions")) {
+          tablePending = false; updateBusy();
+        }
+      }).on("shiny:value", function (event) {
+        if (event.name === "selectedResidueInfo") {
+          (window.requestAnimationFrame || window.setTimeout)(function () {
+            residuePending = false; updateBusy();
+          });
+        }
+        if (event.name === "sequenceView" || event.name === "sequenceOverview")
+          (window.requestAnimationFrame || window.setTimeout)(applyChainSections);
+      });
+  }
 
   // A residue identity is made of chain, sequence position and insertion
   // code. Do not focus an arbitrary selector received from a browser event.
@@ -41,10 +334,12 @@
   }
 
   function syncNglSelection(zoom) {
+    const host = document.getElementById("NGL");
+    if (host && host.getClientRects && !host.getClientRects().length) return false;
     if (typeof window.getNGLStage !== "function" ||
         typeof window.getNGLStructure !== "function") return false;
-    const stage = window.getNGLStage("NGL");
-    const structures = window.getNGLStructure("NGL");
+    const stage = primaryStage();
+    const structures = primaryStructures();
     if (!stage || !structures || !structures.length ||
         typeof stage.getRepresentationsByName !== "function") return false;
     const highlight = stage.getRepresentationsByName("ram-highlight");
@@ -56,7 +351,10 @@
     const sele = nglSelection(selectedResidue);
     // Update the already-created orange ball-and-stick representation rather
     // than adding a new representation for every residue click.
-    highlight.setSelection(sele || "none");
+    if (highlightedComponent !== structures[0] || highlightedSelector !== (sele || "none")) {
+      highlight.setSelection(sele || "none");
+      highlightedComponent = structures[0]; highlightedSelector = sele || "none";
+    }
 
     const key = sele ? selectionKey(selectedResidue) + "::" +
       String(selectedResidue.modelIndex || 1) : "";
@@ -69,12 +367,12 @@
         // side chain stays centered while it is being inspected.
         if (typeof stage.setRock === "function") stage.setRock(false);
         if (typeof stage.setSpin === "function") stage.setSpin(false);
-        component.autoView(sele, 650);
+        component.autoView(sele, viewerSettings && viewerSettings.large ? 0 : 250);
         focusedKey = key;
       }
     } else if (!sele && focusedKey) {
       // Clearing a selection restores the whole-structure overview.
-      if (typeof stage.autoView === "function") stage.autoView(450);
+      if (typeof stage.autoView === "function") stage.autoView(viewerSettings && viewerSettings.large ? 0 : 250);
       focusedKey = "";
     }
     return true;
@@ -94,11 +392,24 @@
   }
 
   function refreshSelection() {
-    if (!plot || !window.Plotly || selectionTrace < 0 ||
-        !plot.classList.contains("js-plotly-plot")) return;
-    const point = selectionTraceData();
-    window.Plotly.restyle(plot, { x: [point.x], y: [point.y] },
-                        [selectionTrace]);
+    if (!plot || !plot.clientWidth) return;
+    const layout = plot._fullLayout;
+    if (!layout || !layout.xaxis || !layout.yaxis) return;
+    if (!selectionMarker || !selectionMarker.isConnected) {
+      selectionMarker = document.createElement("div");
+      selectionMarker.className = "ram-selection-marker";
+      selectionMarker.setAttribute("aria-hidden", "true");
+      plot.appendChild(selectionMarker);
+    }
+    const point = selectedCoordinates.get(selectionKey(selectedResidue));
+    if (!point) { selectionMarker.hidden = true; return; }
+    const x = layout.xaxis.l2p(point.phi), y = layout.yaxis.l2p(point.psi);
+    selectionMarker.hidden = !Number.isFinite(x) || !Number.isFinite(y) ||
+      x < 0 || y < 0 || x > layout.xaxis._length || y > layout.yaxis._length;
+    if (!selectionMarker.hidden) {
+      selectionMarker.style.left = (x + layout.xaxis._offset) + "px";
+      selectionMarker.style.top = (y + layout.yaxis._offset) + "px";
+    }
   }
 
   function onPlotClick(event) {
@@ -120,7 +431,7 @@
 
   function bindNglPick() {
     if (typeof window.getNGLStage !== "function") return false;
-    const stage = window.getNGLStage("NGL");
+    const stage = primaryStage();
     if (!stage || !stage.signals || !stage.signals.clicked) return false;
     if (stage === boundStage) return true;
     if (boundStage && boundPickHandler &&
@@ -141,9 +452,6 @@
         window.Shiny.setInputValue("ramNglPick", pick, { priority: "event" });
     };
     stage.signals.clicked.add(boundPickHandler);
-    // A selection can be made before NGL finishes loading. Once the widget
-    // announces it is ready, apply both the stick representation and focus.
-    syncNglSelection(true);
     return true;
   }
 
@@ -263,7 +571,8 @@
         insertion_code: button.dataset.insertion || ""
       });
       const active = !!selected && selected === key;
-      button.setAttribute("aria-pressed", String(active));
+      if (button.getAttribute("aria-pressed") !== String(active))
+        button.setAttribute("aria-pressed", String(active));
       if (active) activeButton = button;
     });
     document.querySelectorAll(".ram-sequence-chain").forEach(function (chain) {
@@ -405,6 +714,7 @@
 
   function drawPlot(obj) {
     if (!plot) return;
+    if (obj && obj.matrix) densityFrame = obj.matrix;
     if (!window.Plotly) {
       // A structure has arrived before the plotting library. Keep only the
       // latest reactive update; palette/filter changes may arrive meanwhile.
@@ -433,7 +743,8 @@
       return;
     }
 
-    const frame = obj && obj.matrix;
+    if (obj && obj.matrix) densityFrame = obj.matrix;
+    const frame = densityFrame;
     const limits = array(obj && obj.limits);
     const shades = array(obj && obj.backgroundColors);
     if (!frame || !frame.x || !frame.y || !frame.z || limits.length < 3) return;
@@ -465,14 +776,19 @@
     selectedCoordinates = new Map();
     const phis = array(df.phi);
     const psis = array(df.psi);
-    const uniqueChains = [...new Set(chains.map(String))];
+    const chainRows = new Map();
+    chains.forEach(function (name, row) {
+      const chain = String(name);
+      if (!chainRows.has(chain)) chainRows.set(chain, []);
+      chainRows.get(chain).push(row);
+    });
+    const uniqueChains = [...chainRows.keys()];
     const chainColors = array(obj.chainColors);
     let totalPoints = 0;
 
     uniqueChains.forEach(function (chain, index) {
       const x = [], y = [], label = [], customdata = [];
-      chains.forEach(function (name, row) {
-        if (String(name) !== chain) return;
+      chainRows.get(chain).forEach(function (row) {
         const phi = phis[row];
         const psi = psis[row];
         // Missing angles are NA/null, not (0, 0).
@@ -496,7 +812,10 @@
       if (!x.length) return;
       totalPoints += x.length;
       traces.push({
-        type: x.length > 2500 ? "scattergl" : "scatter",
+        type: chains.length > 2500 ? "scattergl" : "scatter",
+        meta: { ramChain: chain },
+        uid: "ram-chain-" + chain,
+        visible: !visibleChains || visibleChains.selected.map(String).includes(chain),
         mode: "markers",
         x: x, y: y,
         text: label, customdata: customdata,
@@ -517,7 +836,7 @@
 
     // Keep a dedicated overlay trace for linked selection instead of
     // mutating the original chain markers or the scientific density layers.
-    const active = selectionTraceData();
+    const active = { x: [], y: [] };
     traces.push({
       type: "scatter", mode: "markers",
       x: active.x, y: active.y,
@@ -605,10 +924,16 @@
         (obj.name ? obj.name + " · " : "") +
         totalPoints.toLocaleString() + " plotted residues";
     }
+    plotTitle = (obj.name ? obj.name + " · " : "");
+    drawingPlot = true; updateBusy();
     Promise.resolve(window.Plotly.react(plot, traces, layout, config))
       .then(function () {
+        refreshSelection();
+        applyPlotVisibility();
         if (typeof plot.on === "function" && !plot.__ramPickBound) {
           plot.on("plotly_click", onPlotClick);
+          plot.on("plotly_relayout", refreshSelection);
+          plot.on("plotly_afterplot", refreshSelection);
           plot.__ramPickBound = true;
         }
         // Keep the full introductory form for first-time visitors. Once a
@@ -629,7 +954,7 @@
           if (message) message.textContent =
             "The plot could not be rendered. Choose a different structure or reload.";
         }
-      });
+      }).finally(function () { drawingPlot = false; updateBusy(); });
   }
 
   let comparisonRows = null;
@@ -812,6 +1137,52 @@
   }
 
   if (window.Shiny) {
+    window.Shiny.addCustomMessageHandler("ram-style-complete", function (message) {
+      const chosen = document.querySelector('input[name="nglRepresentation"]:checked');
+      if (chosen && chosen.value !== message.style) return;
+      acknowledgedStyle = message.style;
+      const stage = window.getNGLStage && primaryStage();
+      const finish = function () {
+        (window.requestAnimationFrame || window.setTimeout)(function () {
+          stylePending = false; updateBusy();
+        });
+      };
+      if (stage && stage.tasks && stage.tasks.onZeroOnce) stage.tasks.onZeroOnce(finish);
+      else finish();
+    });
+    window.Shiny.addCustomMessageHandler("ram-layer-model", function (message) {
+      if (!viewerSettings) return;
+      viewerSettings.modelIndex = message.modelIndex;
+      viewerSettings.multipleModels = message.multipleModels;
+      syncLayers();
+    });
+    window.Shiny.addCustomMessageHandler("ram-chain-visibility", function (message) {
+      const incoming = { chains: array(message.chains), selected: array(message.selected) };
+      const structure = message.structure || null;
+      if (structure !== chainStructure) {
+        const firstScope = chainStructure === null;
+        chainStructure = structure;
+        // The first server handshake must not discard a picker change made
+        // while the structure was still initializing.
+        if (!firstScope || !pendingChain) {
+          desiredChainKey = null; acknowledgedChainKey = null; pendingChain = null;
+        }
+      }
+      const key = chainKey(incoming.selected);
+      if (desiredChainKey !== null && key !== desiredChainKey) {
+        // Ignore stale replies even after the latest paint has completed.
+        if (visibleChains) visibleChains.chains = incoming.chains;
+        applyChainVisibility(); applyChainSections();
+        return;
+      }
+      visibleChains = incoming;
+      desiredChainKey = key;
+      acknowledgedChainKey = key;
+      if (pendingChain) {
+        pendingChain.ack = true;
+        if (pendingChain.painted) finishChain(pendingChain.generation);
+      } else paintChains(chainGeneration);
+    });
     window.Shiny.addCustomMessageHandler("process", drawPlot);
     window.Shiny.addCustomMessageHandler("ram-comparison", drawComparison);
     window.Shiny.addCustomMessageHandler("ram-comparison-selected", function (choice) {
@@ -836,7 +1207,11 @@
     });
     // Shiny requires every custom message handler to declare one argument.
     window.Shiny.addCustomMessageHandler("ram-bind-ngl", function (message) {
+      viewerSettings = message || {};
+      acknowledgedStyle = viewerSettings.style || "cartoon";
+      syncLayers();
       bindNglPick();
+      paintChains(chainGeneration);
       syncNglSelection(true);
       // NGLVieweR reuses the camera between renderValue calls. An old
       // residue-focused camera can clip a newly loaded multi-chain protein
@@ -844,10 +1219,10 @@
       // an actual structure load, not after every representation change.
       if (message && message.resetView === true && !selectedResidue &&
           typeof window.getNGLStage === "function") {
-        const stage = window.getNGLStage("NGL");
+        const stage = primaryStage();
         if (stage && typeof stage.autoView === "function") {
           if (typeof stage.handleResize === "function") stage.handleResize();
-          stage.autoView(450);
+          stage.autoView(viewerSettings && viewerSettings.large ? 0 : 250);
         }
       }
     });
@@ -969,11 +1344,13 @@
 
   document.addEventListener("shown.bs.tab", function () {
     scheduleResize(); adjustVisibleTables(); markSequenceSelection();
+    refreshSelection(); syncNglSelection(true);
   });
   if (window.jQuery) {
     window.jQuery(document).on("shown.bs.tab", function () {
       scheduleResize();
       markSequenceSelection();
+      refreshSelection(); syncNglSelection(true);
       // Wait for the Bootstrap pane to finish its layout before measuring DT.
       if (window.requestAnimationFrame)
         window.requestAnimationFrame(adjustVisibleTables);

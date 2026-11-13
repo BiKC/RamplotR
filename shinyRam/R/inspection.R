@@ -62,11 +62,27 @@ ram_nearby_hetero_context <- function(pdb, row, max_distance = 6,
   if (!nrow(target) || !nrow(hetero)) return(empty)
 
   target_xyz <- as.matrix(target[,c("x","y","z"),drop=FALSE])
-  nearest <- vapply(seq_len(nrow(hetero)),function(i) {
-    delta <- sweep(target_xyz,2L,
-      as.numeric(hetero[i,c("x","y","z")]),FUN="-")
-    min(sqrt(rowSums(delta^2)))
-  },numeric(1))
+  # Reject distant atoms with a conservative bounding box first. Distances
+  # are then vectorized over hetero atoms, looping over the few target atoms.
+  # This avoids a data.frame copy and sweep for every deposited hetero atom.
+  bounds <- apply(target_xyz,2L,range)
+  nearby <- hetero$x >= bounds[1L,1L]-max_distance &
+    hetero$x <= bounds[2L,1L]+max_distance &
+    hetero$y >= bounds[1L,2L]-max_distance &
+    hetero$y <= bounds[2L,2L]+max_distance &
+    hetero$z >= bounds[1L,3L]-max_distance &
+    hetero$z <= bounds[2L,3L]+max_distance
+  hetero <- hetero[nearby,,drop=FALSE]
+  if (!nrow(hetero)) return(empty)
+  hetero_xyz <- as.matrix(hetero[,c("x","y","z"),drop=FALSE])
+  nearest_squared <- rep(Inf,nrow(hetero))
+  for (i in seq_len(nrow(target_xyz))) {
+    squared <- (hetero_xyz[,1L]-target_xyz[i,1L])^2 +
+      (hetero_xyz[,2L]-target_xyz[i,2L])^2 +
+      (hetero_xyz[,3L]-target_xyz[i,3L])^2
+    nearest_squared <- pmin(nearest_squared,squared)
+  }
+  nearest <- sqrt(nearest_squared)
   hetero$.ram_distance <- nearest
   hetero <- hetero[is.finite(hetero$.ram_distance) &
                    hetero$.ram_distance<=max_distance,,drop=FALSE]
@@ -691,4 +707,44 @@ ram_plddt_overview_bins <- function(plddt, max_bins = 180L) {
     values <- plddt[bucket == i]
     if (!any(is.finite(values))) NA_real_ else min(values[is.finite(values)])
   }, numeric(1))
+}
+
+# Build residue slots in vectors instead of thousands of nested R tag objects.
+# All structure-derived text is escaped before insertion into HTML attributes.
+ram_sequence_markup <- function(chain, selectable) {
+  n <- nrow(chain)
+  stopifnot(length(selectable) == n)
+  if (!n) return(htmltools::HTML(""))
+  esc <- function(x) htmltools::htmlEscape(as.character(x), attribute=TRUE)
+  score <- chain$plddt
+  finite <- is.finite(score)
+  standard <- chain$rama8000_region
+  has_standard <- !is.na(standard)
+  confidence <- any(finite)
+  status <- ram_sequence_status(chain$region)
+  labels <- ram_sequence_position_labels(chain$resi, chain$insertion_code)
+  labels[!nzchar(labels)] <- "\u00a0"
+  standard_class <- ifelse(has_standard,
+    paste0("ram-seq-standard-",tolower(standard)),"ram-seq-standard-missing")
+  title <- paste0(chain$resn," ",chain$chain,chain$resi,chain$insertion_code,
+    " · ",ifelse(is.na(chain$region),"Missing angles",chain$region),
+    ifelse(has_standard,paste0(" · Rama8000 ",standard,
+      " (",chain$rama8000_group,")"),""),
+    ifelse(finite,sprintf(" · pLDDT %.1f",score),""),
+    ifelse(selectable,""," · Hidden by current filters"))
+  style <- ifelse(finite,paste0(' style="--ram-plddt-color:',
+    ram_plddt_color(score),'"'),"")
+  confidence_html <- if (confidence) paste0('<span class="ram-seq-plddt">',
+    ifelse(finite,sprintf("%.0f",score),"\u2014"),'</span>') else rep("",n)
+  slots <- paste0('<div class="ram-seq-slot"><span class="ram-seq-position" aria-hidden="true">',
+    esc(labels),'</span><button type="button" class="ram-seq-res ram-seq-',
+    status,' ',esc(standard_class),if(confidence) ' ram-seq-with-confidence' else '',
+    '"',style,ifelse(selectable,"",' disabled="disabled"'),
+    ' data-chain="',esc(chain$chain),'" data-resi="',esc(chain$resi),
+    '" data-insertion="',esc(chain$insertion_code),'" data-plddt="',
+    ifelse(finite,sprintf("%.1f",score),""),'" data-rama8000="',
+    esc(ifelse(has_standard,standard,"")),'" title="',esc(title),
+    '" aria-pressed="false"><span class="ram-seq-aa">',esc(chain$letter),
+    '</span>',confidence_html,'</button></div>')
+  htmltools::HTML(paste0(slots,collapse=""))
 }

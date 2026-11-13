@@ -824,6 +824,9 @@ server <- function(input, output, session) {
   compare_swapped <- reactiveVal(FALSE)
   compare_swap_chains <- reactiveVal(NULL)
   viewer_ready <- reactiveVal(FALSE)
+  represented_style_model <- NULL
+  applied_chain_colors <- NULL
+  sequence_requested <- reactiveVal(FALSE)
   current_model <- reactive({
     value <- input$modelChoice
     if (is.null(value) || !nzchar(value)) return(1L)
@@ -841,7 +844,7 @@ server <- function(input, output, session) {
   default_color <- function(index) color_set[((index - 1L) %% length(color_set)) + 1L]
   residue_key <- function(chain, resi, insertion_code = "") {
     paste(as.character(chain), as.integer(resi),
-          if (is.na(insertion_code)) "" else as.character(insertion_code),
+          ifelse(is.na(insertion_code), "", as.character(insertion_code)),
           sep = "\r")
   }
   selection_string <- function(row) {
@@ -993,18 +996,27 @@ server <- function(input, output, session) {
       # structure used the same chain and residue numbering.
       selected_residue(NULL)
       viewer_ready(FALSE)
+      represented_style_model <<- c("cartoon", "1")
+      applied_chain_colors <<- vapply(seq_along(chains), default_color, character(1))
       viewer_format <- if (is_upload || is_afdb)
         ram_detect_format(original_name) else NULL
+      large_structure <- nrow(pdb$atom) > 10000L
+      if (large_structure) {
+        updateCheckboxInput(session, "rocking", value = FALSE)
+        updateCheckboxInput(session, "spinning", value = FALSE)
+      }
       widget <- NGLVieweR(data = source_id, format = viewer_format) %>%
-        NGLVieweR::stageParameters(backgroundColor = "#f7fafb") %>%
-        setRock()
+        NGLVieweR::stageParameters(backgroundColor = "#f7fafb", sampleLevel = -1) %>%
+        setRock(rock = !large_structure && isTRUE(isolate(input$rocking)))
       for (k in seq_along(chains)) {
         chain <- chains[[k]]
         widget <- addRepresentation(
           widget, "cartoon",
           param = list(
             name = paste0("ram-chain-", chain),
-            sele = paste0(":", chain, " and protein"),
+            sele = paste0(":", chain, " and protein",
+              if (ram_model_count(pdb) > 1L) " and /0" else ""),
+            quality = if (nrow(pdb$atom) > 10000L) "low" else "auto",
             color = default_color(k)
           )
         )
@@ -1026,12 +1038,16 @@ server <- function(input, output, session) {
         shinyWidgets::dropdown(widgets, label = "Chain color settings")
       })
       output$chains <- renderUI({
-        shinyWidgets::pickerInput(
+        tags$div("data-ram-structure" = key, shinyWidgets::pickerInput(
           "chainselection", "Chain selection", choices = chains,
           multiple = TRUE, options = list("actions-box" = TRUE),
           selected = chains
-        )
+        ))
       })
+      # Publish chain identities before classification/3D readiness. A user
+      # can change the picker while those initial views are still building.
+      session$sendCustomMessage("ram-chain-visibility", list(
+        structure = key, chains = chains, selected = chains))
       session$sendCustomMessage("ram-clear-density",list())
       loaded(list(key = key, name = name, torsions = torsions, chains = chains,
                   pdb = pdb, nmodels = ram_model_count(pdb), source_id = source_id,
@@ -1410,41 +1426,53 @@ server <- function(input, output, session) {
     external_validation(NULL)
   },ignoreInit=TRUE)
 
-  classified <- reactive({
-    structure <- req(loaded(), input$validationMode, input$bgtype)
-    result <- ram_classify_torsions(
-      model_torsions(),
+  native_classified <- reactive({
+    req(loaded(), input$validationMode, input$bgtype)
+    ram_classify_torsions(model_torsions(),
       reference_dir = file.path("static", input$bgtype),
-      selected_reference = plot_reference(),
-      mode = input$validationMode,
-      threshold_fn = ram_density_thresholds
-    )
-    # Compute the six-class Rama8000 result in parallel. It is independent
-    # of the selected RamplotR plotting background and is exposed explicitly
-    # rather than relabelling the native four-region result.
-    result <- ram_rama8000_classify(result, file.path("static", "rama8000"))
+      selected_reference = if (identical(input$validationMode, "legacy"))
+        plot_reference() else NULL,
+      mode = input$validationMode, threshold_fn = ram_density_thresholds)
+  })
+  standard_classified <- reactive({
+    ram_rama8000_classify(model_torsions(), file.path("static", "rama8000"))
+  })
+  scientific_classified <- reactive({
+    structure <- req(loaded())
+    result <- native_classified()
+    standard <- standard_classified()
+    fields <- grep("^rama8000_", names(standard), value = TRUE)
+    result[, fields] <- standard[, fields, drop = FALSE]
     if (current_model() == 1L)
       result <- ram_apply_prediction(result, structure$prediction)
-    result <- ram_join_geometry(result,model_geometry())
+    result <- ram_join_geometry(result, model_geometry())
     official <- external_validation()
-    if(!is.null(official) && identical(official$key,structure$key))
-      result <- ram_external_validation_join(result,official$records,
-                                               model=current_model())
-    result <- ram_canonical_join(result,canonical_mapping())
+    if (!is.null(official) && identical(official$key, structure$key))
+      result <- ram_external_validation_join(result, official$records,
+                                               model = current_model())
     result
   })
-  displayed <- reactive({
-    data <- classified()
+  classified <- reactive({
+    ram_canonical_join(scientific_classified(), canonical_mapping())
+  })
+  plot_residues <- reactive({
+    data <- scientific_classified()
     # Unlike structure loading, this cheap filtering reacts immediately.
     aa <- input$AA
     data <- data[data$resn %in% aa, , drop = FALSE]
-    if (!is.null(input$chainselection))
-      data <- data[data$chain %in% input$chainselection, , drop = FALSE]
     if (identical(input$background, "preProline"))
       data <- data[!is.na(data$bonded_to_next) & data$bonded_to_next &
                      !is.na(data$next_resn) & data$next_resn == "PRO",
                    , drop = FALSE]
     data
+  })
+  displayed <- reactive({
+    visible <- plot_residues()
+    visible <- visible[visible$chain %in% input$chainselection, , drop = FALSE]
+    data <- classified()
+    rows <- match(residue_key(visible$chain, visible$resi, visible$insertion_code),
+      residue_key(data$chain, data$resi, data$insertion_code))
+    data[rows, , drop = FALSE]
   })
   review_queue <- reactive({
     queue <- ram_review_queue(displayed())
@@ -1497,6 +1525,7 @@ server <- function(input, output, session) {
                        selected = if (length(marked)) marked[[1L]] else integer(0)),
       options = list(
         pageLength = 15, scrollX = FALSE, autoWidth = FALSE,
+        deferRender = TRUE, processing = TRUE, searchDelay = 250,
         dom = "ftip", order = list(list(0, "asc"), list(1, "asc")),
         language = list(emptyTable = "No residues match the selected filters.")
       ),
@@ -1613,9 +1642,7 @@ server <- function(input, output, session) {
     req(loaded())
     # A sequence must retain its true residue positions even if an amino-acid
     # or pre-proline filter limits the points currently drawn in the plot.
-    data <- classified()
-    if (!is.null(input$chainselection))
-      data <- data[data$chain %in% input$chainselection, , drop=FALSE]
+    data <- scientific_classified()
     ram_sequence_groups(data)
   })
   # Keep the condensed position maps reactive even while the full sequence
@@ -1632,6 +1659,7 @@ server <- function(input, output, session) {
         status <- ram_sequence_status(chain$region)
         bins <- ram_sequence_overview_bins(chain$region)
         tags$div(class="ram-sequence-overview-chain",
+          "data-ram-chain"=as.character(chain$chain[[1L]]),
           tags$span(class="ram-sequence-chain-name",
             if (identical(title, "Unassigned")) title else paste("Chain", title)),
           tags$div(class="ram-sequence-mini", role="img",
@@ -1663,10 +1691,17 @@ server <- function(input, output, session) {
   })
   outputOptions(output,"sequenceOverview",suspendWhenHidden=FALSE)
 
+  observeEvent(loaded(), {
+    sequence_requested(isTRUE(isolate(input$sequenceExpanded)))
+  })
+  observeEvent(input$sequenceExpanded, {
+    if (isTRUE(input$sequenceExpanded)) sequence_requested(TRUE)
+  })
   output$sequenceView <- renderUI({
+    req(sequence_requested())
     groups <- sequence_groups()
     if (!length(groups)) return(tags$p("No chains match the current selection."))
-    shown <- displayed()
+    shown <- plot_residues()
     shown_keys <- paste(shown$chain, shown$resi,
                         shown$insertion_code, sep="\r")
     tags$div(class="ram-sequence-chains", role="group",
@@ -1678,6 +1713,7 @@ server <- function(input, output, session) {
         selectable <- paste(chain$chain, chain$resi,
                             chain$insertion_code, sep="\r") %in% shown_keys
         tags$section(class="ram-sequence-chain",
+          "data-ram-chain"=as.character(chain$chain[[1L]]),
           tags$div(class="ram-sequence-chain-heading",
             tags$strong(if (identical(chain_name, "Unassigned"))
               chain_name else paste("Chain",chain_name)),
@@ -1698,53 +1734,7 @@ server <- function(input, output, session) {
           ),
           tags$div(class="ram-sequence-grid", role="group",
             "aria-label"=paste("Select a residue in",chain_name),
-            {
-              labels <- ram_sequence_position_labels(chain$resi, chain$insertion_code)
-              show_confidence <- any(is.finite(chain$plddt))
-              lapply(seq_len(nrow(chain)), function(i) {
-                residue <- chain[i,,drop=FALSE]
-                score <- residue$plddt[[1L]]
-                standard <- residue$rama8000_region[[1L]]
-                standard_class <- if (is.na(standard)) "ram-seq-standard-missing"
-                  else paste0("ram-seq-standard-",tolower(standard))
-                position <- paste0(residue$resi[[1L]],
-                                   residue$insertion_code[[1L]])
-                tags$div(class="ram-seq-slot",
-                  tags$span(class="ram-seq-position",
-                    if (nzchar(labels[[i]])) labels[[i]] else "\u00a0",
-                    "aria-hidden"="true"),
-                  tags$button(type="button",
-                    class=paste("ram-seq-res",
-                      paste0("ram-seq-",statuses[[i]]),
-                      standard_class,
-                      if (show_confidence) "ram-seq-with-confidence" else ""),
-                    style=if (is.finite(score))
-                      paste0("--ram-plddt-color:",ram_plddt_color(score)) else NULL,
-                    disabled=if (!selectable[[i]]) "disabled" else NULL,
-                    "data-chain"=residue$chain[[1L]],
-                    "data-resi"=residue$resi[[1L]],
-                    "data-insertion"=residue$insertion_code[[1L]],
-                    "data-plddt"=if (is.finite(score))
-                      sprintf("%.1f",score) else "",
-                    "data-rama8000"=if (!is.na(standard)) standard else "",
-                    title=paste0(residue$resn[[1L]], " ",
-                      residue$chain[[1L]], position, " · ",
-                      if (is.na(residue$region[[1L]])) "Missing angles"
-                      else residue$region[[1L]],
-                      if (!is.na(standard)) paste0(" · Rama8000 ",standard,
-                        " (",residue$rama8000_group[[1L]],")") else "",
-                      if (is.finite(score)) sprintf(" · pLDDT %.1f",score)
-                      else "",
-                      if (!selectable[[i]]) " · Hidden by current filters"
-                      else ""),
-                    "aria-pressed"="false",
-                    tags$span(class="ram-seq-aa",residue$letter[[1L]]),
-                    if (show_confidence) tags$span(class="ram-seq-plddt",
-                      if (is.finite(score)) sprintf("%.0f",score) else "\u2014")
-                  )
-                )
-              })
-            }
+            ram_sequence_markup(chain, selectable)
           )
         )
       })
@@ -5536,28 +5526,38 @@ server <- function(input, output, session) {
     data <- req(loaded())
     req(viewer_ready())
     colors <- current_chain_colors()
-    for (k in seq_along(data$chains))
+    changed <- if (length(applied_chain_colors) == length(colors))
+      which(colors != applied_chain_colors) else seq_along(colors)
+    applied_chain_colors <<- colors
+    for (k in changed)
       NGLVieweR_proxy("NGL") %>% updateColor(
         name = paste0("ram-chain-", data$chains[[k]]), color = colors[[k]]
       )
   })
 
+  plot_limits <- reactive(ram_density_thresholds(plot_reference()))
   plot_state <- reactive({
     data <- req(loaded())
     list(
-      df = displayed(),
+      df = plot_residues()[, c("chain", "resn", "resi", "insertion_code", "phi", "psi"), drop = FALSE],
       matrix = plot_reference(),
       name = data$name,
       backgroundColors = active_palette(),
       chainColors = {
         colors <- current_chain_colors()
-        colors[match(unique(displayed()$chain), data$chains)]
+        colors[match(unique(plot_residues()$chain), data$chains)]
       },
-      limits = ram_density_thresholds(plot_reference())
+      limits = plot_limits()
     )
   }) %>% shiny::debounce(100)
+  last_plot_reference <- NULL
   observeEvent(plot_state(), {
-    session$sendCustomMessage("process", plot_state())
+    state <- plot_state()
+    reference <- state$matrix
+    # Density grids dwarf residue payloads. Send only when the reference changes.
+    if (identical(reference, last_plot_reference)) state$matrix <- NULL
+    else last_plot_reference <<- reference
+    session$sendCustomMessage("process", state)
   }, ignoreInit = FALSE)
 
   resolve_selection <- function(pick) {
@@ -5814,13 +5814,8 @@ server <- function(input, output, session) {
       modelIndex = current_model(),
       multipleModels = isolate(loaded())$nmodels > 1L
     ))
-    if (!is.null(isolate(loaded())) && isTRUE(viewer_ready())) {
-      sele <- if (is.null(row)) "none" else selection_string(row)
-      if (!is.null(row) && isolate(loaded())$nmodels > 1L)
-        sele <- paste0(sele, " and /", current_model() - 1L)
-      NGLVieweR_proxy("NGL") %>% updateSelection(
-        name = "ram-highlight", sele = sele)
-    }
+    # ram-selection updates the existing highlight in JavaScript. Sending
+    # a second NGL proxy update rebuilt the same highlight again per click.
     rows <- table_rows()
     index <- if (is.null(row)) integer(0) else which(
       rows$chain == row$chain[[1L]] & rows$resi == row$resi[[1L]] &
@@ -5833,21 +5828,28 @@ server <- function(input, output, session) {
     if (!identical(input$NGL_rendering, FALSE) ||
         is.null(isolate(loaded()))) return()
     first_ready <- !isTRUE(isolate(viewer_ready()))
+    if (!first_ready) return()
     viewer_ready(TRUE)
     # The NGL widget reuses its stage when a second PDB is loaded. Reframe
     # the new structure after it has finished loading, not at submit time.
     session$sendCustomMessage("ram-bind-ngl",
-      list(resetView = first_ready))
+      list(resetView = first_ready, style = represented_style_model[[1L]], large = nrow(isolate(loaded())$pdb$atom) > 10000L,
+        modelIndex = current_model(), multipleModels = isolate(loaded())$nmodels > 1L,
+        layers = list(dna = isTRUE(isolate(input$dna)),
+          rna = isTRUE(isolate(input$rna)), ligands = isTRUE(isolate(input$ligands)))))
   })
 
   # Swap only named chain representations. The named orange highlight
   # representation survives changes to the whole-structure rendering mode.
-  observe({
+  observeEvent(list(loaded(), viewer_ready(), input$nglRepresentation, current_model()), {
     data <- req(loaded())
     req(viewer_ready(), input$nglRepresentation)
     style <- input$nglRepresentation
     model <- current_model()
     if (is.na(model)) model <- 1L
+    state <- c(style, as.character(model))
+    if (identical(state, represented_style_model)) return()
+    represented_style_model <<- state
     suffix <- if (data$nmodels > 1L)
       paste0(" and /", model - 1L) else ""
     if (!style %in% c("cartoon", "ribbon", "licorice", "ball+stick", "surface"))
@@ -5861,40 +5863,38 @@ server <- function(input, output, session) {
       proxy %>% addSelection(style, param = list(
         name = name, sele = paste0(":", chain, " and protein", suffix),
         color = colors[[k]],
+        visible = chain %in% isolate(input$chainselection),
+        quality = if (nrow(data$pdb$atom) > 10000L) "low" else "auto",
         opacity = if (identical(style, "surface")) 0.8 else 1
       ))
     }
+    session$sendCustomMessage("ram-style-complete", list(style = style))
   })
 
-  # Existing molecular toggles operate independently of plot redraws.
-  observeEvent(input$ligands, {
-    if (is.null(loaded()) || !isTRUE(viewer_ready())) return()
-    if (isTRUE(input$ligands))
-      NGLVieweR_proxy("NGL") %>% addSelection(
-        "ball+stick", param = list(name = "ligand", sele = "ligand"))
-    else NGLVieweR_proxy("NGL") %>% removeSelection("ligand")
+  # Visibility changes retain GPU buffers rather than rebuilding chain geometry.
+  observe({
+    data <- req(loaded())
+    session$sendCustomMessage("ram-chain-visibility", list(
+      structure = data$key,
+      chains = data$chains,
+      selected = if (is.null(input$chainselection)) character() else input$chainselection
+    ))
   })
-  observeEvent(input$dna, {
-    if (is.null(loaded()) || !isTRUE(viewer_ready())) return()
-    if (isTRUE(input$dna))
-      NGLVieweR_proxy("NGL") %>% addSelection(
-        "cartoon", param = list(name = "dna", sele = "dna"))
-    else NGLVieweR_proxy("NGL") %>% removeSelection("dna")
+
+  observe({
+    data <- req(loaded())
+    req(viewer_ready())
+    session$sendCustomMessage("ram-layer-model", list(
+      modelIndex = current_model(), multipleModels = data$nmodels > 1L))
   })
-  observeEvent(input$rna, {
-    if (is.null(loaded()) || !isTRUE(viewer_ready())) return()
-    if (isTRUE(input$rna))
-      NGLVieweR_proxy("NGL") %>% addSelection(
-        "cartoon", param = list(name = "rna", sele = "rna"))
-    else NGLVieweR_proxy("NGL") %>% removeSelection("rna")
-  })
-  observeEvent(input$rocking, {
+  # DNA/RNA/ligand checkboxes operate locally and retain their GPU buffers.
+  observeEvent(list(loaded(), viewer_ready(), input$rocking), {
     if (is.null(loaded()) || !isTRUE(viewer_ready())) return()
     NGLVieweR_proxy("NGL") %>% updateRock(rock = isTRUE(input$rocking))
     if (isTRUE(input$rocking) && isTRUE(input$spinning))
       updateCheckboxInput(session, "spinning", value = FALSE)
   })
-  observeEvent(input$spinning, {
+  observeEvent(list(loaded(), viewer_ready(), input$spinning), {
     if (is.null(loaded()) || !isTRUE(viewer_ready())) return()
     NGLVieweR_proxy("NGL") %>% updateSpin(spin = isTRUE(input$spinning))
     if (isTRUE(input$spinning) && isTRUE(input$rocking))

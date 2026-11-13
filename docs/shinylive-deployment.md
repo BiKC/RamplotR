@@ -148,3 +148,22 @@ separately from webR startup and R-package initialization. Then reload
 with caching enabled. A long download points to hosting and network costs;
 slow initialization after all downloads points to webR/package startup
 or device CPU. This is useful before making further application changes.
+
+## Firefox/Zen startup and reloads
+
+The export script installs an app-local, content-hashed bootstrap in the
+RamplotR entry page. It waits for service-worker control before importing
+Shinylive. It does not run the vendor loader's automatic reload when worker
+readiness resolves before page control. That path reproduced a continuous
+reload loop in local Firefox. Worker-control failure now shows a bounded
+startup error and a manual reload button. Shared vendor runtime files are
+unchanged.
+
+The corrected main entry page was tested in Firefox 159 with 28OE, selecting
+C during startup, waiting for calculation feedback to clear, switching to D,
+and reloading. This is Firefox coverage, not a test inside the user's Zen
+profile. Do not infer all Zen configurations are validated from that result.
+
+An existing v4 installation can take the small browser hotfix: replace its
+RamplotR/index.html and add the named ramplotr-bootstrap-*.js beside it.
+Close the old tab before reopening. The full bundle includes the same fix.

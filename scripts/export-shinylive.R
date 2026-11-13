@@ -35,6 +35,14 @@ ramplotr_export_shinylive <- function(args) {
                  file.path(thin, "static"), recursive = TRUE)) {
     stop("Failed to copy Rama8000 validation tables")
   }
+  # Parsing six CSV grids in webR delays first classification. Stage compact
+  # binary matrices with identical values; leave the source CSVs untouched.
+  rama_helpers <- new.env(parent = baseenv())
+  sys.source(file.path(source_app, "R", "rama8000.R"), envir = rama_helpers)
+  rama_directory <- file.path(thin, "static", "rama8000")
+  rama_helpers$ram_prepare_rama8000_binary(rama_directory)
+  unlink(list.files(rama_directory, pattern = "\\.csv$", full.names = TRUE))
+
   staging <- tempfile("ramplotr-public-data-")
   dir.create(staging)
   on.exit(unlink(staging, recursive = TRUE), add = TRUE)
@@ -90,6 +98,10 @@ ramplotr_export_shinylive <- function(args) {
       )
     )
   )
+
+  bootstrap_helpers <- new.env(parent = baseenv())
+  sys.source(file.path("scripts", "patch-shinylive-bootstrap.R"), envir = bootstrap_helpers)
+  bootstrap_helpers$ram_patch_shinylive_bootstrap(destination)
 
   # The outer Shinylive page and Shiny's iframe both get the same favicon.
   if (!file.copy(

@@ -27,11 +27,12 @@ ram_rama8000_table <- local({
       stop("Unknown Rama8000 residue class.")
     }
     path <- file.path(reference_dir, unname(ram_rama8000_file[[residue_class]]))
+    binary <- sub("\\.csv$", ".rds", path)
+    if (file.exists(binary)) path <- binary
     key <- normalizePath(path, mustWork = TRUE)
     if (!exists(key, envir = cache, inherits = FALSE)) {
-      table <- as.matrix(utils::read.csv(
-        key, header = FALSE, check.names = FALSE
-      ))
+      table <- if (grepl("\\.rds$", key)) readRDS(key) else
+        as.matrix(utils::read.csv(key, header = FALSE, check.names = FALSE))
       storage.mode(table) <- "double"
       if (!identical(dim(table), c(180L, 180L)) || any(!is.finite(table))) {
         stop("Invalid Rama8000 reference table: ", basename(path))
@@ -148,4 +149,17 @@ ram_rama8000_classify <- function(torsions, reference_dir) {
     result$rama8000_score, result$rama8000_group
   )
   result
+}
+
+# Export-time conversion: preserve exact parsed doubles and matrix metadata.
+ram_prepare_rama8000_binary <- function(directory) {
+  paths <- character()
+  for (residue_class in names(ram_rama8000_file)) {
+    table <- ram_rama8000_table(directory, residue_class)
+    path <- file.path(directory, sub("\\.csv$", ".rds", ram_rama8000_file[[residue_class]]))
+    saveRDS(table, path, version = 2, compress = "gzip")
+    stopifnot(identical(readRDS(path), table))
+    paths <- c(paths, path)
+  }
+  paths
 }
